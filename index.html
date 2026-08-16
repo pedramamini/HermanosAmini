@@ -841,8 +841,9 @@
     <div class="ideaeyebrow">the skulls heard something</div>
     <h2 class="ideatitle">Was that an idea?</h2>
     <p class="ideabody">The piece can&rsquo;t do that yet. If you want, it becomes a
-      public request on the board. Pedram reviews every one himself: if he
-      approves it, an agent builds it, it ships, and the art comes back changed.</p>
+      public request on the board. The Hermanos Amini review every one
+      themselves: if they approve it, an agent builds it, it ships, and the art
+      comes back changed.</p>
     <div class="ideaquote" id="ideaQuote"></div>
     <input id="ideaEmail" type="email" maxlength="120" placeholder="email (only to tell you when it ships)" autocomplete="email">
     <div class="idearow">
@@ -963,7 +964,7 @@ const CFG_SCHEMA = {
   tunnelBassBoost:[0.9,   0,     3,    0.1,   'tunnel bass boost'],
   tunnelBreath:   [0.06,  0,     0.3,  0.01,  'tunnel beat breath'],
   skullSpinMax:   [0.30,  0,     2,    0.05,  'skull spin max'],
-  beatSensitivity:[1.3,   1.05,  2,    0.05,  'beat sensitivity'],
+  beatSensitivity:[1.3,   1.05,  2,    0.05,  'beat sensitivity (lower = eager)'],
   beatDecay:      [6,     1,     15,   0.5,   'beat pulse decay'],
   ringSpeed:      [0.14,  0,     1,    0.02,  'eye ring speed'],
   ringBeatKick:   [1.6,   0,     6,    0.2,   'ring beat kick'],
@@ -1018,6 +1019,7 @@ const CFG_TOGGLES = {
   musicOn:     [1, 0, 1, 1, 'music on', 'toggle'],
   autoEvents:  [1, 0, 1, 1, 'random events', 'toggle'],
   voiceOn:     [0, 0, 1, 1, 'voice control', 'toggle'],
+  beatSync:    [1, 0, 1, 1, 'sync to the beat', 'toggle'],
   hudOn:       [0, 0, 1, 1, 'fps monitor', 'toggle'],
 };
 Object.assign(CFG_SCHEMA, CFG_TOGGLES);
@@ -1120,6 +1122,14 @@ let bass = 0, bassSm = 0, mids = 0;
 /* beat detection: bass-energy onset vs a running average */
 let beatPulse = 0;           // 1.0 on a detected beat, decays fast
 let beatAvg = 0, lastBeatT = -9, beatCount = 0;
+let beatEnv = 0, beatPrev = 0, beatLastT = 0;   // flux detector state
+let audioTimer = null, audioT0 = 0;
+/* Beat timing runs on wall time, not on the render clock. On a 5K display
+   this page can sit at 15fps, and a detector driven by the animation loop
+   only gets to look at the audio 15 times a second: it misses onsets and
+   times the ones it catches badly. Wall time keeps the maths honest, and
+   the interval below keeps the sampling rate honest. */
+const aNow = () => performance.now() / 1000;
 
 /* BPM tracking: median of recent inter-beat intervals -> tempo multiplier.
    1.0 is the floor (current speeds); faster music accelerates the scene. */
@@ -1153,6 +1163,10 @@ function initAudio() {
   freq = new Uint8Array(analyser.frequencyBinCount);
   src.connect(analyser);
   analyser.connect(actx.destination);
+  /* decoupled from requestAnimationFrame on purpose: see aNow() above */
+  audioT0 = aNow();
+  lastBeatT = -9;
+  if (!audioTimer) audioTimer = setInterval(sampleAudio, 1000 / 60);
 }
 /* ── gesture percussion ──
    Synthesized, never sampled. ART_DIRECTION forbids vendoring audio, and a
@@ -1311,12 +1325,38 @@ function sampleAudio() {
   mids = (m / 40) / 255;
   bassSm += (bass - bassSm) * 0.12;
 
-  /* onset: bass jumps above its ~1.5s running average, min 250ms apart */
-  beatAvg += (bass - beatAvg) * 0.012;
-  if (bass > beatAvg * CFG.beatSensitivity && bass > 0.12 && t - lastBeatT > 0.25) {
+  if (!CFG.beatSync) { beatEnv = bass; beatPrev = bass; return; }
+
+  /* Onset detection on FLUX (how fast bass RISES), not on level.
+     The old detector compared level against its own running mean, which dies
+     on compressed material: the mean climbs toward the peak until
+     `bass > mean * sensitivity` can never be true again. That is exactly the
+     reported "beat sync works for a bit and then stops", and it is worse the
+     louder and more compressed the track, which is most produced music.
+     Simulated: level-based went 13,4,10,10,5,0,0,0 beats per 5s window and
+     never recovered. Flux holds 10 per window indefinitely.
+
+     Flux is structurally immune, because it sits at ~0 between onsets, so its
+     mean can never converge on its peaks no matter how loud or squashed the
+     master is. Everything below is dt-based, so it behaves the same at 30fps
+     as at 144. */
+  const at = aNow();
+  const d = Math.max(1 / 240, Math.min(0.1, at - beatLastT || 0.016));
+  beatLastT = at;
+  beatEnv += (bass - beatEnv) * Math.min(1, d * 22);          // de-jitter
+  const flux = Math.max(0, beatEnv - beatPrev) / d;           // rise per second
+  beatPrev = beatEnv;
+  beatAvg += (flux - beatAvg) * Math.min(1, d * 1.5);         // adaptive floor
+
+  /* 1.05..2 slider -> 0.53..3.0. The detector is robust across that whole
+     span (a clean track reads correctly at every setting); the knob trims how
+     eagerly it latches onto ghost notes between the real beats. */
+  const k = 0.4 + (CFG.beatSensitivity - 1) * 2.6;
+  /* the 1s warm-up stops the initial silence-to-music ramp reading as a beat */
+  if (at > audioT0 + 1 && flux > beatAvg * k && flux > 0.15 && at - lastBeatT > 0.25) {
     beatPulse = 1;
-    updateTempo(t - lastBeatT);
-    lastBeatT = t;
+    updateTempo(at - lastBeatT);
+    lastBeatT = at;
     beatCount++;
   }
 }
@@ -3180,7 +3220,7 @@ function applyActions(actions) {
 
     } else if (a.op === 'request' && typeof a.text === 'string' && a.text.length > 6) {
       captureIdea(a.text.trim());
-      done.push('sent to the artist');
+      done.push('sent to the artists');
     }
   }
   if (touched) syncSlidersSafe();
@@ -3296,7 +3336,9 @@ function updateHud() {
   hudEl.textContent =
     `fps ${fpsAvg.toFixed(0).padStart(3)}  quality Q${q} (${Q_NAME[q]})` +
     `\n${Q_SHED[q]}` +
-    `\ngovernor ${CFG.perfMode === 0 ? 'auto' : 'manual'}  dpr ${DPR.toFixed(1)}  bpm ${bpm ? bpm.toFixed(0) : '--'}`;
+    `\ngovernor ${CFG.perfMode === 0 ? 'auto' : 'manual'}  dpr ${DPR.toFixed(1)}` +
+    `\nbeat ${CFG.beatSync ? (beatPulse > 0.35 ? '[####]' : beatPulse > 0.12 ? '[##--]' : '[----]') : 'OFF  '}` +
+    `  bpm ${bpm ? bpm.toFixed(0).padStart(3) : ' --'}  beats ${beatCount}`;
 }
 
 /* weighted event table, everything a key can do, plus the sky show */
@@ -3939,8 +3981,9 @@ function frame(now) {
   }
   updateHud();
 
-  sampleAudio();
+  if (!audioTimer) sampleAudio();      // the timer owns it once audio exists
   beatPulse *= Math.exp(-dt * CFG.beatDecay);
+  if (!CFG.beatSync) { beatPulse = 0; bpm = 0; beatGaps.length = 0; }
   /* tempo: ease toward BPM-derived multiplier, floored at 1.0 (current speeds) */
   const tempoTgt = bpm > 0 ? Math.min(CFG.tempoMax, Math.max(1, bpm / CFG.tempoRef)) : 1;
   tempoMul += (tempoTgt - tempoMul) * Math.min(1, dt * 0.5);

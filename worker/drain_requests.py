@@ -104,8 +104,8 @@ def issue_body(row):
         f"Asked at hermanosamini.com on {when}. The viewer {who}.\n\n"
         f"**This is not approved yet.** Per "
         f"[ART_DIRECTION.md](https://github.com/{REPO}/blob/main/ART_DIRECTION.md), "
-        f"nothing gets built until Pedram comments here and applies the "
-        f"`approved` label. Anyone may discuss it in the meantime."
+        f"nothing gets built until one of the Hermanos Amini comments here and "
+        f"applies the `approved` label. Anyone may discuss it in the meantime."
         f"{cfg}\n\n"
         f"<!-- sklz-request-id: {row['id']} -->"
     )
@@ -190,8 +190,8 @@ def main():
 
     filed = file_issues(a.apply)
     if filed:
-        # Pedram is the approval gate, so a filed request is only useful if he
-        # learns it is waiting. Never let a notify failure lose the drain.
+        # The artists are the approval gate, so a filed request is only useful
+        # once they know it is waiting. Never let a notify failure lose the drain.
         n = len(filed)
         try:
             sh(["node", MAESTRO_CLI, "notify", "toast",

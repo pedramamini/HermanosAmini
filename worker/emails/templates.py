@@ -4,7 +4,7 @@ SKLZ transactional email templates.
 
 Two states in the loop:
   received  -> "your request is filed, here is the issue"
-  shipped   -> "the artist approved it, it is live, go look"
+  shipped   -> "the artists approved it, it is live, go look"
 
 Email HTML rules that shaped this: tables not flexbox, inline styles only,
 no webfonts (Anton will not load in Gmail, so the display face falls back
@@ -159,9 +159,10 @@ def received(request_text, issue_url=None, issue_number=None):
         headline="The skulls heard you.",
         body=(f"Your idea is now {ref} on the piece&rsquo;s public board, where "
               f"anyone can see it and argue with it."
-              f"<p style='margin:14px 0 0;'>Next it goes to the artist. Pedram "
-              f"reviews every request himself: nothing gets built until he "
-              f"says so. If he approves it, an agent implements it, it gets "
+              f"<p style='margin:14px 0 0;'>Next it goes to the artists. The "
+              f"Hermanos Amini review every request themselves: nothing gets "
+              f"built until they say so. If they approve it, an agent implements it, it "
+              f"gets "
               f"tagged and deployed, and <strong style='color:{INK};'>we&rsquo;ll "
               f"email you the moment it&rsquo;s live in the art.</strong></p>"),
         quote=_quote_block(request_text),

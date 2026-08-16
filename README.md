@@ -46,9 +46,9 @@ That's the loop. You talk to the piece, and over time the piece becomes partly
 yours. Every deployment leaves it recognizably itself with one more thing alive
 in it.
 
-**The catch, and it's on purpose:** Pedram is the artist. Anyone can ask;
-nothing is built until he comments on the issue and approves it. That gate is
-enforced by CI, not by good manners. See
+**The catch, and it's on purpose:** the Hermanos Amini are the artists. Anyone
+can ask; nothing is built until one of the brothers comments on the issue and
+approves it. That gate is enforced by CI, not by good manners. See
 [ART_DIRECTION.md](ART_DIRECTION.md) for what will and won't be accepted, short version, the two themes (Día de los Muertos and deep space) don't bend,
 and the music stays Latin downtempo.
 
@@ -87,7 +87,7 @@ Click the microphone to pick how you talk to it:
   want in plain language ("dim the smoke", "make everything more purple") and
   it changes the piece while it answers. Type or talk; it talks back unless you
   mute it. Ask for something that does not exist yet and it files that as a
-  request for the artist instead of pretending.
+  request for the artists instead of pretending.
 
 The chat can only turn dials that already exist. It cannot retheme the piece,
 and it is told to refuse if you ask.

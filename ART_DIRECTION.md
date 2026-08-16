@@ -4,8 +4,9 @@ Read this before writing a line of code. It exists because this is **a piece of
 art with an owner**, not a community sandbox. Contributions extend the piece;
 they do not redirect it.
 
-Pedram Amini is the artist. Anything in the "Never" list below is not a
-judgement call an agent or contributor gets to make.
+The Hermanos Amini, Pedram and Neema, are the artists. Anything in the
+"Never" list below is not a judgement call an agent or contributor gets to
+make.
 
 ---
 
@@ -112,17 +113,22 @@ forget.
 
 ---
 
-## Governance: nothing ships without the artist
+## Governance: nothing ships without an artist
 
 Anyone (or any AI) may open an issue describing what they want. Issues are
 free and welcome.
 
-**No issue is implemented, merged, or deployed until Pedram Amini has
-commented on it AND applied the `approved` label.** Both, by him. An
-`approved` label added by anyone else does not count and the automation
-checks the actor.
+**No issue is implemented, merged, or deployed until one of the Hermanos
+Amini has commented on it AND applied the `approved` label.** Both, by an
+artist. An `approved` label added by anyone else does not count and the
+automation checks the actor.
 
-This is not bureaucracy. He is the artist; he accepts or declines the
+Either brother can approve alone. Requiring both would mean nothing ships
+while one of them is asleep, and this is a two-artist piece, not a committee.
+The list of who counts lives in one place, `ARTISTS` in
+`.github/workflows/approval-gate.yml`.
+
+This is not bureaucracy. They are the artists; they accept or decline the
 recommendation. Agents: if an issue lacks that approval, **do not start
 work on it**, not even "just a draft PR."
 
