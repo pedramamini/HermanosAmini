@@ -135,7 +135,11 @@
   /* the red slash: drawn by CSS so the glyph underneath stays the note */
   #mute { position: fixed; }
   #mute.off::after {
-    content: ""; position: absolute; left: 9px; right: 9px; top: 50%;
+    /* Dissect the circle: the bar is near-diameter length so its rotated
+       endpoints land ~2px shy of the inner border (44px button, 1px ring ->
+       inner radius ~21px; a 38px chord through center puts each end at 19px).
+       Widen the button and this stays proportional via the insets. */
+    content: ""; position: absolute; left: 3px; right: 3px; top: 50%;
     height: 2px; background: #ff2f60; border-radius: 1px;
     transform: rotate(-45deg);
     box-shadow: 0 0 5px rgba(255,47,96,.7);
