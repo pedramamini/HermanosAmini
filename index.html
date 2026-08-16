@@ -252,6 +252,51 @@
     background: rgba(245,234,223,.1); margin-top: 8px;
     box-shadow: none; border-color: rgba(245,234,223,.25);
   }
+  /* The dials button was styled `.reset`, identical to the five secondary
+     buttons around it, so the panel's biggest feature looked like its least
+     important one and nothing said it expands. It now gets its own treatment:
+     a calavera to own it, a subtitle stating what is inside, and a chevron
+     that rotates, which is the affordance people already read as "this
+     opens". */
+  #cfgPanel button.dialsbtn {
+    display: flex; align-items: center; gap: 11px; text-align: left;
+    padding: 12px 13px; margin-top: 10px;
+    background: linear-gradient(180deg, rgba(255,179,71,.16), rgba(255,140,50,.09));
+    border: 1px solid rgba(255,179,71,.5);
+    box-shadow: 0 2px 0 rgba(120,70,10,.35), inset 0 1px 0 rgba(255,255,255,.08);
+    transition: border-color .2s, background .2s, box-shadow .2s;
+  }
+  #cfgPanel button.dialsbtn:hover {
+    border-color: rgba(255,179,71,.9);
+    background: linear-gradient(180deg, rgba(255,179,71,.26), rgba(255,140,50,.14));
+  }
+  .db-skull { font-size: 19px; line-height: 1; flex: none; filter: drop-shadow(0 0 7px rgba(255,179,71,.55)); }
+  .db-txt { flex: 1; min-width: 0; }
+  .db-txt b {
+    display: block; font-size: 13px; font-weight: 500; letter-spacing: .06em;
+    color: #ffd9a0;
+  }
+  .db-txt small {
+    display: block; margin-top: 2px; font-size: 10px; letter-spacing: .03em;
+    color: rgba(245,234,223,.5); text-transform: none; font-weight: 300;
+  }
+  .db-chev {
+    flex: none; font-size: 13px; color: #ffb347;
+    transition: transform .28s cubic-bezier(.16,1,.3,1);
+  }
+  #cfgPanel button.dialsbtn[aria-expanded="true"] .db-chev { transform: rotate(180deg); }
+  /* Until it has been opened once, breathe. A viewer who has already found it
+     never sees this again, so it draws the eye without becoming noise. */
+  #cfgPanel button.dialsbtn.unseen { animation: dialsHint 2.6s ease-in-out infinite; }
+  @keyframes dialsHint {
+    0%, 100% { box-shadow: 0 2px 0 rgba(120,70,10,.35), 0 0 0 0 rgba(255,179,71,.42); }
+    50%      { box-shadow: 0 2px 0 rgba(120,70,10,.35), 0 0 0 9px rgba(255,179,71,0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #cfgPanel button.dialsbtn.unseen { animation: none; border-color: rgba(255,179,71,.95); }
+    .db-chev { transition: none; }
+  }
+
   /* toggle switch: sits in the slider column of the config grid */
   #cfgPanel .sw {
     position: relative; width: 40px; height: 20px; border-radius: 11px;
@@ -869,7 +914,14 @@
   <button id="galBrowse">browse the gallery</button>
   <button id="cfgLoad" class="reset">restore my saved board</button>
   <div class="cfgsec">2 &middot; configure it</div>
-  <button id="cfgToggleSliders" class="reset">show the dials <span id="cfgCount"></span></button>
+  <button id="cfgToggleSliders" class="dialsbtn" aria-expanded="false" aria-controls="cfgSliders">
+    <span class="db-skull" aria-hidden="true">&#128128;</span>
+    <span class="db-txt">
+      <b id="cfgToggleTitle">open the dials</b>
+      <small><span id="cfgCount"></span> things you can change: color, speed, size, sound</small>
+    </span>
+    <span class="db-chev" aria-hidden="true">&#9662;</span>
+  </button>
   <div id="cfgSliders" class="collapsed"></div>
   <div class="cfgsec">3 &middot; save it</div>
   <div class="galrow">
@@ -4582,10 +4634,31 @@ document.getElementById('settings').addEventListener('click', () => togglePanel(
   const btn = document.getElementById('cfgToggleSliders');
   const box = document.getElementById('cfgSliders');
   const cnt = document.getElementById('cfgCount');
-  cnt.textContent = '(' + Object.keys(CFG_SCHEMA).length + ')';
+  const title = document.getElementById('cfgToggleTitle');
+  cnt.textContent = Object.keys(CFG_SCHEMA).length;
+
+  /* Hint until they have opened it once, then never again. */
+  const SEEN = 'sklz.dialsSeen.v1';
+  let seen = false;
+  try { seen = localStorage.getItem(SEEN) === '1'; } catch (_) {}
+  if (!seen) btn.classList.add('unseen');
+
   btn.addEventListener('click', () => {
     const open = box.classList.toggle('collapsed') === false;
-    btn.firstChild.nodeValue = open ? 'hide the dials ' : 'show the dials ';
+    /* the label is a real element now, not a stray text node: writing
+       btn.firstChild here would set the whitespace before the skull */
+    title.textContent = open ? 'hide the dials' : 'open the dials';
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (open && !seen) {
+      seen = true;
+      btn.classList.remove('unseen');
+      try { localStorage.setItem(SEEN, '1'); } catch (_) {}
+    }
+    /* Opening 55 dials below the fold is useless if the viewport does not
+       follow, and the panel is already scrollable. */
+    if (open) requestAnimationFrame(() => {
+      box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    });
   });
 })();
 
