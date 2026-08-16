@@ -17,6 +17,7 @@ id_rsa*
 
 # ── internal ops: infra ids, private host, unlisted URLs ─────────────────
 CLAUDE.md
+CLAUDE-*.md
 README-NEEMA.md
 # deploy.sh carries the private origin host and the unlisted source path
 deploy.sh
@@ -42,3 +43,5 @@ clip*.mp4
 *.log
 node_modules/
 .DS_Store
+__pycache__/
+*.pyc

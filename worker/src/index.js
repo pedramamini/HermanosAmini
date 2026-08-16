@@ -162,6 +162,52 @@ export default {
         return json({ ok: true }, 200, request);
       }
 
+      /* ── element request from the site ──
+         Stored here; a separate pipeline files the GitHub issue and mails the
+         requester. We deliberately do NOT file the issue inline: that needs a
+         GH token, and a public unauthenticated endpoint holding one is a bad
+         trade. The pipeline runs with its own credentials. */
+      if (request.method === 'POST' && path === '/api/requests') {
+        const body = await request.json().catch(() => null);
+        if (!body) return json({ error: 'bad json' }, 400, request);
+
+        const text = String(body.request || '').trim();
+        if (text.length < 8) return json({ error: 'say a little more' }, 400, request);
+        if (text.length > 400) return json({ error: 'keep it under 400 characters' }, 400, request);
+        /* same PG bar as preset names: this becomes a public issue */
+        if (nameProblem(text.slice(0, 28)) === 'keep it PG' ||
+            BAD_ANY.some(w => normalizeForFilter(text).replace(/ /g, '').includes(w.replace(/ /g, '')))) {
+          return json({ error: 'keep it PG' }, 400, request);
+        }
+
+        const email = String(body.email || '').trim().slice(0, 120);
+        if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(email)) {
+          return json({ error: 'that email does not look right' }, 400, request);
+        }
+
+        const ip = request.headers.get('CF-Connecting-IP') || '0.0.0.0';
+        const author = await hashIp(ip, env.SALT || 'sklz');
+        const hour = Math.floor(Date.now() / 3600000);
+        const quota = await env.sklz_presets.prepare(
+          'SELECT n FROM writes WHERE author_hash = ? AND hour_bucket = ?'
+        ).bind(author, hour).first();
+        if (quota && quota.n >= 10) return json({ error: 'easy there, try again later' }, 429, request);
+
+        const id = makeId();
+        await env.sklz_presets.prepare(
+          `INSERT INTO requests (id, body, email, config, created_at, author_hash)
+           VALUES (?, ?, ?, ?, ?, ?)`
+        ).bind(id, text, email || null,
+               body.config ? JSON.stringify(cleanConfig(body.config) || {}) : null,
+               Date.now(), author).run();
+        await env.sklz_presets.prepare(
+          `INSERT INTO writes (author_hash, hour_bucket, n) VALUES (?, ?, 1)
+           ON CONFLICT(author_hash, hour_bucket) DO UPDATE SET n = n + 1`
+        ).bind(author, hour).run();
+
+        return json({ id, queued: true }, 200, request);
+      }
+
       /* ── save ── */
       if (request.method === 'POST' && path === '/api/presets') {
         const body = await request.json().catch(() => null);

@@ -121,6 +121,8 @@
     transition: border-color .3s;
   }
   .ctl:hover { border-color: rgba(245,234,223,.7); }
+  /* the hammer tray is a mobile affordance; desktop shows all four buttons */
+  #tools { display: none; }
   #mute { right: 24px; }
   #help { right: 80px; font-family: 'Space Grotesk', sans-serif; font-weight: 500; }
   #mic { right: 136px; font-size: 14px; }
@@ -272,6 +274,18 @@
   }
   #cfgPanel .cfgsec:first-child { margin-top: 4px; }
   #cfgPanel .galrow { display: flex; gap: 8px; margin-top: 4px; }
+  #cfgPanel .cfgnote {
+    margin: 4px 0 8px; font-size: 11px; line-height: 1.5;
+    color: rgba(245,234,223,.55);
+  }
+  #cfgPanel textarea {
+    width: 100%; box-sizing: border-box; resize: vertical;
+    padding: 8px 10px; margin-bottom: 8px;
+    background: rgba(245,234,223,.08); color: #f5eadf;
+    border: 1px solid rgba(245,234,223,.25); border-radius: 8px;
+    font-family: 'Space Grotesk', sans-serif; font-size: 12px; outline: none;
+  }
+  #cfgPanel textarea:focus { border-color: rgba(145,70,255,.8); }
   #cfgPanel .galrow input {
     flex: 1; min-width: 0; padding: 8px 10px;
     background: rgba(245,234,223,.08); color: #f5eadf;
@@ -481,11 +495,49 @@
     .galitem button { padding: 10px 18px; font-size: 13px; border-radius: 9px; margin-top: 0; }
 
     /* controls clear the home indicator, and get out of the way of a sheet */
-    .ctl {
-      bottom: calc(22px + env(safe-area-inset-bottom));
-      transition: opacity .25s, transform .3s cubic-bezier(.16,1,.3,1), border-color .3s;
+    /* ── hammer tray ──
+       Four circles across the bottom of a phone is too much furniture, and
+       they sit right where the thumb rests. Collapse them behind one hammer
+       that expands vertically. */
+    #tools {
+      display: grid; place-items: center;
+      position: fixed; z-index: 17;
+      right: 22px; bottom: calc(22px + env(safe-area-inset-bottom));
+      width: 52px; height: 52px; border-radius: 50%;
+      font-size: 21px; cursor: pointer; user-select: none;
+      color: #f5eadf;
+      background: rgba(9,4,20,.66);
+      border: 1px solid rgba(245,234,223,.3);
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      box-shadow: 0 6px 18px rgba(0,0,0,.45);
+      transition: transform .3s cubic-bezier(.34,1.56,.64,1), background .2s, opacity .25s;
     }
-    body.sheet-open .ctl {
+    #tools:active { transform: scale(.9); }
+    body.tools-open #tools {
+      transform: rotate(-24deg); background: rgba(145,70,255,.5);
+      border-color: rgba(200,160,255,.7);
+    }
+
+    .ctl {
+      right: 22px;
+      width: 48px; height: 48px; font-size: 18px;
+      /* stacked above the hammer; each one is its own step up */
+      bottom: calc(22px + env(safe-area-inset-bottom));
+      opacity: 0; pointer-events: none;
+      transform: translateY(10px) scale(.7);
+      transition: opacity .22s ease, transform .34s cubic-bezier(.34,1.56,.64,1),
+                  border-color .3s;
+    }
+    body.tools-open .ctl { opacity: 1; pointer-events: auto; }
+    body.tools-open #mute     { transform: translateY(-62px)  scale(1); transition-delay: .00s; }
+    body.tools-open #help     { transform: translateY(-120px) scale(1); transition-delay: .04s; }
+    body.tools-open #mic      { transform: translateY(-178px) scale(1); transition-delay: .08s; }
+    body.tools-open #settings { transform: translateY(-236px) scale(1); transition-delay: .12s; }
+    /* the desktop right-offsets would scatter the stack sideways */
+    #mute, #help, #mic, #settings { right: 22px; }
+
+    /* a sheet covers the tray anyway; hide both so nothing floats over it */
+    body.sheet-open .ctl, body.sheet-open #tools {
       opacity: 0; pointer-events: none; transform: translateY(14px);
     }
     #cfgStatus { bottom: calc(88px + env(safe-area-inset-bottom)); font-size: 13px; }
@@ -525,6 +577,7 @@
 <div id="tag" class="ui">una obra psicod&eacute;lica de los hermanos amini</div>
 <div id="hud" class="ui"></div>
 <div id="credit" class="ui">music &middot; j. pool &mdash; latin &amp; world downtempo</div>
+<div id="tools" class="ui" title="tools">&#128296;</div>
 <div id="settings" class="ui ctl" title="settings &amp; presets">&#9881;</div>
 <div id="mic" class="ui ctl" title="voice control">&#127908;</div>
 <div id="help" class="ui ctl" title="controls">?</div>
@@ -556,6 +609,15 @@
   <button id="cfgCopy" class="reset">copy settings JSON</button>
   <div class="cfgsec">4 &middot; start over</div>
   <button id="cfgReset" class="reset">reset defaults</button>
+  <div class="cfgsec">5 &middot; ask for something new</div>
+  <p class="cfgnote">Want something the piece doesn't do yet? Describe it. If the
+    artist approves it, an agent builds it and it lands in the art. We'll email
+    you when it ships.</p>
+  <textarea id="reqText" maxlength="400" rows="3" placeholder="a comet that sheds marigold petals..."></textarea>
+  <div class="galrow">
+    <input id="reqEmail" type="email" maxlength="120" placeholder="your email" autocomplete="email">
+    <button id="reqSend">send</button>
+  </div>
 </div>
 
 <div id="galPanel" class="panel">
@@ -3634,6 +3696,64 @@ addEventListener('keydown', e => {
 });
 
 applyToggles({ skipVoice: true });   // restored toggles take effect (voice needs a gesture)
+
+
+/* ── request an element ──
+   Posts to the Worker, which stores it and (once Resend + a GH token are
+   wired) files a public issue and emails the requester. The email is optional
+   and only used to tell them when their request actually ships. */
+(function requestBox() {
+  const txt = document.getElementById('reqText');
+  const mail = document.getElementById('reqEmail');
+  const btn = document.getElementById('reqSend');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    const body = (txt.value || '').trim();
+    const email = (mail.value || '').trim();
+    if (body.length < 8) { galSay('describe it in a few more words'); txt.focus(); return; }
+    if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(email)) {
+      galSay('that email does not look right'); mail.focus(); return;
+    }
+    btn.textContent = '...'; btn.disabled = true;
+    try {
+      const r = await fetch(GALLERY_API.replace('/presets', '/requests'), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ request: body, email, config: galConfigPayload() })
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || 'could not send');
+      txt.value = '';
+      galSay(email ? 'sent. we will email you when it ships.' : 'sent. thank you.');
+    } catch (e) {
+      galSay(String(e.message || e));
+    } finally {
+      btn.textContent = 'send'; btn.disabled = false;
+    }
+  });
+})();
+
+/* ── hammer tray (mobile) ──
+   One button expands into the four. Tapping any of them runs its action and
+   collapses the tray, so a sheet never opens behind a floating stack. */
+(function hammerTray() {
+  const hammer = document.getElementById('tools');
+  if (!hammer) return;
+  const closeTray = () => document.body.classList.remove('tools-open');
+  hammer.addEventListener('click', e => {
+    e.stopPropagation();
+    document.body.classList.toggle('tools-open');
+  });
+  document.querySelectorAll('.ctl').forEach(b => {
+    b.addEventListener('click', () => setTimeout(closeTray, 60));
+  });
+  /* tapping the art dismisses the tray without doing anything else */
+  addEventListener('pointerdown', e => {
+    if (!document.body.classList.contains('tools-open')) return;
+    if (e.target.closest && e.target.closest('.ctl, #tools, .panel')) return;
+    closeTray();
+  }, true);
+})();
+
 autoResume();                        // last: every binding it touches is initialized by now
 </script>
 </body>

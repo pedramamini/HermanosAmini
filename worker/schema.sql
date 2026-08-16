@@ -20,3 +20,20 @@ CREATE TABLE IF NOT EXISTS writes (
   n           INTEGER NOT NULL DEFAULT 1,
   PRIMARY KEY (author_hash, hour_bucket)
 );
+
+-- Element requests from the site. Each becomes a public GitHub issue; the
+-- email (optional) exists only to tell that person when their request ships.
+CREATE TABLE IF NOT EXISTS requests (
+  id           TEXT PRIMARY KEY,
+  body         TEXT NOT NULL,
+  email        TEXT,
+  config       TEXT,
+  created_at   INTEGER NOT NULL,
+  issue_number INTEGER,           -- filled once the issue is filed
+  filed_at     INTEGER,
+  notified_open   INTEGER NOT NULL DEFAULT 0,  -- "we got it" mail sent
+  notified_closed INTEGER NOT NULL DEFAULT 0,  -- "it shipped" mail sent
+  author_hash  TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_req_issue ON requests (issue_number);
+CREATE INDEX IF NOT EXISTS idx_req_pending ON requests (notified_closed, issue_number);
