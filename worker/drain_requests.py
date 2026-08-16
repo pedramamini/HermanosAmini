@@ -104,8 +104,8 @@ def issue_body(row):
         f"Asked at hermanosamini.com on {when}. The viewer {who}.\n\n"
         f"**This is not approved yet.** Per "
         f"[ART_DIRECTION.md](https://github.com/{REPO}/blob/main/ART_DIRECTION.md), "
-        f"nothing gets built until one of the Hermanos Amini comments here and "
-        f"applies the `approved` label. Anyone may discuss it in the meantime."
+        f"nothing gets built until one of the Hermanos Amini applies the "
+        f"`approved` label. Anyone may discuss it in the meantime."
         f"{cfg}\n\n"
         f"<!-- sklz-request-id: {row['id']} -->"
     )

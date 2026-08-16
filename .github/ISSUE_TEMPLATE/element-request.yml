@@ -8,9 +8,8 @@ body:
       value: |
         Anyone can file this, including the AI chat on the site. Filing is free.
 
-        **Nothing gets built until one of the Hermanos Amini comments and adds the
-        `approved` label.** They are the artists and accept or decline every
-        recommendation.
+        **Nothing gets built until one of the Hermanos Amini adds the `approved`
+        label.** They are the artists and accept or decline every recommendation.
 
         Before filing, skim [ART_DIRECTION.md](../../blob/main/ART_DIRECTION.md).
         The piece is Día de los Muertos + deep space. Requests that retheme it,

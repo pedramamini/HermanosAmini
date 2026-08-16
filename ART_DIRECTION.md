@@ -119,9 +119,11 @@ Anyone (or any AI) may open an issue describing what they want. Issues are
 free and welcome.
 
 **No issue is implemented, merged, or deployed until one of the Hermanos
-Amini has commented on it AND applied the `approved` label.** Both, by an
-artist. An `approved` label added by anyone else does not count and the
-automation checks the actor.
+Amini has applied the `approved` label.** That label is the decision. No
+comment is required: if the idea is good enough to approve it is good enough
+to build, and an artist who wants to say something will say it. GitHub only
+lets people with write or triage permission label anything, and the automation
+checks the actor on top of that.
 
 Either brother can approve alone. Requiring both would mean nothing ships
 while one of them is asleep, and this is a two-artist piece, not a committee.

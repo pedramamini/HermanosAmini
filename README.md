@@ -47,8 +47,8 @@ yours. Every deployment leaves it recognizably itself with one more thing alive
 in it.
 
 **The catch, and it's on purpose:** the Hermanos Amini are the artists. Anyone
-can ask; nothing is built until one of the brothers comments on the issue and
-approves it. That gate is enforced by CI, not by good manners. See
+can ask; nothing is built until one of the brothers puts the `approved` label
+on the issue. That gate is enforced by CI, not by good manners. See
 [ART_DIRECTION.md](ART_DIRECTION.md) for what will and won't be accepted, short version, the two themes (Día de los Muertos and deep space) don't bend,
 and the music stays Latin downtempo.
 
