@@ -4779,6 +4779,7 @@ const HELP_ROWS = [
   [['Space'], 'play / pause music', '', ' '],
   [['M'], 'mute music', '', 'm'],
   [['↑', '↓'], 'music volume', '', 'ArrowUp'],
+  [['←', '→'], 'skull size', '', 'ArrowLeft'],
   [['E'], 'rainbow third eye', '"rainbow"', 'e'],
   [['R'], 'spin the eye rings', '', 'r'],
   [['W'], 'whirl the cheek spirals', '', 'w'],
@@ -4818,7 +4819,7 @@ const HELP_ROWS = [
      Plain letters first A-Z; a shifted variant sorts next to its own letter
      (J then Shift-J); everything that is not a letter goes to the bottom in a
      stated order, since "where does Space go" has no alphabetical answer. */
-  const TAIL = ['Enter', 'Space', '.', '\u2191', '?', '\u{1F3A4}'];
+  const TAIL = ['Enter', 'Space', '.', '\u2191', '\u2190', '?', '\u{1F3A4}'];
   const sortKey = ([keys]) => {
     const k = keys[0];
     const bare = k.replace('\u21e7', '');
@@ -4838,7 +4839,8 @@ const HELP_ROWS = [
       const kb = document.createElement('kbd');
       kb.textContent = kLabel;
       if (evKey) {
-        const dispatchKey = idx === 1 && kLabel === '↓' ? 'ArrowDown' : evKey;
+        const dispatchKey = idx === 1 && kLabel === '↓' ? 'ArrowDown'
+                         : idx === 1 && kLabel === '\u2192' ? 'ArrowRight' : evKey;
         kb.addEventListener('click', ev => {
           ev.stopPropagation();
           kb.classList.add('pressed');
@@ -5058,6 +5060,14 @@ addEventListener('keydown', e => {
   else if (k === 'm') toggleMute();
   else if (k === 'arrowup')   { e.preventDefault(); CFG.musicVolume = Math.min(1, CFG.musicVolume + 0.05); if (!muted) music.volume = CFG.musicVolume; }
   else if (k === 'arrowdown') { e.preventDefault(); CFG.musicVolume = Math.max(0, CFG.musicVolume - 0.05); if (!muted) music.volume = CFG.musicVolume; }
+  else if (k === 'arrowleft' || k === 'arrowright') {
+    e.preventDefault();                            // keep the page from scrolling
+    const [, min, max, step] = CFG_SCHEMA.skullSize;
+    CFG.skullSize = Math.max(min, Math.min(max,
+      CFG.skullSize + (k === 'arrowright' ? step : -step)));
+    syncSlidersSafe();                             // the C panel slider follows
+    cfgStatusSay(`skull size ${CFG.skullSize.toFixed(2)}`);
+  }
   else if (k === 'e') { rainbowEyeUntil = t + 5; SFX.bell(); }
   else if (k === 'r') { face.ringSpin += 10; SFX.shaker(); }
   else if (k === 'w') { const dir = Math.random() < 0.5 ? -1 : 1; face.spiralSpin += dir * 12; SFX.guiro(dir); }
