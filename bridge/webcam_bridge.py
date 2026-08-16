@@ -128,7 +128,13 @@ async def main():
                     help="WebSocket port; the page listens on 8181")
     args = ap.parse_args()
 
-    async with websockets.serve(handler, "localhost", args.port):
+    # Origin allowlist: while this only broadcasts, without it ANY website you
+    # have open could connect and read where you are in the room. "null" is a
+    # file:// page (running the art locally); None is a non-browser client.
+    async with websockets.serve(handler, "localhost", args.port,
+                                origins=["https://hermanosamini.com",
+                                         "https://www.hermanosamini.com",
+                                         "null", None]):
         print(f"bridge on ws://localhost:{args.port}; open https://hermanosamini.com")
         await (pump_fake() if args.fake else pump_camera(args.camera))
 

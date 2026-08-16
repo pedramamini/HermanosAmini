@@ -60,7 +60,11 @@ async def pump():
 
 
 async def main():
-    async with websockets.serve(handler, "localhost", 8181):
+    # Origin allowlist: keeps arbitrary websites from reading your position.
+    async with websockets.serve(handler, "localhost", 8181,
+                                origins=["https://hermanosamini.com",
+                                         "https://www.hermanosamini.com",
+                                         "null", None]):
         print("Kinect bridge on ws://localhost:8181; open https://hermanosamini.com")
         await pump()
 
