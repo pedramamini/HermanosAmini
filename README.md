@@ -76,6 +76,7 @@ It runs silently without audio, see [Audio](#audio) below.
 | `L` | keyword voice | | `D` | fps / quality monitor |
 | `Enter` | surprise me | | `Esc` | back out of panels |
 | `J` | flood with skulls | | `Shift`+`J` | clear the flood |
+| `Q` | galactic battle | | `Shift`+`Q` | clear the sky |
 
 Click the art: the eyes follow you, face parts react, skulls flick away.
 Click the microphone to pick how you talk to it:
@@ -90,6 +91,13 @@ Click the microphone to pick how you talk to it:
 
 The chat can only turn dials that already exist. It cannot retheme the piece,
 and it is told to refuse if you ask.
+
+### Galactic Battle
+
+`Q` scrambles three fleets, sixteen saucers each, one to a corner of the sky.
+They close on each other, open fire, juke incoming lasers, and take two or three
+hits to go down. It runs about half a minute and the last fleet standing cruises
+off. `Shift`+`Q` calls it off early.
 
 ### Gesture Percussion
 

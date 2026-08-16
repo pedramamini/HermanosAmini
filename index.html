@@ -2468,6 +2468,10 @@ const CAPS = {
      others so there is one place to look. 140 is generous enough that a held
      key genuinely floods the frame, and the FPS governor thins them above it. */
   swarm:    140,
+  /* lasers self-expire in 2s so this never bound anything at 3 UFOs. A full
+     galactic battle is 50 saucers firing every ~0.7s, which is ~140 in flight,
+     so it is load-bearing now. Its own array, like the swarm. */
+  laser:    150,
 };
 const SPARK_HARD_CAP = 700;      // backstop across every kind combined
 function countKind(kind) {
@@ -2569,6 +2573,70 @@ const UFO_KINDS = [
   { body: '#e8b8c8', dome: 'rgba(255,120,140,', glow: '255,110,140', laser: '255,60,90' },    // crimson
   { body: '#e8d9a8', dome: 'rgba(255,220,120,', glow: '255,200,90',  laser: '255,190,60' },   // gold
 ];
+/* Saucer art is identical for every ship of a kind, but it was being rebuilt
+   from two gradients and ~11 path ops per ship per FRAME. Fine for 3 saucers,
+   35ms for a 48-ship battle, which is the whole frame budget. Bake the static
+   half once per kind (glow, hull, dome base, sheen) and leave only the parts
+   that actually animate: blink, running lights, shield flash. Same trick the
+   tunnel skulls already use via VARIANTS. */
+const UFO_R = 44;                       // sprite half-extent, covers the glow
+const UFO_PHASES = 8;                   // flipbook frames of the light chase
+let UFO_SPRITES = [];
+
+/* The saucer was rebuilt from two gradients and ~11 path ops per ship per
+   FRAME. Fine for 3 saucers, 35ms for a 48-ship battle: the entire budget.
+   Baking the static half helped but left 5 running-light ellipses and a dome
+   per ship, still 336 path ops a frame and still ~20ms, because Canvas2D path
+   overhead is the cost, not the pixels.
+
+   So bake the ANIMATION too. Everything that moves on a saucer is driven by
+   time, not by state, so eight frames of the light chase and dome blink cover
+   the whole cycle. Each ship then costs exactly one drawImage, and its own
+   phase offset keeps the fleet from blinking in unison. Same flipbook idea the
+   tunnel skulls already use via VARIANTS. */
+function makeUfoFrame(K, phase) {
+  const S = 2;                          // supersample so it stays crisp
+  const c = document.createElement('canvas');
+  c.width = c.height = UFO_R * 2 * S;
+  const x = c.getContext('2d');
+  x.scale(S, S); x.translate(UFO_R, UFO_R);
+
+  const gg = x.createRadialGradient(0, 0, 0, 0, 0, 40);
+  gg.addColorStop(0, `rgba(${K.glow},0.30)`);
+  gg.addColorStop(1, `rgba(${K.glow},0)`);
+  x.fillStyle = gg;
+  x.beginPath(); x.arc(0, 0, 40, 0, Math.PI * 2); x.fill();
+
+  const bg = x.createLinearGradient(0, -8, 0, 8);
+  bg.addColorStop(0, '#ffffff');
+  bg.addColorStop(0.45, K.body);
+  bg.addColorStop(1, '#5a6470');
+  x.beginPath(); x.ellipse(0, 2, 19, 6.5, 0, 0, Math.PI * 2);
+  x.fillStyle = bg; x.fill();
+  x.lineWidth = 1; x.strokeStyle = 'rgba(30,30,45,0.6)'; x.stroke();
+
+  const blink = 0.5 + 0.5 * Math.sin((phase / UFO_PHASES) * Math.PI * 2);
+  x.beginPath(); x.ellipse(0, -4, 8.5, 6.5, 0, Math.PI, 0);
+  x.fillStyle = K.dome + (0.45 + 0.4 * blink).toFixed(3) + ')'; x.fill();
+  x.beginPath(); x.ellipse(-2.5, -6, 2.4, 1.6, -0.5, 0, Math.PI * 2);
+  x.fillStyle = 'rgba(255,255,255,0.75)'; x.fill();
+
+  const spin = (phase / UFO_PHASES) * Math.PI * 2;
+  for (let li = 0; li < 5; li++) {
+    const la = (li / 5) * Math.PI * 2 + spin;
+    x.beginPath();
+    x.ellipse(Math.cos(la) * 14, 3 + Math.sin(la) * 3.2, 1.6, 1.2, 0, 0, Math.PI * 2);
+    x.fillStyle = `rgba(${K.laser},${(0.35 + 0.6 * ((Math.sin(la * 3 + spin * 2.5) + 1) / 2)).toFixed(3)})`;
+    x.fill();
+  }
+  return c;
+}
+function buildUfoSprites() {
+  UFO_SPRITES = UFO_KINDS.map(K =>
+    Array.from({ length: UFO_PHASES }, (_, ph) => makeUfoFrame(K, ph)));
+}
+buildUfoSprites();
+
 const ufos = [], lasers = [];
 function fxUfo() {
   if (ufos.length >= CAPS.ufo) return;
@@ -2587,6 +2655,61 @@ function fxUfo() {
     hitT: -9, jukeT: 0,
     ph: Math.random() * 7, born: t
   });
+}
+/* ── galactic battle ──
+   fxUfo() drops one saucer at a random edge, which makes a skirmish, not a
+   war. This fills the sky to the cap and sorts every team into its own
+   staging ground first, so the fight opens as three fronts converging rather
+   than a soup that was already mixed.
+
+   Three kinds means a triangle, not four corners. A screen is wider than it is
+   tall so no triangle in it is equilateral, and the arrangement that matters is
+   the one that keeps every fleet clear of the hero skull sitting dead centre:
+   top centre (above the crown) plus the two bottom corners. Two up top with one
+   at bottom centre reads the same on paper and buries a whole fleet in the
+   skull's teeth. The existing dwell logic takes over from there, which is why
+   this only has to place them and then get out of the way. */
+function fxGalacticBattle() {
+  const room = CAPS.ufo - ufos.length;
+  if (room <= 0) return 0;
+
+  /* the combat AI clamps saucers to the top 75% of the screen, so the staging
+     grounds have to live inside that box or a team spawns pinned to the rail */
+  const pad = 120, floor = H * 0.75;
+  const corners = [
+    { x: W / 2,       y: pad },              // top centre, above the crown
+    { x: pad,         y: floor - pad * 0.4 },// bottom left
+    { x: W - pad,     y: floor - pad * 0.4 } // bottom right
+  ];
+
+  const teams = UFO_KINDS.length;
+  const per = Math.floor(room / teams);
+  if (per < 1) return 0;
+
+  let made = 0;
+  for (let k = 0; k < teams; k++) {
+    const c = corners[k % corners.length];
+    for (let n = 0; n < per; n++) {
+      /* a tight cluster reads as a formation; a loose one reads as a mess */
+      const a = Math.random() * Math.PI * 2;
+      const r = Math.sqrt(Math.random()) * 130;
+      const x = Math.max(30, Math.min(W - 30, c.x + Math.cos(a) * r));
+      const y = Math.max(30, Math.min(floor, c.y + Math.sin(a) * r));
+      /* nudge them toward the middle so the fronts close on each other */
+      const ang = Math.atan2(H * 0.42 - y, W / 2 - x);
+      const sp = 40 + Math.random() * 40;
+      ufos.push({
+        kind: k,
+        x, y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp,
+        wx: 0, wy: 0, retargetT: 0, fireT: t + Math.random() * 0.8,
+        hp: 2 + (Math.random() < 0.5 ? 1 : 0),
+        hitT: -9, jukeT: 0,
+        ph: Math.random() * 7, born: t
+      });
+      made++;
+    }
+  }
+  return made;
 }
 function ufoExplode(u) {
   sparks.push({ kind: 'boom', x: u.x, y: u.y, vx: 0, vy: 0, life: 0, max: 1.1, hue: u.kind });
@@ -2628,8 +2751,10 @@ function updateUfos(dt) {
         const d = Math.hypot(v.x - u.x, v.y - u.y);
         if (d < 520 && t > u.fireT) {
           const dl = d || 1;
-          lasers.push({ x: u.x, y: u.y + 4, dx: (v.x - u.x) / dl, dy: (v.y - u.y) / dl,
-                        speed: 700, kind: u.kind, target: v, life: 0 });
+          if (lasers.length < CAPS.laser) {
+            lasers.push({ x: u.x, y: u.y + 4, dx: (v.x - u.x) / dl, dy: (v.y - u.y) / dl,
+                          speed: 700, kind: u.kind, target: v, life: 0 });
+          }
           u.fireT = t + 0.5 + Math.random() * 0.9;
         }
       }
@@ -2687,7 +2812,6 @@ function drawUfos() {
   }
   for (const u of ufos) {
     const K = UFO_KINDS[u.kind];
-    const blink = 0.5 + 0.5 * Math.sin(t * 9 + u.ph);
     const bank = Math.max(-0.6, Math.min(0.6, u.vx * (t < u.jukeT ? 0.004 : 0.002)));
     dctx.save();
     dctx.translate(u.x, u.y);
@@ -2704,31 +2828,11 @@ function drawUfos() {
       dctx.fillStyle = `rgba(${K.laser},${0.25 * ha2})`;
       dctx.fill();
     }
-    const gg = dctx.createRadialGradient(0, 0, 0, 0, 0, 40);
-    gg.addColorStop(0, `rgba(${K.glow},0.30)`);
-    gg.addColorStop(1, `rgba(${K.glow},0)`);
-    dctx.fillStyle = gg;
-    dctx.beginPath(); dctx.arc(0, 0, 40, 0, Math.PI * 2); dctx.fill();
-    /* saucer body with sheen */
-    const bg = dctx.createLinearGradient(0, -8, 0, 8);
-    bg.addColorStop(0, '#ffffff');
-    bg.addColorStop(0.45, K.body);
-    bg.addColorStop(1, '#5a6470');
-    dctx.beginPath(); dctx.ellipse(0, 2, 19, 6.5, 0, 0, Math.PI * 2);
-    dctx.fillStyle = bg; dctx.fill();
-    dctx.lineWidth = 1; dctx.strokeStyle = 'rgba(30,30,45,0.6)'; dctx.stroke();
-    /* dome with highlight */
-    dctx.beginPath(); dctx.ellipse(0, -4, 8.5, 6.5, 0, Math.PI, 0);
-    dctx.fillStyle = K.dome + (0.45 + 0.4 * blink) + ')'; dctx.fill();
-    dctx.beginPath(); dctx.ellipse(-2.5, -6, 2.4, 1.6, -0.5, 0, Math.PI * 2);
-    dctx.fillStyle = 'rgba(255,255,255,0.75)'; dctx.fill();
-    /* running lights chase around the rim */
-    for (let li = 0; li < 5; li++) {
-      const la = (li / 5) * Math.PI * 2 + t * 2.4;
-      dctx.beginPath();
-      dctx.ellipse(Math.cos(la) * 14, 3 + Math.sin(la) * 3.2, 1.6, 1.2, 0, 0, Math.PI * 2);
-      dctx.fillStyle = `rgba(${K.laser},${0.35 + 0.6 * ((Math.sin(la * 3 + t * 6) + 1) / 2)})`;
-      dctx.fill();
+    const book = UFO_SPRITES[u.kind];
+    if (book) {
+      const ph = ((t * 2.4 + u.ph) / (Math.PI * 2) * UFO_PHASES) | 0;
+      dctx.drawImage(book[((ph % UFO_PHASES) + UFO_PHASES) % UFO_PHASES],
+                     -UFO_R, -UFO_R, UFO_R * 2, UFO_R * 2);
     }
     dctx.restore();
   }
@@ -2832,6 +2936,7 @@ const VOICE_MAP = [
   [['petal', 'petals', 'flores', 'flowers'],      fxPetalBurst],
   [['alebrije', 'dragon'],                        fxAlebrije],
   [['rainbow', 'arcoiris'],                       () => { rainbowEyeUntil = t + 5; }],
+  [['battle', 'war', 'batalla', 'guerra'],        fxGalacticBattle],
   [['swarm', 'flood', 'horde', 'enjambre'],       () => spawnSkull(8)],
   [['skull', 'calavera', 'flick'],                fxFlickRandom],
   [['teeth', 'dientes', 'chatter'],               () => { face.chatterUntil = t + 1.6; }],
@@ -2987,6 +3092,7 @@ const CHAT_FX = {
   petals: fxPetalBurst, alebrije: fxAlebrije, flick: fxFlickRandom,
   random: randomEffect,
   swarm: () => spawnSkull(8),
+  battle: fxGalacticBattle,
   rainbow: () => { rainbowEyeUntil = t + 5; },
   teeth:   () => { face.chatterUntil = t + 1.6; },
   stare:   () => { stare.until = t + 3.2; },
@@ -4312,6 +4418,7 @@ const HELP_ROWS = [
   [['Y'], 'mean mug (the stare)', '"mirada"', 'y'],
   [['I'], 'save a photo', '', 'i'],
   [['Z'], 'zen mode (hide all text)', '', 'z'],
+  [['Q'], 'galactic battle (3 fleets)', '"battle"', 'q'],
   [['J'], 'spawn more skulls (hold to flood)', '"skulls"', 'j'],
   [['L'], 'keyword voice on / off', '', 'l'],
   [['🎤'], 'pick keyword or agentic chat', '', ''],
@@ -4510,6 +4617,10 @@ addEventListener('keydown', e => {
   else if (k === 'n') { face.noseBurst = t + 1.2; heartBurst(W / 2, H / 2); SFX.tom(); }
   else if (k === 's') fxShootingStar();
   else if (k === 'p') fxPetalBurst();
+  else if (k === 'q') {
+    if (e.shiftKey) { const had = ufos.length; ufos.length = 0; lasers.length = 0; if (had) SFX.knock(); }
+    else if (fxGalacticBattle()) SFX.glare();
+  }
   else if (k === 'j') {
     /* shift clears, so a flood is reversible without a reload */
     if (e.shiftKey) { const had = swarm.length; swarm.length = 0; if (had) SFX.knock(); }
