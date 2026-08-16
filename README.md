@@ -90,6 +90,20 @@ Click the microphone to pick how you talk to it:
 The chat can only turn dials that already exist. It cannot retheme the piece,
 and it is told to refuse if you ask.
 
+### Gesture Percussion
+
+Touching the face plays it. The eye rings shake a maraca, the cheek spirals
+scrape a guiro, the teeth clatter like bone, the heart nostril thumps a low tom,
+the third eye rings a bell. Flicking a background skull knocks like wood.
+
+Every one of those is synthesized in the browser with Web Audio, not sampled.
+The piece ships no percussion files and vendors no audio.
+
+Sounds fire on your gestures only, whether you click or use the keyboard. When
+the art chatters its own teeth or stares at you on its own schedule it stays
+silent, so the audio always means "you did that". Level lives on the
+`gesture sfx volume` dial, and muting the music mutes these too.
+
 Under the hood: WebGL nebula, four stacked canvases, beat detection driving a
 BPM-locked tempo, and a five-tier quality ladder that sheds detail until the
 piece runs on a phone or an old TV browser.

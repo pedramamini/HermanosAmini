@@ -32,7 +32,7 @@ const LIMITS = {
   tempoRef: [60, 140, 'tempo ref BPM'], dayCycleMin: [2, 30, 'day/night cycle minutes'], perfMode: [0, 2, 'perf mode'], tempoMax: [1, 3, 'tempo speed cap'],
   eventMinGap: [1, 30, 'event gap min seconds'], eventMaxGap: [2, 60, 'event gap max seconds'],
   liquidFill: [2, 30, 'logo travel time'], liquidRest: [0, 20, 'logo dwell'],
-  musicVolume: [0, 1, 'music volume'], gritoVolume: [0, 1, 'grito volume'],
+  musicVolume: [0, 1, 'music volume'], gritoVolume: [0, 1, 'grito volume'], sfxVolume: [0, 1, 'gesture sfx volume'],
   /* color + feel. These shipped in the page well after this list was written,
      and their absence here meant cleanConfig() silently dropped every one of
      them: any preset saved to the gallery came back with its palette, hues,

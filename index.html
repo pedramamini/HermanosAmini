@@ -994,6 +994,7 @@ const CFG_SCHEMA = {
   liquidRest:     [6,     0,     20,   1,     'logo dwell max (s)'],
   musicVolume:    [0.9,   0,     1,    0.05,  'music volume'],
   gritoVolume:    [1.0,   0,     1,    0.05,  'grito volume'],
+  sfxVolume:      [0.55,  0,     1,    0.05,  'gesture sfx volume'],
   /* ── color ── */
   palette:        [0,     0,     7,    1,     'palette (0-7)'],
   hueShift:       [0,   -180,  180,    5,     'ornament hue shift'],
@@ -1153,6 +1154,150 @@ function initAudio() {
   src.connect(analyser);
   analyser.connect(actx.destination);
 }
+/* ── gesture percussion ──
+   Synthesized, never sampled. ART_DIRECTION forbids vendoring audio, and a
+   Dia de los Muertos kit (shaker, guiro, clave, tom) is all noise bursts and
+   short decays, so Web Audio builds it for free: no files, no rights, no
+   payload, still one self-contained page.
+
+   These fire ONLY from a real gesture. The calls live at the interaction
+   sites (faceHit, the keyboard handler) rather than inside the animation
+   functions, so the art's own autonomous chatter, stares and random events
+   stay silent by construction: there is no flag anyone can forget to pass. */
+let sfxBus = null;
+const sfxLast = Object.create(null);
+
+function sfxReady() {
+  if (!CFG.sfxVolume || muted) return null;
+  if (!actx) return null;                       // no gesture has started audio yet
+  if (actx.state === 'suspended') actx.resume();
+  if (!sfxBus) {
+    sfxBus = actx.createGain();
+    sfxBus.connect(actx.destination);
+  }
+  sfxBus.gain.value = CFG.sfxVolume;
+  return actx;
+}
+
+/* Key repeat would machine-gun a voice into a buzz, so each named sound has a
+   floor on how often it can retrigger. */
+function sfxThrottle(name, ms) {
+  const now = performance.now();
+  if (sfxLast[name] && now - sfxLast[name] < ms) return false;
+  sfxLast[name] = now;
+  return true;
+}
+
+/* one short band-passed noise burst: the grain every shaker/guiro is made of */
+function noiseHit(at, dur, freq, q, peak) {
+  const n = Math.max(1, Math.floor(actx.sampleRate * dur));
+  const buf = actx.createBuffer(1, n, actx.sampleRate);
+  const ch = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) ch[i] = Math.random() * 2 - 1;
+  const src = actx.createBufferSource(); src.buffer = buf;
+  const bp = actx.createBiquadFilter();
+  bp.type = 'bandpass'; bp.frequency.value = freq; bp.Q.value = q;
+  const g = actx.createGain();
+  g.gain.setValueAtTime(0.0001, at);
+  g.gain.exponentialRampToValueAtTime(peak, at + 0.004);
+  g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+  src.connect(bp); bp.connect(g); g.connect(sfxBus);
+  src.start(at); src.stop(at + dur + 0.02);
+}
+
+/* a struck wooden body: pitched click with a noise transient on top */
+function woodHit(at, freq, peak, dur) {
+  const o = actx.createOscillator();
+  o.type = 'triangle';
+  o.frequency.setValueAtTime(freq, at);
+  o.frequency.exponentialRampToValueAtTime(freq * 0.72, at + dur);
+  const g = actx.createGain();
+  g.gain.setValueAtTime(0.0001, at);
+  g.gain.exponentialRampToValueAtTime(peak, at + 0.003);
+  g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+  o.connect(g); g.connect(sfxBus);
+  o.start(at); o.stop(at + dur + 0.02);
+  noiseHit(at, Math.min(0.03, dur), freq * 1.8, 3, peak * 0.5);
+}
+
+const SFX = {
+  /* maracas: a handful of accelerating shakes, loudest on the first */
+  shaker() {
+    if (!sfxReady() || !sfxThrottle('shaker', 90)) return;
+    const t0 = actx.currentTime;
+    for (let i = 0; i < 5; i++) {
+      const at = t0 + i * (0.055 + i * 0.012);
+      noiseHit(at, 0.075, 6200 + Math.random() * 1800, 1.1, (i ? 0.21 : 0.36) * (1 - i * 0.13));
+    }
+  },
+  /* guiro: a scrape is many tiny ticks, tightening as the stick travels */
+  guiro(dir) {
+    if (!sfxReady() || !sfxThrottle('guiro', 140)) return;
+    const t0 = actx.currentTime, N = 13;
+    for (let i = 0; i < N; i++) {
+      const p = i / (N - 1);
+      const at = t0 + p * 0.3;
+      /* sweep the band with the scrape direction so left and right differ */
+      const f = dir >= 0 ? 1700 + p * 2600 : 4300 - p * 2600;
+      noiseHit(at, 0.032, f, 6, 0.26 + p * 0.13);
+    }
+  },
+  /* teeth: irregular bone clacks, high and dry, tapering off */
+  teeth() {
+    if (!sfxReady() || !sfxThrottle('teeth', 200)) return;
+    const t0 = actx.currentTime, N = 9;
+    for (let i = 0; i < N; i++) {
+      const at = t0 + i * 0.052 + Math.random() * 0.022;
+      woodHit(at, 1500 + Math.random() * 700, 0.22 * (1 - i / N * 0.7), 0.035);
+    }
+  },
+  /* the heart nostril: a low tom, felt more than heard */
+  tom() {
+    if (!sfxReady() || !sfxThrottle('tom', 120)) return;
+    const t0 = actx.currentTime;
+    const o = actx.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(165, t0);
+    o.frequency.exponentialRampToValueAtTime(52, t0 + 0.34);
+    const g = actx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(0.4, t0 + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.38);
+    o.connect(g); g.connect(sfxBus);
+    o.start(t0); o.stop(t0 + 0.4);
+    noiseHit(t0, 0.05, 900, 1.4, 0.1);
+  },
+  /* third eye: a struck bell, three detuned partials ringing out */
+  bell() {
+    if (!sfxReady() || !sfxThrottle('bell', 160)) return;
+    const t0 = actx.currentTime;
+    [1, 2.76, 5.4].forEach((mul, i) => {
+      const o = actx.createOscillator();
+      o.type = 'sine';
+      o.frequency.value = 784 * mul;
+      const g = actx.createGain();
+      const peak = 0.2 / (i + 1.4);
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(peak, t0 + 0.006);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.5 - i * 0.35);
+      o.connect(g); g.connect(sfxBus);
+      o.start(t0); o.stop(t0 + 1.6);
+    });
+  },
+  /* flicking a skull: one hollow knock */
+  knock() {
+    if (!sfxReady() || !sfxThrottle('knock', 70)) return;
+    woodHit(actx.currentTime, 420, 0.4, 0.09);
+  },
+  /* the mean mug: a low woody thud, like a stool pulled up */
+  glare() {
+    if (!sfxReady() || !sfxThrottle('glare', 200)) return;
+    const t0 = actx.currentTime;
+    woodHit(t0, 240, 0.3, 0.16);
+    noiseHit(t0 + 0.02, 0.22, 2400, 0.8, 0.07);
+  },
+};
+
 function sampleAudio() {
   if (!analyser) { // idle breathing when silent
     bassSm = 0.18 + 0.12 * Math.sin(t * 0.7);
@@ -1626,12 +1771,12 @@ function heartBurst(cx, cy) {
 function faceHit(cx, cy) {
   const u = toSkullUnits(cx, cy), ux = u[0], uy = u[1];
   const d = (x, y) => Math.hypot(ux - x, uy - y);
-  if (d(0, -300) < 120)  { rainbowEyeUntil = t + 5; return true; }          // third eye
-  if (d(-178, -60) < 190 || d(178, -60) < 190) { face.ringSpin += 10; return true; } // eye rings
-  if (d(0, 165) < 85)    { face.noseBurst = t + 1.2; heartBurst(cx, cy); return true; }
-  if (Math.abs(ux) < 155 && uy > 325 && uy < 470) { face.chatterUntil = t + 1.6; return true; }
-  if (d(-275, 165) < 95) { face.spiralSpin += 12; return true; }
-  if (d(275, 165) < 95)  { face.spiralSpin -= 12; return true; }
+  if (d(0, -300) < 120)  { rainbowEyeUntil = t + 5; SFX.bell(); return true; }   // third eye
+  if (d(-178, -60) < 190 || d(178, -60) < 190) { face.ringSpin += 10; SFX.shaker(); return true; } // eye rings
+  if (d(0, 165) < 85)    { face.noseBurst = t + 1.2; heartBurst(cx, cy); SFX.tom(); return true; }
+  if (Math.abs(ux) < 155 && uy > 325 && uy < 470) { face.chatterUntil = t + 1.6; SFX.teeth(); return true; }
+  if (d(-275, 165) < 95) { face.spiralSpin += 12; SFX.guiro(1); return true; }
+  if (d(275, 165) < 95)  { face.spiralSpin -= 12; SFX.guiro(-1); return true; }
   return false;
 }
 
@@ -1807,7 +1952,7 @@ addEventListener('pointerdown', e => {
   if (e.target.closest && e.target.closest('.panel, .ctl')) return;  // UI clicks stay UI clicks
   face.gazeX = e.clientX; face.gazeY = e.clientY; face.gazeUntil = t + 2.2;  // eyes snap to the click
   if (faceHit(e.clientX, e.clientY)) return;    // face parts eat the click
-  flickAt(e.clientX, e.clientY);
+  if (flickAt(e.clientX, e.clientY)) SFX.knock();
 });
 
 function drawTunnel(dt) {
@@ -4234,21 +4379,21 @@ addEventListener('keydown', e => {
   else if (k === 'm') toggleMute();
   else if (k === 'arrowup')   { e.preventDefault(); CFG.musicVolume = Math.min(1, CFG.musicVolume + 0.05); if (!muted) music.volume = CFG.musicVolume; }
   else if (k === 'arrowdown') { e.preventDefault(); CFG.musicVolume = Math.max(0, CFG.musicVolume - 0.05); if (!muted) music.volume = CFG.musicVolume; }
-  else if (k === 'e') rainbowEyeUntil = t + 5;
-  else if (k === 'r') face.ringSpin += 10;
-  else if (k === 'w') face.spiralSpin += (Math.random() < 0.5 ? -12 : 12);
-  else if (k === 't') face.chatterUntil = t + 1.6;
-  else if (k === 'n') { face.noseBurst = t + 1.2; heartBurst(W / 2, H / 2); }
+  else if (k === 'e') { rainbowEyeUntil = t + 5; SFX.bell(); }
+  else if (k === 'r') { face.ringSpin += 10; SFX.shaker(); }
+  else if (k === 'w') { const dir = Math.random() < 0.5 ? -1 : 1; face.spiralSpin += dir * 12; SFX.guiro(dir); }
+  else if (k === 't') { face.chatterUntil = t + 1.6; SFX.teeth(); }
+  else if (k === 'n') { face.noseBurst = t + 1.2; heartBurst(W / 2, H / 2); SFX.tom(); }
   else if (k === 's') fxShootingStar();
   else if (k === 'p') fxPetalBurst();
-  else if (k === 'f') fxFlickRandom();
+  else if (k === 'f') { fxFlickRandom(); SFX.knock(); }
   else if (k === 'k') fxComet();
   else if (k === 'x') fxMeteorShower();
   else if (k === 'v') fxSupernova();
   else if (k === 'a') fxAurora();
   else if (k === 'u') fxUfo();
   else if (k === 'b') fxAlebrije();
-  else if (k === 'y') stare.until = t + 3.2;
+  else if (k === 'y') { stare.until = t + 3.2; SFX.glare(); }
   else if (k === 'z') toggleText();
   else if (k === 'd') { CFG.hudOn = CFG.hudOn ? 0 : 1; applyToggles({ skipVoice: true }); }
   else if (k === 'l') { CFG.voiceOn = voiceOn ? 0 : 1; toggleVoice(); syncToggleUI(); }

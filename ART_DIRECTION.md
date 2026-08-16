@@ -98,6 +98,18 @@ linked to a mirror, or fetched by a script in this repo. Anyone running
 locally supplies their own audio, or runs without it (the art works silently).
 A PR that adds audio files or a downloader will be closed.
 
+**Sound effects are the exception that proves the rule: synthesize, do not
+sample.** The gesture percussion (maraca, guiro, teeth, tom, bell, knock) is
+built at runtime from Web Audio oscillators and noise buffers. It ships zero
+bytes of audio, has no rights encumbrance, and keeps the page self-contained.
+Any new sound must be synthesized the same way.
+
+**Sound is feedback, not ambience.** A sound plays only in response to a
+gesture the viewer made. The art's autonomous behavior stays silent, so audio
+always means "you did that". Enforce this by calling the sound at the
+interaction site rather than inside the animation, so there is no flag to
+forget.
+
 ---
 
 ## Governance: nothing ships without the artist
