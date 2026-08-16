@@ -16,7 +16,10 @@ id_rsa*
 .wrangler/
 
 # ── internal ops: infra ids, private host, unlisted URLs ─────────────────
-CLAUDE.md
+# CLAUDE.md is PUBLIC now (contributor guide). The private operational
+# notes live in CLAUDE.local.md and the CLAUDE-*.md sheets: infra ids,
+# hosts, unlisted URLs. Those stay ignored.
+CLAUDE.local.md
 CLAUDE-*.md
 README-NEEMA.md
 # deploy.sh carries the private origin host and the unlisted source path
