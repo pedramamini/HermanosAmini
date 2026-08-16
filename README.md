@@ -126,15 +126,36 @@ new coherent look: palette, hues, background, and glow together. Design asks
 change what the piece looks like; effect asks make things happen in it. The
 agent knows the difference.
 
-### Kinect / Sensor Rigs
+### The Skull Watches You (Human Tracking)
 
-The page auto-connects to `ws://localhost:8181` and retries forever, so any
-local bridge that reads a sensor (Kinect skeleton, webcam pose model, lidar,
-whatever) and speaks a tiny JSON protocol can drive the art with zero page
-setup: `{x, y}` aims the skull's eyes, `{z}` under 1.2m earns you the stare,
-`{stir}` churns the smoke, `{effect}` fires any named effect. Browsers cannot
-talk to a Kinect directly; the bridge is ~60 lines of Python with the Kinect
-SDK. An Xbox controller needs no bridge at all: the Gamepad API works natively.
+The page auto-connects to `ws://localhost:8181` and retries forever, so a tiny
+local bridge can drive the art with zero page setup. Two bridges ship in
+[`bridge/`](bridge/):
+
+**Webcam (any laptop, two minutes):**
+
+```bash
+git clone https://github.com/pedramamini/HermanosAmini
+cd HermanosAmini/bridge
+pip install opencv-python websockets
+python3 webcam_bridge.py          # macOS asks once for camera access
+```
+
+Then open [hermanosamini.com](https://hermanosamini.com). Walk left and the
+skull's eyes follow you; walk toward the screen and it glares. No hardware
+beyond the webcam you already have. `python3 webcam_bridge.py --fake` runs a
+scripted ghost so you can test the pipeline with no camera at all. If Chrome
+asks to allow connections to your local network, say yes: that permission is
+exactly this feature.
+
+**Kinect (better range, low light, multiple people):** `kinect_bridge.py`,
+Windows + Kinect v2 + the Kinect SDK 2.0. Same protocol.
+
+Any tracker works, honestly. The whole contract is one JSON object per
+message on `ws://localhost:8181`: `{x, y}` in 0..1 aims the eyes, `{z}` in
+meters under 1.2 earns the stare, `{stir}` churns the smoke, `{effect}` fires
+any named effect. Point a pose model, lidar, or a potato at it. An Xbox
+controller needs no bridge at all: the Gamepad API works natively.
 
 ### Everything at Once
 
