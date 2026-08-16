@@ -4333,7 +4333,9 @@ window.SKLZ = {
       teeth: () => { face.chatterUntil = t + 1.6; },
       nose: () => { face.noseBurst = t + 1.2; heartBurst(W / 2, H / 2); },
       random: randomEffect };
-    if (m[name]) m[name]();
+    /* own-property check: names now arrive from external bridges, and
+       m['__proto__'] is truthy-but-not-callable, which would throw */
+    if (Object.prototype.hasOwnProperty.call(m, name)) m[name]();
   },
   stare(on) { stare.until = on ? t + 3600 : t; },
   config(obj) { return obj ? cfgApply(obj) : { ...CFG }; },   // read or patch
@@ -5103,6 +5105,47 @@ ideaSend.addEventListener('click', async () => {
     if (e.target.closest && e.target.closest('.ctl, #tools, .panel')) return;
     closeTray();
   }, true);
+})();
+
+/* ── sensor bridge auto-connect ──
+   A browser cannot read a Kinect (or any depth camera): there is no driver,
+   no skeleton API, nothing in the web platform. So the shape is always
+       sensor ──USB──> bridge process on the viewer's machine ──WebSocket──> page
+   and this is the page half, baked in so a rig needs no console pasting:
+   run any bridge that serves ws://localhost:8181 speaking the JSON below,
+   load the site, done.
+
+   Protocol, one JSON object per message, all fields optional:
+     {x, y}          0..1 viewport coords -> the skull's eyes track the person
+     {z}             meters from sensor; closer than 1.2m -> the stare
+     {stir: 0..1.5}  churn the smoke at x,y
+     {effect: name}  any SKLZ.effect() name, e.g. raise-both-hands -> 'grito'
+
+   https pages may open ws:// only to localhost (a potentially-trustworthy
+   origin), which is exactly what we want: the ONLY thing this will ever
+   connect to is the viewer's own machine. Backoff doubles 2s -> 60s and
+   retries forever, because on a wall install the bridge often starts after
+   the page. Silent when nothing is listening: that is every normal visitor. */
+(function sensorBridge() {
+  if (!('WebSocket' in window)) return;
+  let delay = 2000, ws = null;
+  const connect = () => {
+    try { ws = new WebSocket('ws://localhost:8181'); } catch (_) { return retry(); }
+    ws.onopen = () => { delay = 2000; };
+    ws.onmessage = ev => {
+      let p; try { p = JSON.parse(ev.data); } catch (_) { return; }
+      if (typeof p.x === 'number' && typeof p.y === 'number') {
+        SKLZ.setGaze(p.x, p.y);
+        if (typeof p.stir === 'number' && p.stir > 0) SKLZ.stir(p.x, p.y, Math.min(1.5, p.stir));
+      }
+      if (typeof p.z === 'number') SKLZ.stare(p.z < 1.2);
+      if (typeof p.effect === 'string') SKLZ.effect(p.effect);
+    };
+    ws.onclose = () => { SKLZ.releaseGaze(); SKLZ.stare(false); retry(); };
+    ws.onerror = () => { try { ws.close(); } catch (_) {} };
+  };
+  const retry = () => { setTimeout(connect, delay); delay = Math.min(60000, delay * 2); };
+  connect();
 })();
 
 autoResume();                        // last: every binding it touches is initialized by now

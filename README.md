@@ -115,6 +115,16 @@ new coherent look: palette, hues, background, and glow together. Design asks
 change what the piece looks like; effect asks make things happen in it. The
 agent knows the difference.
 
+### Kinect / Sensor Rigs
+
+The page auto-connects to `ws://localhost:8181` and retries forever, so any
+local bridge that reads a sensor (Kinect skeleton, webcam pose model, lidar,
+whatever) and speaks a tiny JSON protocol can drive the art with zero page
+setup: `{x, y}` aims the skull's eyes, `{z}` under 1.2m earns you the stare,
+`{stir}` churns the smoke, `{effect}` fires any named effect. Browsers cannot
+talk to a Kinect directly; the bridge is ~60 lines of Python with the Kinect
+SDK. An Xbox controller needs no bridge at all: the Gamepad API works natively.
+
 ### Everything at Once
 
 Ask the chat for "everything" (or say "fiesta") and the piece fires the whole
