@@ -48,3 +48,5 @@ __pycache__/
 
 # agent scratch: browser captures
 interceptor-screenshot-*
+state/
+drain.log
