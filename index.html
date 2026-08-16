@@ -1927,7 +1927,109 @@ const skullSpin = Array.from({ length: N_SKULLS }, (_, i) => {
   return dir * (0.17 + h * 0.83);
 });
 
+/* ── skull swarm ──
+   The tunnel field is 56 fixed slots on a golden spiral: its density is a
+   dial, not a spawner, and every slot has a determined position. So "flood
+   the scene from random locations" needs its own population, drawn on the
+   TUNNEL canvas so the new skulls sit behind the hero face where background
+   belongs, not on the dust layer in front of it.
+
+   These persist rather than fading, because the point is to pile up. That
+   makes the cap load-bearing: it is the only thing standing between a held
+   key and an unbounded array. */
+const swarm = [];
+
+function spawnSkull(n) {
+  let made = 0;
+  for (let k = 0; k < (n || 1); k++) {
+    if (swarm.length >= CAPS.swarm) break;
+    /* Random origin, but weighted: two thirds burst in from off-screen so the
+       flood reads as arriving, one third pops in mid-field so the middle of
+       the screen fills too instead of only the rim. */
+    const edge = Math.random() < 0.66;
+    let x, y, vx, vy;
+    if (edge) {
+      const side = Math.floor(Math.random() * 4);
+      const m = 90;
+      x = side === 0 ? -m : side === 1 ? W + m : Math.random() * W;
+      y = side === 2 ? -m : side === 3 ? H + m : Math.random() * H;
+      /* aim loosely at the far side so it crosses the frame, not the corner */
+      const tx = W * (0.2 + Math.random() * 0.6), ty = H * (0.2 + Math.random() * 0.6);
+      const a = Math.atan2(ty - y, tx - x);
+      const sp = 26 + Math.random() * 54;
+      vx = Math.cos(a) * sp; vy = Math.sin(a) * sp;
+    } else {
+      x = Math.random() * W; y = Math.random() * H;
+      const a = Math.random() * Math.PI * 2;
+      const sp = 10 + Math.random() * 34;
+      vx = Math.cos(a) * sp; vy = Math.sin(a) * sp;
+    }
+    swarm.push({
+      x, y, vx, vy,
+      scale: (0.30 + Math.random() * 0.85) * TUN_SCALE,
+      rot: Math.random() * Math.PI * 2,
+      vr: (Math.random() < 0.5 ? -1 : 1) * (0.15 + Math.random() * 0.75),
+      v: Math.floor(Math.random() * Math.max(1, VARIANTS.length)),
+      born: t,
+    });
+    made++;
+  }
+  return made;
+}
+
+function stepSwarm(dt) {
+  if (!swarm.length) return;
+  const beatS = 1 + beatPulse * CFG.tunnelBreath;
+  const lite = isLite();
+  const pool = lite ? VARIANTS_STATIC : VARIANTS;
+  if (!pool.length) return;
+  const m = 140;                                  // wrap margin, in screen px
+  /* The governor cannot drop the population (the viewer asked for it) but it
+     can stop drawing some of them: at Q3 every other one, at Q4 two in three.
+     They keep moving, so quality recovering restores the full flood. */
+  const q = qLevel();
+  const skip = q >= 4 ? 3 : q === 3 ? 2 : 1;
+  tctx.save();
+  tctx.scale(DPR, DPR);
+  for (let i = 0; i < swarm.length; i++) {
+    const k = swarm[i];
+    k.x += k.vx * dt; k.y += k.vy * dt;
+    k.rot += k.vr * dt * CFG.skullSpinMax * 2.2;
+    /* wrap instead of despawning: a flood you have to watch drain is a chore,
+       and wrapping keeps the population exactly what the viewer asked for */
+    if (k.x < -m) k.x = W + m; else if (k.x > W + m) k.x = -m;
+    if (k.y < -m) k.y = H + m; else if (k.y > H + m) k.y = -m;
+
+    if (skip > 1 && i % skip !== 0) continue;     // thinned, but still moving
+    const spr = pool[k.v % pool.length];
+    const px = spr.width * k.scale * 0.5 * beatS;
+    const fade = Math.min(1, (t - k.born) * 1.6);  // ease in, never pop
+    tctx.save();
+    tctx.translate(k.x, k.y);
+    tctx.rotate(lite ? k.rot * 0.3 : k.rot);
+    tctx.globalAlpha = 0.82 * fade;
+    tctx.drawImage(spr, -px / 2, -px / 2, px, px);
+    tctx.restore();
+  }
+  tctx.restore();
+}
+
 function flickAt(cx, cy) {
+  /* swarm draws over the spiral field, so it wins the hit test. A flick here
+     is a shove: they have no home to return to, they just carry the momentum. */
+  for (let i = swarm.length - 1; i >= 0; i--) {
+    const k = swarm[i];
+    const r = (VARIANTS.length ? VARIANTS[0].width : 360) * k.scale * 0.5 * 0.34;
+    const dx = cx - k.x, dy = cy - k.y;
+    if (dx * dx + dy * dy < r * r) {
+      const ang = Math.atan2(k.y - cy, k.x - cx);
+      const sp = (360 + Math.random() * 320) * CFG.flickForce;
+      k.vx += Math.cos(ang) * sp;
+      k.vy += Math.sin(ang) * sp;
+      k.vr += (Math.random() < 0.5 ? -1 : 1) * (4 + Math.random() * 6);
+      return true;
+    }
+  }
   let best = -1, bestD = -1;
   for (let i = 0; i < N_SKULLS; i++) {
     const p = skullPos[i];
@@ -2049,6 +2151,7 @@ function drawTunnel(dt) {
     tctx.restore();
   }
   tctx.restore();
+  stepSwarm(dt);            // same canvas: behind the hero face, over the spiral
 }
 
 /* ─────────────────────────────────────────────
@@ -2361,6 +2464,10 @@ const CAPS = {
   ember:    300,
   heart:    120,
   boom:     12,
+  /* not a spark: the swarm has its own array, but the cap belongs with the
+     others so there is one place to look. 140 is generous enough that a held
+     key genuinely floods the frame, and the FPS governor thins them above it. */
+  swarm:    140,
 };
 const SPARK_HARD_CAP = 700;      // backstop across every kind combined
 function countKind(kind) {
@@ -2725,6 +2832,7 @@ const VOICE_MAP = [
   [['petal', 'petals', 'flores', 'flowers'],      fxPetalBurst],
   [['alebrije', 'dragon'],                        fxAlebrije],
   [['rainbow', 'arcoiris'],                       () => { rainbowEyeUntil = t + 5; }],
+  [['swarm', 'flood', 'horde', 'enjambre'],       () => spawnSkull(8)],
   [['skull', 'calavera', 'flick'],                fxFlickRandom],
   [['teeth', 'dientes', 'chatter'],               () => { face.chatterUntil = t + 1.6; }],
   [['stare', 'mirada', 'angry'],                  () => { stare.until = t + 3.2; }],
@@ -2758,9 +2866,23 @@ function handleVoice(text) {
 
   let fired = 0;
   for (const [words, fn] of VOICE_MAP) {
-    if (words.some(w => lower.includes(w))) { fn(); fired++; }
+    if (words.some(w => saidWord(lower, w))) { fn(); fired++; }
   }
   return fired;
+}
+/* Substring matching was firing the wrong effects on ordinary words: "make it
+   yellow" contains "yell" and launched a grito, and "stare at me" contains
+   "star" so it fired a shooting star AND the mean mug. Match whole words
+   instead, tolerating a trailing s/es so plurals still land. */
+const cueRx = new Map();
+function saidWord(hay, cue) {
+  let rx = cueRx.get(cue);
+  if (!rx) {
+    const esc = cue.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    rx = new RegExp('(^|[^a-z])' + esc + '(e?s)?([^a-z]|$)', 'i');
+    cueRx.set(cue, rx);
+  }
+  return rx.test(hay);
 }
 /* ── voice: two modes behind one button ──
    0 = off, 1 = keyword commands, 2 = agentic chat. Both modes want the same
@@ -2864,6 +2986,7 @@ const CHAT_FX = {
   supernova: fxSupernova, meteor: fxMeteorShower, star: fxShootingStar,
   petals: fxPetalBurst, alebrije: fxAlebrije, flick: fxFlickRandom,
   random: randomEffect,
+  swarm: () => spawnSkull(8),
   rainbow: () => { rainbowEyeUntil = t + 5; },
   teeth:   () => { face.chatterUntil = t + 1.6; },
   stare:   () => { stare.until = t + 3.2; },
@@ -4189,6 +4312,7 @@ const HELP_ROWS = [
   [['Y'], 'mean mug (the stare)', '"mirada"', 'y'],
   [['I'], 'save a photo', '', 'i'],
   [['Z'], 'zen mode (hide all text)', '', 'z'],
+  [['J'], 'spawn more skulls (hold to flood)', '"skulls"', 'j'],
   [['L'], 'keyword voice on / off', '', 'l'],
   [['🎤'], 'pick keyword or agentic chat', '', ''],
   [['D'], 'fps / quality monitor', '', 'd'],
@@ -4386,6 +4510,11 @@ addEventListener('keydown', e => {
   else if (k === 'n') { face.noseBurst = t + 1.2; heartBurst(W / 2, H / 2); SFX.tom(); }
   else if (k === 's') fxShootingStar();
   else if (k === 'p') fxPetalBurst();
+  else if (k === 'j') {
+    /* shift clears, so a flood is reversible without a reload */
+    if (e.shiftKey) { const had = swarm.length; swarm.length = 0; if (had) SFX.knock(); }
+    else if (spawnSkull(6)) SFX.shaker();
+  }
   else if (k === 'f') { fxFlickRandom(); SFX.knock(); }
   else if (k === 'k') fxComet();
   else if (k === 'x') fxMeteorShower();

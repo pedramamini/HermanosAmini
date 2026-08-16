@@ -75,6 +75,7 @@ It runs silently without audio, see [Audio](#audio) below.
 | `B` | alebrije spirit | | `I` | save a photo |
 | `L` | keyword voice | | `D` | fps / quality monitor |
 | `Enter` | surprise me | | `Esc` | back out of panels |
+| `J` | flood with skulls | | `Shift`+`J` | clear the flood |
 
 Click the art: the eyes follow you, face parts react, skulls flick away.
 Click the microphone to pick how you talk to it:
