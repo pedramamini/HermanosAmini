@@ -3249,6 +3249,10 @@ async function chatSend(text) {
     const d = await r.json();
     dots.remove();
     const say = d.say || 'I did not catch that.';
+    /* A quota notice is the system talking, not the calavera. Render it in the
+       receipt style so it does not read as the art refusing you on a whim, and
+       keep it out of the history so the model never sees it as its own line. */
+    if (d.limited) { chatSay('did', say); return; }
     chatSay('her', say);
     chatHist.push({ role: 'assistant', content: say });
     applyActions(d.actions);

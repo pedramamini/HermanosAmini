@@ -278,9 +278,25 @@ export default {
         const quota = await env.sklz_presets.prepare(
           'SELECT n FROM writes WHERE author_hash = ? AND hour_bucket = ?'
         ).bind(bucket, hour).first();
-        if (quota && quota.n >= 60) {
-          return json({ say: 'the skulls need a rest. try again in a bit.', actions: [] },
-                      200, request);
+        /* 60/hour was set as a cost guard before anyone had actually held a
+           conversation with this thing. A real back-and-forth burns 20-30 turns
+           without trying, the bucket is per-IP so a household or an office
+           shares one, and testing from the same network as the artist ate his
+           allowance. 240 still bounds a hostile actor to something trivial. */
+        const CHAT_LIMIT = 240;
+        if (quota && quota.n >= CHAT_LIMIT) {
+          /* Say what actually happened and when it clears. The old text was
+             "the skulls need a rest", which reads as the art being broken or
+             refusing on a whim: it named no cause and no remedy, so the only
+             possible reaction was "what does that mean?" */
+          const mins = Math.max(1, 60 - Math.floor((Date.now() % 3600000) / 60000));
+          return json({
+            say: `That is ${CHAT_LIMIT} messages in an hour from this network, ` +
+                 `which is my cap so a runaway script cannot run up a bill. ` +
+                 `It resets in ${mins} minute${mins === 1 ? '' : 's'}. ` +
+                 `Everything else still works: the keys, the dials, the gallery.`,
+            actions: [], limited: true, resetInMinutes: mins,
+          }, 200, request);
         }
 
         /* Trim history hard: last 8 turns, 500 chars each. Keeps the prompt
