@@ -83,6 +83,7 @@ It runs silently without audio, see [Audio](#audio) below.
 | `M` | mute | | `Enter` | surprise me |
 | `N` | nose heart burst | | `Space` | play / pause |
 | `O` | roll a whole new look | | `Esc` | close the open panel |
+| `Shift`+`L` | agentic chat on/off | | hold `.` | push-to-talk |
 | `Shift`+`J` | clear the flood | | `Shift`+`Q` | clear the sky |
 
 The full list lives on `?` in the piece itself, alphabetized.

@@ -3511,6 +3511,36 @@ function chatMicOn(on) {
   else stopRecog();
 }
 
+/* ── push-to-talk: hold `.` to speak, release to send ──
+   Walkie-talkie for the agentic chat. Auto-enters agentic mode if you are not
+   in it, so "hold the key and talk" is the entire gesture from anywhere.
+   Release calls recognition.stop(), which still DELIVERS the final transcript
+   (stop flushes, abort discards), so the words you said while holding arrive
+   at chatSend after you let go.
+   If the continuous mic is already live, holding the key is a no-op: there is
+   nothing to push because it is always talking. */
+let pttHeld = false;
+function pttStart() {
+  if (pttHeld || !SR) return;
+  if (chatOpen && chatMicB.classList.contains('listening')) return;  // already live
+  pttHeld = true;
+  if (!chatOpen) setVoiceMode(2);       // brings up the dock; mic state set below
+  stopRecog();                          // take the mic regardless of prior mode
+  chatMicB.classList.add('listening');
+  startRecog(txt => { if (!chatBusy) chatSend(txt); });
+}
+function pttEnd() {
+  if (!pttHeld) return;
+  pttHeld = false;
+  chatMicB.classList.remove('listening');
+  /* stopRecog nulls onend (no auto-restart) but leaves onresult attached,
+     so the final transcript still lands and sends */
+  stopRecog();
+}
+addEventListener('keyup', e => { if (e.key === '.') pttEnd(); });
+/* releasing outside the window (alt-tab mid-hold) must not wedge the mic */
+addEventListener('blur', pttEnd);
+
 document.getElementById('chatSend').addEventListener('click', () => {
   const v = chatInput.value; chatInput.value = ''; chatSend(v);
 });
@@ -4773,6 +4803,8 @@ const HELP_ROWS = [
   [['\u21e7J'], 'clear the skull flood', '', ''],
   [['\u21e7Q'], 'clear the sky', '', ''],
   [['L'], 'keyword voice on / off', '', 'l'],
+  [['\u21e7L'], 'agentic chat on / off', '', ''],
+  [['.'], 'hold to talk, release to send', '', ''],
   [['🎤'], 'pick keyword or agentic chat', '', ''],
   [['D'], 'fps / quality monitor', '', 'd'],
   [['C'], 'settings + presets', '', 'c'],
@@ -4786,7 +4818,7 @@ const HELP_ROWS = [
      Plain letters first A-Z; a shifted variant sorts next to its own letter
      (J then Shift-J); everything that is not a letter goes to the bottom in a
      stated order, since "where does Space go" has no alphabetical answer. */
-  const TAIL = ['Enter', 'Space', '\u2191', '?', '\u{1F3A4}'];
+  const TAIL = ['Enter', 'Space', '.', '\u2191', '?', '\u{1F3A4}'];
   const sortKey = ([keys]) => {
     const k = keys[0];
     const bare = k.replace('\u21e7', '');
@@ -5052,7 +5084,11 @@ addEventListener('keydown', e => {
   else if (k === 'y') { stare.until = t + 3.2; SFX.glare(); }
   else if (k === 'z') toggleText();
   else if (k === 'd') { CFG.hudOn = CFG.hudOn ? 0 : 1; applyToggles({ skipVoice: true }); }
-  else if (k === 'l') { CFG.voiceOn = voiceOn ? 0 : 1; toggleVoice(); syncToggleUI(); }
+  else if (k === 'l') {
+    if (e.shiftKey) { setVoiceMode(voiceMode === 2 ? 0 : 2); }   // agentic chat
+    else { CFG.voiceOn = voiceOn ? 0 : 1; toggleVoice(); syncToggleUI(); }
+  }
+  else if (k === '.') { if (!e.repeat) pttStart(); }
   else if (k === 'o') document.getElementById('cfgRestyle').click();  // same as the dice
   else if (k === 'i') savePhoto();
   else if (k === 'c') togglePanel(cfgPanel);
