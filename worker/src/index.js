@@ -21,19 +21,27 @@ const ALLOWED_ORIGINS = [
    Anything not on this list is dropped, so a hostile client cannot smuggle
    arbitrary JSON into other people's browsers. */
 const LIMITS = {
-  tunnelSpeed: [0.005, 0.12], tunnelBassBoost: [0, 3], tunnelBreath: [0, 0.3],
-  skullSpinMax: [0, 2], beatSensitivity: [1.05, 2], beatDecay: [1, 15],
-  ringSpeed: [0, 1], ringBeatKick: [0, 6], spiralSpeed: [0, 1], raySpeed: [0, 0.4],
-  nosePulse: [0, 1], teethClack: [0, 0.5], pupilBeat: [0, 0.6],
-  smokeStir: [0, 4], smokeDecay: [0.05, 3], skullSize: [0.5, 1.8],
-  rayLength: [0.3, 2.5], rayCount: [6, 28], smokeScale: [0.4, 3],
-  smokeDrift: [0.1, 4], tunnelCount: [12, 56], starDensity: [0.2, 2.5],
-  dustCount: [0.2, 2], gazeRange: [0.3, 2], wanderPace: [0.3, 3],
-  tempoRef: [60, 140], dayCycleMin: [2, 30], perfMode: [0, 2], tempoMax: [1, 3],
-  eventMinGap: [1, 30], eventMaxGap: [2, 60],
-  liquidFill: [2, 30], liquidRest: [0, 20],
-  musicVolume: [0, 1], gritoVolume: [0, 1],
-  textOn: [0, 1], musicOn: [0, 1], autoEvents: [0, 1], voiceOn: [0, 1], hudOn: [0, 1],
+  tunnelSpeed: [0.005, 0.12, 'tunnel zoom speed'], tunnelBassBoost: [0, 3, 'tunnel bass boost'], tunnelBreath: [0, 0.3, 'tunnel beat breath'],
+  skullSpinMax: [0, 2, 'skull spin max'], beatSensitivity: [1.05, 2, 'beat sensitivity'], beatDecay: [1, 15, 'beat pulse decay'],
+  ringSpeed: [0, 1, 'eye ring speed'], ringBeatKick: [0, 6, 'ring beat kick'], spiralSpeed: [0, 1, 'cheek spiral speed'], raySpeed: [0, 0.4, 'sunbeam speed'],
+  nosePulse: [0, 1, 'nose beat thump'], teethClack: [0, 0.5, 'teeth beat clack'], pupilBeat: [0, 0.6, 'pupil beat snap'],
+  smokeStir: [0, 4, 'smoke cursor stir'], smokeDecay: [0.05, 3, 'smoke stir fade rate'], skullSize: [0.5, 1.8, 'hero skull size'],
+  rayLength: [0.3, 2.5, 'starburst length'], rayCount: [6, 28, 'starburst rays'], smokeScale: [0.4, 3, 'smoke marble size'],
+  smokeDrift: [0.1, 4, 'smoke drift speed'], tunnelCount: [12, 56, 'tunnel skull count'], starDensity: [0.2, 2.5, 'star density'],
+  dustCount: [0.2, 2, 'dust particles'], gazeRange: [0.3, 2, 'pupil travel range'], wanderPace: [0.3, 3, 'eye wander pace'],
+  tempoRef: [60, 140, 'tempo ref BPM'], dayCycleMin: [2, 30, 'day/night cycle minutes'], perfMode: [0, 2, 'perf mode'], tempoMax: [1, 3, 'tempo speed cap'],
+  eventMinGap: [1, 30, 'event gap min seconds'], eventMaxGap: [2, 60, 'event gap max seconds'],
+  liquidFill: [2, 30, 'logo travel time'], liquidRest: [0, 20, 'logo dwell'],
+  musicVolume: [0, 1, 'music volume'], gritoVolume: [0, 1, 'grito volume'],
+  /* color + feel. These shipped in the page well after this list was written,
+     and their absence here meant cleanConfig() silently dropped every one of
+     them: any preset saved to the gallery came back with its palette, hues,
+     and glow reset to default. Keep this in lockstep with CFG_SCHEMA. */
+  palette: [0, 7, 'color palette'], hueShift: [-180, 180, 'ornament hue shift'], satMul: [0, 2, 'ornament saturation'],
+  boneHue: [-180, 180, 'bone hue'], boneSat: [0, 2, 'bone saturation'],
+  nebulaHue: [-180, 180, 'smoke hue shift'], nebulaSat: [0, 2, 'smoke saturation'], bgBright: [0.2, 2, 'smoke brightness'], vignette: [0, 1.2, 'vignette'],
+  flickForce: [0.2, 3, 'flick strength'], socketGlow: [0, 2.5, 'eye socket glow'], auraSize: [0, 2.5, 'skull aura'], petalCount: [4, 20, 'eye petals'],
+  textOn: [0, 1, 'show text'], musicOn: [0, 1, 'music on'], autoEvents: [0, 1, 'random events'], voiceOn: [0, 1, 'voice control'], hudOn: [0, 1, 'fps monitor'],
 };
 
 /* Deliberately blunt list: slurs and profanity roots. Matching happens after
@@ -246,6 +254,112 @@ export default {
         ).bind(author, hour).run();
 
         return json({ id, name: body.name.trim() }, 200, request);
+      }
+
+      /* ── agentic chat ──
+         Runs on Workers AI so no API key exists anywhere in the client. The
+         model only ever PROPOSES actions; the page validates every one against
+         its own CFG_SCHEMA before applying, so a jailbroken reply cannot reach
+         past the knobs that already exist. Anything the art cannot do becomes
+         a request on the issue board instead, which is the whole loop. */
+      if (request.method === 'POST' && path === '/api/chat') {
+        const body = await request.json().catch(() => null);
+        if (!body || !Array.isArray(body.messages)) {
+          return json({ error: 'bad json' }, 400, request);
+        }
+
+        /* A public unauthenticated LLM endpoint is the one thing here that
+           costs real money per call, so it gets a tighter quota than writes
+           and its own bucket (chatting must not consume preset saves). */
+        const ip = request.headers.get('CF-Connecting-IP') || '0.0.0.0';
+        const author = await hashIp(ip, env.SALT || 'sklz');
+        const hour = Math.floor(Date.now() / 3600000);
+        const bucket = `chat:${author}`;
+        const quota = await env.sklz_presets.prepare(
+          'SELECT n FROM writes WHERE author_hash = ? AND hour_bucket = ?'
+        ).bind(bucket, hour).first();
+        if (quota && quota.n >= 60) {
+          return json({ say: 'the skulls need a rest. try again in a bit.', actions: [] },
+                      200, request);
+        }
+
+        /* Trim history hard: last 8 turns, 500 chars each. Keeps the prompt
+           bounded no matter what a client sends. */
+        const msgs = body.messages.slice(-8).map(m => ({
+          role: m.role === 'assistant' ? 'assistant' : 'user',
+          content: String(m.content || '').slice(0, 500),
+        })).filter(m => m.content);
+        if (!msgs.length) return json({ error: 'nothing to say' }, 400, request);
+
+        const knobs = Object.entries(LIMITS)
+          .map(([k, [lo, hi, lab]]) => `${k} = ${lab || k} (${lo}..${hi})`).join('; ');
+
+        const system = [
+          'You are the voice of a Dia de los Muertos calavera altar drifting in deep space,',
+          'a generative art piece called SKLZ by the Amini brothers. You speak as the art itself:',
+          'warm, a little wry, never corporate. Keep replies to one or two short sentences.',
+          '',
+          'You can change the art by returning actions. Reply ONLY with JSON of the form:',
+          '{"say": "<what you tell the viewer>", "actions": [ ... ]}',
+          '',
+          'Action shapes:',
+          '  {"op":"set","key":"<knob>","value":<number>}   change a setting',
+          '  {"op":"fx","name":"<effect>"}                  fire a one-off effect',
+          '  {"op":"request","text":"<their idea>"}         they asked for something that does not exist',
+          '',
+          `Knobs you may set, with their allowed ranges: ${knobs}`,
+          'Effects you may fire: grito, comet, ufo, aurora, supernova, meteor, star,',
+          'petals, alebrije, rainbow, flick, teeth, stare, random.',
+          '',
+          'Rules that do not bend:',
+          '- The themes are Dia de los Muertos and deep space. Never agree to retheme it,',
+          '  change the music genre, or make it scary or gory. Say no warmly and offer',
+          '  something in-theme instead.',
+          '- If they ask for something the knobs and effects above cannot do, do NOT pretend.',
+          '  Use the "request" action so it becomes a real request the artist reviews,',
+          '  and tell them that is what you did.',
+          '- Never invent a knob or effect name that is not listed. Never output prose',
+          '  outside the JSON.',
+        ].join('\n');
+
+        let out;
+        try {
+          out = await env.AI.run('@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
+            messages: [{ role: 'system', content: system }, ...msgs],
+            max_tokens: 320,
+            temperature: 0.7,
+          });
+        } catch (e) {
+          return json({ say: 'my mouth is not working right now. try again?',
+                        actions: [], error: String(e).slice(0, 120) }, 200, request);
+        }
+
+        /* Workers AI hands back `response` as an already-parsed object when the
+           model emits clean JSON, and as a string (sometimes fenced, sometimes
+           wrapped in prose) when it does not. Handle both: assuming the string
+           case alone produced "[object Object]" for every single reply. */
+        let parsed = null;
+        let fenced = '';
+        const resp = out?.response;
+        if (resp && typeof resp === 'object') {
+          parsed = resp;
+        } else {
+          const raw = String(resp || '').trim();
+          fenced = raw.replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+          for (const cand of [fenced, raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1)]) {
+            if (!cand) continue;
+            try { parsed = JSON.parse(cand); break; } catch (_) {}
+          }
+        }
+        const say = String(parsed?.say || (parsed ? '' : fenced) || '...').slice(0, 400);
+        const actions = Array.isArray(parsed?.actions) ? parsed.actions.slice(0, 6) : [];
+
+        await env.sklz_presets.prepare(
+          `INSERT INTO writes (author_hash, hour_bucket, n) VALUES (?, ?, 1)
+           ON CONFLICT(author_hash, hour_bucket) DO UPDATE SET n = n + 1`
+        ).bind(bucket, hour).run();
+
+        return json({ say, actions }, 200, request);
       }
 
       return json({ error: 'not found' }, 404, request);

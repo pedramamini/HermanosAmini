@@ -10,3 +10,6 @@ database_id = "your-d1-database-id"
 
 [vars]
 SALT = "change-me-any-random-string"
+
+[ai]
+binding = "AI"

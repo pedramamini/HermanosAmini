@@ -573,6 +573,136 @@
   }
   /* until the count loads it shows a star glyph; no layout jump either way */
   #ghcount { min-width: 10px; font-variant-numeric: tabular-nums; }
+  /* ── voice mode menu: a small popover above the mic ── */
+  #voiceMenu {
+    position: fixed; right: 24px; bottom: 80px; z-index: 24; display: none;
+    width: 260px; padding: 9px; border-radius: 14px;
+    font-family: 'Space Grotesk', sans-serif; color: #f5eadf;
+    background: rgba(9,4,20,.72);
+    border: 1px solid rgba(245,234,223,.16);
+    backdrop-filter: blur(13px); -webkit-backdrop-filter: blur(13px);
+    box-shadow: 0 18px 50px rgba(0,0,0,.62);
+    animation: vmIn .2s cubic-bezier(.16,1,.3,1);
+  }
+  #voiceMenu.show { display: block; }
+  @keyframes vmIn { from { opacity: 0; transform: translateY(8px); } }
+  .vmhead {
+    font-size: 9.5px; letter-spacing: .26em; text-transform: uppercase;
+    color: rgba(245,234,223,.4); padding: 3px 8px 8px;
+  }
+  .vmopt {
+    display: flex; align-items: center; gap: 10px; padding: 9px 10px;
+    border-radius: 10px; cursor: pointer; transition: background .18s;
+  }
+  .vmopt:hover { background: rgba(245,234,223,.07); }
+  .vmicon { font-size: 15px; width: 18px; text-align: center; }
+  .vmtext { flex: 1; min-width: 0; }
+  .vmtext b { display: block; font-size: 12.5px; font-weight: 500; }
+  .vmtext span { display: block; font-size: 10.5px; color: rgba(245,234,223,.45); margin-top: 2px; }
+  .vmdot {
+    width: 8px; height: 8px; border-radius: 50%; flex: none;
+    border: 1px solid rgba(245,234,223,.3);
+  }
+  .vmopt.on .vmdot { background: #2fe8d0; border-color: #2fe8d0; box-shadow: 0 0 9px rgba(47,232,208,.85); }
+  .vmopt.on .vmtext b { color: #2fe8d0; }
+
+  /* ── agentic chat dock ── */
+  #chatDock {
+    position: fixed; right: 24px; bottom: 80px; z-index: 25; display: none;
+    width: 330px; border-radius: 15px; overflow: hidden;
+    font-family: 'Space Grotesk', sans-serif; color: #f5eadf;
+    background: rgba(9,4,20,.74);
+    border: 1px solid rgba(255,179,71,.24);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    box-shadow: 0 20px 56px rgba(0,0,0,.66);
+    animation: vmIn .24s cubic-bezier(.16,1,.3,1);
+  }
+  #chatDock.show { display: block; }
+  #chatBar {
+    display: flex; align-items: center; gap: 9px; padding: 10px 11px;
+    cursor: pointer; border-bottom: 1px solid rgba(245,234,223,.1);
+  }
+  .cdglyph { font-size: 15px; filter: drop-shadow(0 0 8px rgba(255,47,160,.7)); }
+  .cdtitle {
+    flex: 1; min-width: 0; font-size: 12.5px; letter-spacing: .04em;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  /* collapsed, the bar becomes the bubble: title plus a peek at the last line */
+  #chatPeek { color: rgba(245,234,223,.42); font-size: 11px; }
+  #chatPeek:not(:empty)::before { content: "\00a0·\00a0"; }
+  #chatDock:not(.min) #chatPeek { display: none; }
+  .cdacts { display: flex; gap: 3px; flex: none; }
+  .cdacts button {
+    width: 24px; height: 24px; display: grid; place-items: center;
+    border: none; border-radius: 7px; cursor: pointer; font-size: 11px;
+    background: rgba(245,234,223,.08); color: rgba(245,234,223,.66);
+    font-family: inherit; transition: background .18s, color .18s;
+  }
+  .cdacts button:hover { background: rgba(245,234,223,.16); color: #f5eadf; }
+  #chatMute.muted { color: #ff2fa0; }
+  #chatDock.min #chatBody { display: none; }
+  #chatDock.min { width: 258px; }
+  #chatBody { display: block; }
+  #chatLog {
+    max-height: 290px; min-height: 74px; overflow-y: auto;
+    padding: 12px 11px 4px; display: flex; flex-direction: column; gap: 8px;
+    scrollbar-width: thin; scrollbar-color: rgba(245,234,223,.2) transparent;
+  }
+  #chatLog::-webkit-scrollbar { width: 5px; }
+  #chatLog::-webkit-scrollbar-thumb { background: rgba(245,234,223,.2); border-radius: 3px; }
+  .cmsg {
+    max-width: 84%; padding: 8px 11px; border-radius: 12px;
+    font-size: 12.5px; line-height: 1.5; word-wrap: break-word;
+    animation: vmIn .2s ease-out;
+  }
+  .cmsg.me {
+    align-self: flex-end; color: #fff; border-bottom-right-radius: 4px;
+    background: linear-gradient(180deg, rgba(145,70,255,.95), rgba(110,45,210,.95));
+  }
+  .cmsg.her {
+    align-self: flex-start; border-bottom-left-radius: 4px;
+    background: rgba(245,234,223,.09); border: 1px solid rgba(245,234,223,.1);
+  }
+  .cmsg.did {
+    align-self: flex-start; font-size: 10.5px; letter-spacing: .04em;
+    color: #2fe8d0; background: rgba(47,232,208,.09);
+    border: 1px solid rgba(47,232,208,.22); padding: 5px 9px;
+  }
+  .cmsg.dots span {
+    display: inline-block; width: 5px; height: 5px; margin: 0 1px;
+    border-radius: 50%; background: rgba(245,234,223,.6);
+    animation: cdot 1.1s infinite;
+  }
+  .cmsg.dots span:nth-child(2) { animation-delay: .15s; }
+  .cmsg.dots span:nth-child(3) { animation-delay: .3s; }
+  @keyframes cdot { 0%,60%,100% { opacity: .25; } 30% { opacity: 1; } }
+  #chatForm { display: flex; gap: 6px; padding: 9px 11px 11px; align-items: center; }
+  #chatInput {
+    flex: 1; min-width: 0; padding: 9px 11px; border-radius: 9px;
+    background: rgba(245,234,223,.08); color: #f5eadf;
+    border: 1px solid rgba(245,234,223,.18);
+    font-family: inherit; font-size: 12.5px; outline: none;
+  }
+  #chatInput:focus { border-color: rgba(145,70,255,.8); }
+  #chatForm button {
+    width: 32px; height: 32px; flex: none; display: grid; place-items: center;
+    border-radius: 9px; cursor: pointer; font-size: 13px; font-family: inherit;
+    border: 1px solid rgba(245,234,223,.18);
+    background: rgba(245,234,223,.08); color: rgba(245,234,223,.7);
+    transition: border-color .2s, color .2s;
+  }
+  #chatForm button:hover { color: #f5eadf; border-color: rgba(245,234,223,.45); }
+  #chatMic.listening {
+    color: #ff2fa0; border-color: #ff2fa0;
+    animation: mic-pulse 1.6s ease-out infinite;
+  }
+  @media (max-width: 720px) {
+    #chatDock { right: 12px; left: 12px; width: auto; bottom: 76px; }
+    #chatDock.min { width: auto; }
+    #voiceMenu { right: 12px; left: 12px; width: auto; bottom: 76px; }
+    #chatLog { max-height: 42vh; }
+  }
+
   /* ── idea capture modal ── */
   #ideaModal {
     position: fixed; inset: 0; z-index: 30; display: none;
@@ -665,6 +795,40 @@
 <div id="mic" class="ui ctl" title="voice control">&#127908;</div>
 <div id="help" class="ui ctl" title="controls">?</div>
 <div id="mute" class="ui ctl" title="mute">&#9835;</div>
+
+<div id="voiceMenu" class="ui">
+  <div class="vmhead">voice</div>
+  <div class="vmopt" data-mode="1">
+    <div class="vmicon">&#9889;</div>
+    <div class="vmtext"><b>keyword commands</b><span>say &ldquo;comet&rdquo;, &ldquo;grito&rdquo;, &ldquo;supernova&rdquo;</span></div>
+    <div class="vmdot"></div>
+  </div>
+  <div class="vmopt" data-mode="2">
+    <div class="vmicon">&#9760;</div>
+    <div class="vmtext"><b>agentic chat</b><span>talk to the art, it talks back</span></div>
+    <div class="vmdot"></div>
+  </div>
+</div>
+
+<div id="chatDock" class="ui">
+  <div id="chatBar">
+    <div class="cdglyph">&#9760;</div>
+    <div class="cdtitle">la calavera<span id="chatPeek"></span></div>
+    <div class="cdacts">
+      <button id="chatMute" title="mute the voice">&#128266;</button>
+      <button id="chatMin" title="minimize">&#9866;</button>
+      <button id="chatEnd" title="end chat">&#10005;</button>
+    </div>
+  </div>
+  <div id="chatBody">
+    <div id="chatLog"></div>
+    <div id="chatForm">
+      <button id="chatMic" title="hold a conversation out loud">&#127908;</button>
+      <input id="chatInput" type="text" maxlength="400" placeholder="ask the skull for something..." autocomplete="off">
+      <button id="chatSend" title="send">&#10148;</button>
+    </div>
+  </div>
+</div>
 
 <div id="ideaModal" class="ui">
   <div id="ideaCard">
@@ -2447,39 +2611,270 @@ function handleVoice(text) {
   }
   return fired;
 }
-function toggleVoice() {
-  if (!SR) {                                     // Firefox etc: no Web Speech API
+/* ── voice: two modes behind one button ──
+   0 = off, 1 = keyword commands, 2 = agentic chat. Both modes want the same
+   microphone, so they are mutually exclusive and share one recognizer. */
+let voiceMode = 0;
+const voiceMenu = document.getElementById('voiceMenu');
+
+function startRecog(onFinal) {
+  if (!SR) return false;
+  recog = new SR();
+  recog.continuous = true;
+  recog.interimResults = false;
+  recog.lang = 'en-US';
+  recog.onresult = e => {
+    for (let i = e.resultIndex; i < e.results.length; i++)
+      onFinal(e.results[i][0].transcript);
+  };
+  /* Chrome stops on silence; restart unless we stopped on purpose */
+  recog.onend = () => {
+    if (recog && recog._wanted && !ttsHold) { try { recog.start(); } catch (_) {} }
+  };
+  recog.onerror = ev => {
+    if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') {
+      setVoiceMode(0);
+      micBtn.title = 'microphone permission denied';
+      if (chatOpen) chatSay('her', 'I cannot hear you: the browser blocked the mic. You can still type.');
+    }
+  };
+  recog._wanted = true;
+  try { recog.start(); } catch (_) {}
+  return true;
+}
+function stopRecog() {
+  if (!recog) return;
+  recog._wanted = false;
+  recog.onend = null;
+  try { recog.stop(); } catch (_) {}
+  recog = null;
+}
+
+function setVoiceMode(mode) {
+  if (!SR && mode) {                             // Firefox etc: no Web Speech API
     micBtn.title = 'voice control not supported in this browser';
     micBtn.style.opacity = 0.35;
+    if (mode === 2) { openChat(); }              // typing still works fine
     return;
   }
-  voiceOn = !voiceOn;
-  micBtn.classList.toggle('listening', voiceOn);
-  if (voiceOn) {
-    recog = new SR();
-    recog.continuous = true;
-    recog.interimResults = false;
-    recog.lang = 'en-US';
-    recog.onresult = e => {
-      for (let i = e.resultIndex; i < e.results.length; i++)
-        handleVoice(e.results[i][0].transcript);
+  if (mode === voiceMode) mode = 0;              // clicking the live mode turns it off
+  voiceMode = mode;
+  voiceOn = mode > 0;
+  CFG.voiceOn = voiceOn ? 1 : 0;
+
+  stopRecog();
+  micBtn.classList.toggle('listening', mode === 1);
+  voiceMenu.querySelectorAll('.vmopt').forEach(o => {
+    o.classList.toggle('on', +o.dataset.mode === mode);
+  });
+
+  if (mode === 1) { closeChat(); startRecog(handleVoice); }
+  else if (mode === 2) { openChat(); }
+  else { closeChat(); }
+}
+
+/* the old single-toggle entry points (L key, config switch) mean "keyword" */
+function toggleVoice() { setVoiceMode(voiceMode ? 0 : 1); }
+
+micBtn.addEventListener('click', e => {
+  e.stopPropagation();
+  if (chatOpen) { chatDock.classList.toggle('min'); return; }
+  voiceMenu.classList.toggle('show');
+});
+voiceMenu.querySelectorAll('.vmopt').forEach(o => {
+  o.addEventListener('click', e => {
+    e.stopPropagation();
+    setVoiceMode(+o.dataset.mode);
+    if (voiceMode !== 1) voiceMenu.classList.remove('show');
+  });
+});
+addEventListener('pointerdown', e => {
+  if (!voiceMenu.classList.contains('show')) return;
+  if (e.target.closest && e.target.closest('#voiceMenu, #mic')) return;
+  voiceMenu.classList.remove('show');
+}, true);
+
+/* ── agentic chat ──
+   The model proposes; this validates. Every action is checked against
+   CFG_SCHEMA and the effect table below before it touches the art, so a
+   jailbroken or hallucinated reply cannot reach past knobs that already
+   exist. Anything unbuildable becomes a request on the issue board. */
+const chatDock  = document.getElementById('chatDock');
+const chatLogEl = document.getElementById('chatLog');
+const chatInput = document.getElementById('chatInput');
+const chatPeek  = document.getElementById('chatPeek');
+const chatMicB  = document.getElementById('chatMic');
+const chatMuteB = document.getElementById('chatMute');
+let chatOpen = false, chatBusy = false, chatMuted = false;
+let chatHist = [], ttsHold = false;
+
+const CHAT_FX = {
+  grito: () => grito(), comet: fxComet, ufo: fxUfo, aurora: fxAurora,
+  supernova: fxSupernova, meteor: fxMeteorShower, star: fxShootingStar,
+  petals: fxPetalBurst, alebrije: fxAlebrije, flick: fxFlickRandom,
+  random: randomEffect,
+  rainbow: () => { rainbowEyeUntil = t + 5; },
+  teeth:   () => { face.chatterUntil = t + 1.6; },
+  stare:   () => { stare.until = t + 3.2; },
+};
+
+function chatSay(who, text) {
+  const d = document.createElement('div');
+  d.className = 'cmsg ' + who;
+  d.textContent = text;
+  chatLogEl.appendChild(d);
+  chatLogEl.scrollTop = chatLogEl.scrollHeight;
+  if (who === 'me' || who === 'her') chatPeek.textContent = text.slice(0, 30);
+  return d;
+}
+
+/* Speaking out loud through the same mic we are listening on feeds the
+   recognizer its own voice and the conversation talks to itself. Hold
+   recognition for the duration of every utterance. */
+function speak(text) {
+  if (chatMuted || !window.speechSynthesis) return;
+  try {
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'en-US'; u.rate = 1.02; u.pitch = 0.92;
+    let resumed = false;
+    const resume = () => {
+      if (resumed) return;
+      resumed = true;
+      clearTimeout(ttsGuard);
+      ttsHold = false;
+      if (voiceMode === 2 && recog && recog._wanted) { try { recog.start(); } catch (_) {} }
     };
-    recog.onend = () => { if (voiceOn) { try { recog.start(); } catch (_) {} } };  // Chrome auto-stops on silence
-    recog.onerror = ev => {
-      if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') {
-        voiceOn = false;
-        micBtn.classList.remove('listening');
-        micBtn.title = 'microphone permission denied';
-      }
-    };
-    try { recog.start(); } catch (_) {}
-  } else if (recog) {
-    recog.onend = null;
-    try { recog.stop(); } catch (_) {}
-    recog = null;
+    u.onend = resume; u.onerror = resume;
+    /* Chrome intermittently never fires onend on a long utterance. Without a
+       fallback that leaves ttsHold stuck true and the microphone dead for the
+       rest of the conversation, so bound the hold by the worst-case duration. */
+    const ttsGuard = setTimeout(resume, 2500 + text.length * 90);
+    if (recog && recog._wanted) { ttsHold = true; try { recog.stop(); } catch (_) {} }
+    speechSynthesis.speak(u);
+  } catch (_) {}
+}
+
+const RECOLOR_KEYS = new Set(['palette', 'hueShift', 'satMul', 'boneHue', 'boneSat',
+  'nebulaHue', 'nebulaSat', 'bgBright', 'vignette', 'socketGlow', 'auraSize', 'petalCount']);
+
+function applyActions(actions) {
+  const done = [];
+  let touched = false, recolor = false;
+  for (const a of actions || []) {
+    if (!a || typeof a !== 'object') continue;
+
+    if (a.op === 'set' && a.key in CFG_SCHEMA) {
+      const [, min, max] = CFG_SCHEMA[a.key];
+      const v = parseFloat(a.value);
+      if (!isFinite(v)) continue;
+      CFG[a.key] = Math.max(min, Math.min(max, v));
+      touched = true;
+      if (RECOLOR_KEYS.has(a.key)) recolor = true;
+      done.push(`${CFG_SCHEMA[a.key][4]} \u2192 ${CFG[a.key]}`);
+
+    } else if (a.op === 'fx' && CHAT_FX[a.name]) {
+      try { CHAT_FX[a.name](); done.push(a.name); } catch (_) {}
+
+    } else if (a.op === 'request' && typeof a.text === 'string' && a.text.length > 6) {
+      captureIdea(a.text.trim());
+      done.push('sent to the artist');
+    }
+  }
+  if (touched) syncSlidersSafe();
+  /* rebuilding sprites is expensive and only color keys are baked into them,
+     so a tempo or speed change must not trigger a full re-bake */
+  if (recolor) { applyPalette(); schedulePaletteRebuild(); }
+  if (done.length) chatSay('did', done.join(' \u00b7 '));
+}
+
+/* the slider panel may not be built yet; never let a redraw kill a reply */
+function syncSlidersSafe() { try { syncSliders(); } catch (_) {} }
+
+async function chatSend(text) {
+  text = (text || '').trim();
+  if (!text || chatBusy) return;
+  chatBusy = true;
+  chatSay('me', text);
+  chatHist.push({ role: 'user', content: text });
+  const dots = chatSay('dots', '');
+  dots.innerHTML = '<span></span><span></span><span></span>';
+  try {
+    const r = await fetch(GALLERY_API.replace('/presets', '/chat'), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: chatHist.slice(-8) })
+    });
+    const d = await r.json();
+    dots.remove();
+    const say = d.say || 'I did not catch that.';
+    chatSay('her', say);
+    chatHist.push({ role: 'assistant', content: say });
+    applyActions(d.actions);
+    speak(say);
+  } catch (_) {
+    dots.remove();
+    chatSay('her', 'the void ate that one. say it again?');
+  } finally {
+    chatBusy = false;
   }
 }
-micBtn.addEventListener('click', toggleVoice);
+
+function openChat() {
+  if (chatOpen) return;
+  chatOpen = true;
+  chatDock.classList.add('show');
+  chatDock.classList.remove('min');
+  voiceMenu.classList.remove('show');
+  if (!chatLogEl.children.length) {
+    chatSay('her', 'I am the calavera. Tell me what to change, or ask for something that is not here yet.');
+  }
+  if (SR) chatMicOn(true);
+  else chatSay('did', 'no speech recognition in this browser: type instead');
+}
+function closeChat() {
+  if (!chatOpen) return;
+  chatOpen = false;
+  chatDock.classList.remove('show');
+  chatMicB.classList.remove('listening');
+  stopRecog();
+  try { speechSynthesis.cancel(); } catch (_) {}
+}
+function chatMicOn(on) {
+  chatMicB.classList.toggle('listening', on);
+  if (on) startRecog(txt => { if (!chatBusy) chatSend(txt); });
+  else stopRecog();
+}
+
+document.getElementById('chatSend').addEventListener('click', () => {
+  const v = chatInput.value; chatInput.value = ''; chatSend(v);
+});
+chatInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { const v = chatInput.value; chatInput.value = ''; chatSend(v); }
+});
+chatMicB.addEventListener('click', e => {
+  e.stopPropagation();
+  chatMicOn(!chatMicB.classList.contains('listening'));
+});
+chatMuteB.addEventListener('click', e => {
+  e.stopPropagation();
+  chatMuted = !chatMuted;
+  chatMuteB.classList.toggle('muted', chatMuted);
+  chatMuteB.innerHTML = chatMuted ? '&#128263;' : '&#128266;';
+  if (chatMuted) { try { speechSynthesis.cancel(); } catch (_) {} }
+});
+document.getElementById('chatMin').addEventListener('click', e => {
+  e.stopPropagation();
+  chatDock.classList.toggle('min');
+});
+document.getElementById('chatEnd').addEventListener('click', e => {
+  e.stopPropagation();
+  setVoiceMode(0);                 // ending returns to the menu, as asked
+  voiceMenu.classList.add('show');
+});
+/* clicking the bar (not its buttons) expands or collapses */
+document.getElementById('chatBar').addEventListener('click', e => {
+  if (e.target.closest('.cdacts')) return;
+  chatDock.classList.toggle('min');
+});
 
 /* ── FPS / quality HUD (D key) ── */
 const hudEl = document.getElementById('hud');
@@ -3638,7 +4033,8 @@ const HELP_ROWS = [
   [['Y'], 'mean mug (the stare)', '"mirada"', 'y'],
   [['I'], 'save a photo', '', 'i'],
   [['Z'], 'zen mode (hide all text)', '', 'z'],
-  [['L'], 'voice control on / off', '', 'l'],
+  [['L'], 'keyword voice on / off', '', 'l'],
+  [['🎤'], 'pick keyword or agentic chat', '', ''],
   [['D'], 'fps / quality monitor', '', 'd'],
   [['C'], 'settings + presets', '', 'c'],
   [['H', '?'], 'this menu', '', 'h'],
@@ -3780,6 +4176,13 @@ addEventListener('keydown', e => {
   if (k === 'escape') {
     /* idea modal sits on top of everything and closes first */
     if (ideaModal.classList.contains('show')) { closeIdea(); return; }
+    if (voiceMenu.classList.contains('show')) { voiceMenu.classList.remove('show'); return; }
+    /* first escape minimizes a live chat, second ends it */
+    if (chatOpen) {
+      if (chatDock.classList.contains('min')) { setVoiceMode(0); }
+      else { chatDock.classList.add('min'); }
+      return;
+    }
     /* gallery -> config -> help -> closed */
     const gal = document.getElementById('galPanel');
     if (gal && gal.classList.contains('show')) {

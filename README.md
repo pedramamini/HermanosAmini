@@ -73,11 +73,22 @@ It runs silently without audio, see [Audio](#audio) below.
 | `G` | grito | | `Z` | zen mode (hide text) |
 | `U` | UFO (2+ dogfight) | | `Y` | mean mug |
 | `B` | alebrije spirit | | `I` | save a photo |
-| `L` | voice control | | `D` | fps / quality monitor |
+| `L` | keyword voice | | `D` | fps / quality monitor |
 | `Enter` | surprise me | | `Esc` | back out of panels |
 
 Click the art: the eyes follow you, face parts react, skulls flick away.
-Say "grito" or "ufo" out loud with voice control on.
+Click the microphone to pick how you talk to it:
+
+- **Keyword commands** listen for single words. Say "grito", "ufo", or
+  "supernova" and the art responds.
+- **Agentic chat** opens a conversation in the bottom right. Ask for what you
+  want in plain language ("dim the smoke", "make everything more purple") and
+  it changes the piece while it answers. Type or talk; it talks back unless you
+  mute it. Ask for something that does not exist yet and it files that as a
+  request for the artist instead of pretending.
+
+The chat can only turn dials that already exist. It cannot retheme the piece,
+and it is told to refuse if you ask.
 
 Under the hood: WebGL nebula, four stacked canvases, beat detection driving a
 BPM-locked tempo, and a five-tier quality ladder that sheds detail until the
