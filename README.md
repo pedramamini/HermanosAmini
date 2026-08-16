@@ -1,5 +1,13 @@
 # HermanosAmini
 
+<p align="center">
+  <a href="https://hermanosamini.com"><img src="og.jpg" alt="SKLZ · Ritmos de los Muertos: the hero calavera, third eye open, deep in the skull tunnel" width="820"></a>
+</p>
+
+<p align="center">
+  <a href="https://runmaestro.ai"><img src="https://runmaestro.ai/assets/made-with-maestro.svg" alt="Made with Maestro"></a>
+</p>
+
 **UNA OBRA PSICODÉLICA DE LOS HERMANOS AMINI**
 
 ### [hermanosamini.com](https://hermanosamini.com)
