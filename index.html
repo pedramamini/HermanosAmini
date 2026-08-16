@@ -46,7 +46,9 @@
   }
   /* zen mode: every word off the screen, art only. Panels stay usable. */
   body.notext #eyebrow, body.notext #wordmark, body.notext #tag,
-  body.notext #credit, body.notext #hud { opacity: 0 !important; }
+  body.notext #credit, body.notext #hud, body.notext #ghstar {
+    opacity: 0 !important; pointer-events: none;
+  }
   #eyebrow, #tag, #credit, #wordmark { transition: opacity .6s; }
   #wordmark {
     bottom: 5vh; left: 0; right: 0; text-align: center; pointer-events: none;
@@ -549,6 +551,28 @@
     }
   }
 
+  /* GitHub star badge, top-left. Same restraint as the rest of the chrome:
+     dim until you look at it. Hidden in zen mode with the other text. */
+  #ghstar {
+    top: 16px; left: 18px; z-index: 16;
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 8px 14px 8px 11px; border-radius: 999px;
+    color: rgba(245,234,223,.62); text-decoration: none;
+    font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 500;
+    letter-spacing: .04em;
+    background: rgba(9,4,20,.34);
+    border: 1px solid rgba(245,234,223,.13);
+    backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px);
+    transition: color .25s, border-color .25s, background .25s, opacity .6s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #ghstar svg { width: 20px; height: 20px; display: block; flex: 0 0 auto; }
+  #ghstar:hover {
+    color: #f5eadf; border-color: rgba(245,234,223,.4);
+    background: rgba(9,4,20,.6);
+  }
+  /* until the count loads it shows a star glyph; no layout jump either way */
+  #ghcount { min-width: 10px; font-variant-numeric: tabular-nums; }
   #hud {
     top: 16px; left: 16px; z-index: 16; display: none;
     font-family: 'SF Mono', 'Menlo', monospace; font-size: 11px;
@@ -572,6 +596,11 @@
 <canvas id="hero"></canvas>
 <canvas id="dust"></canvas>
 
+<a id="ghstar" class="ui" href="https://github.com/pedramamini/HermanosAmini"
+   target="_blank" rel="noopener noreferrer" title="Star us on GitHub">
+  <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.922.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
+  <span id="ghcount">&#9733;</span>
+</a>
 <div id="eyebrow" class="ui">los que amamos nunca mueren</div>
 <div id="wordmark" class="ui"><span id="wm-stack">SKLZ<span id="wm-fill" aria-hidden="true">SKLZ</span></span><small>ritmos de los muertos</small></div>
 <div id="tag" class="ui">una obra psicod&eacute;lica de los hermanos amini</div>
@@ -3730,6 +3759,32 @@ applyToggles({ skipVoice: true });   // restored toggles take effect (voice need
       btn.textContent = 'send'; btn.disabled = false;
     }
   });
+})();
+
+
+/* ── GitHub star count ──
+   Cached for 6h in localStorage so a permanent display does not hammer the
+   API (unauthenticated GitHub allows 60 req/hr per IP, and a wall screen that
+   auto-reloads would burn that). Fails silently to a star glyph. */
+(function ghStars() {
+  const el = document.getElementById('ghcount');
+  if (!el) return;
+  const KEY = 'sklz.ghstars.v1', TTL = 6 * 3600 * 1000;
+  const show = n => {
+    el.textContent = n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k' : String(n);
+  };
+  try {
+    const c = JSON.parse(localStorage.getItem(KEY) || 'null');
+    if (c && Date.now() - c.at < TTL) { show(c.n); return; }
+  } catch (_) {}
+  fetch('https://api.github.com/repos/pedramamini/HermanosAmini')
+    .then(r => r.ok ? r.json() : null)
+    .then(d => {
+      if (!d || typeof d.stargazers_count !== 'number') return;
+      show(d.stargazers_count);
+      try { localStorage.setItem(KEY, JSON.stringify({ n: d.stargazers_count, at: Date.now() })); } catch (_) {}
+    })
+    .catch(() => {});
 })();
 
 /* ── hammer tray (mobile) ──
