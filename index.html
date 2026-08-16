@@ -1804,7 +1804,7 @@ function heartBurst(cx, cy) {
   if (!canSpawn('heart', 10)) return;
   for (let k = 0; k < 10; k++) {
     const a = -Math.PI / 2 + (Math.random() - 0.5) * 1.6, sp = 120 + Math.random() * 200;
-    sparks.push({ kind: 'heart', x: cx, y: cy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+    sparks.push({ kind: 'heart', behind: false, x: cx, y: cy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
                   life: 0, max: 1.8, ph: Math.random() * 7, hue: Math.random() });
   }
 }
@@ -2465,7 +2465,21 @@ function drawHero(dt) {
    LAYER 4, DUST (embers + petals, two planes)
    ───────────────────────────────────────────── */
 const dustCanvas = document.getElementById('dust');
-const dctx = dustCanvas.getContext('2d');
+/* `dctx` is deliberately a let, not a const. Every effect draws through it, and
+   the spark loop retargets it per-object so an object can render either in
+   FRONT of the hero skull (the dust canvas, z-4) or BEHIND it (the tunnel
+   canvas, z-2). Depth is a property of the object, not of the code that draws
+   it, so the ~250 `dctx.` calls below never need to know which layer they are
+   painting on. Always leave it pointing at DUST_CTX when you are done. */
+let dctx = dustCanvas.getContext('2d');
+const DUST_CTX = dctx;
+
+/* Randomized depth. The hero calavera sits dead centre, so an effect that
+   always passes in front of it reads as pasted on. Letting roughly half of
+   them slip behind the skull is what makes the scene feel like it has volume
+   rather than being one flat plane of stickers. */
+const BEHIND_ODDS = 0.45;
+const pickDepth = () => Math.random() < BEHIND_ODDS;
 const motes = [];
 for (let i = 0; i < 130; i++) {
   motes.push({
@@ -2530,7 +2544,7 @@ function fxShootingStar() {
   if (!canSpawn('star')) return;
   const fromLeft = Math.random() < 0.5;
   sparks.push({
-    kind: 'star',
+    kind: 'star', behind: pickDepth(),
     x: fromLeft ? -60 : W + 60, y: Math.random() * H * 0.45,
     vx: (fromLeft ? 1 : -1) * (900 + Math.random() * 700),
     vy: 120 + Math.random() * 180,
@@ -2543,7 +2557,7 @@ function fxPetalBurst() {
   for (let k = 0; k < 16; k++) {
     const a = Math.random() * Math.PI * 2, sp = 90 + Math.random() * 260;
     sparks.push({
-      kind: 'petal', x: bx, y: by,
+      kind: 'petal', behind: pickDepth(), x: bx, y: by,
       vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 80,
       life: 0, max: 2.4, hue: Math.random(), ph: Math.random() * 7
     });
@@ -2564,7 +2578,7 @@ function fxComet() {
   if (!canSpawn('comet')) return;
   const fromLeft = Math.random() < 0.5;
   sparks.push({
-    kind: 'comet',
+    kind: 'comet', behind: pickDepth(),
     x: fromLeft ? -80 : W + 80, y: H * (0.08 + Math.random() * 0.4),
     vx: (fromLeft ? 1 : -1) * (110 + Math.random() * 90),
     vy: 18 + Math.random() * 30,
@@ -2578,7 +2592,7 @@ function fxMeteorShower() {
   if (!n) return;
   for (let k = 0; k < n; k++) {
     sparks.push({
-      kind: 'star',
+      kind: 'star', behind: pickDepth(),
       x: (fromLeft ? -60 : W + 60) - (fromLeft ? 1 : -1) * Math.random() * 200,
       y: Math.random() * H * 0.5,
       vx: (fromLeft ? 1 : -1) * (800 + Math.random() * 800),
@@ -2591,7 +2605,7 @@ function fxMeteorShower() {
 function fxSupernova() {
   if (!canSpawn('nova')) return;
   sparks.push({
-    kind: 'nova',
+    kind: 'nova', behind: pickDepth(),
     x: W * (0.15 + Math.random() * 0.7), y: H * (0.1 + Math.random() * 0.5),
     vx: 0, vy: 0, life: 0, max: 3.2, hue: Math.random()
   });
@@ -2599,7 +2613,7 @@ function fxSupernova() {
 function fxAurora() {
   if (!canSpawn('aurora')) return;
   sparks.push({
-    kind: 'aurora',
+    kind: 'aurora', behind: pickDepth(),
     x: 0, y: H * (0.04 + Math.random() * 0.55),
     vx: 0, vy: 0, life: 0, max: 12, hue: Math.random(), ph: Math.random() * 7
   });
@@ -2688,7 +2702,7 @@ function fxUfo() {
   else if (edge < 0.9)  { x = W * (0.1 + Math.random() * 0.8); y = -40; vx = (Math.random() - 0.5) * 120; vy = 60 + Math.random() * 50; }
   else                  { x = W * (0.1 + Math.random() * 0.8); y = H * 0.78; vx = (Math.random() - 0.5) * 120; vy = -(50 + Math.random() * 40); }
   ufos.push({
-    kind: (Math.random() * UFO_KINDS.length) | 0,
+    kind: (Math.random() * UFO_KINDS.length) | 0, behind: pickDepth(),
     x, y, vx, vy,
     wx: 0, wy: 0, retargetT: 0, fireT: 0,
     hp: 2 + (Math.random() < 0.5 ? 1 : 0),        // takes 2-3 hits
@@ -2729,6 +2743,8 @@ function fxGalacticBattle() {
   let made = 0;
   for (let k = 0; k < teams; k++) {
     const c = corners[k % corners.length];
+    /* one depth per fleet: a team split across layers stops reading as a team */
+    const fleetBehind = pickDepth();
     for (let n = 0; n < per; n++) {
       /* a tight cluster reads as a formation; a loose one reads as a mess */
       const a = Math.random() * Math.PI * 2;
@@ -2739,7 +2755,7 @@ function fxGalacticBattle() {
       const ang = Math.atan2(H * 0.42 - y, W / 2 - x);
       const sp = 40 + Math.random() * 40;
       ufos.push({
-        kind: k,
+        kind: k, behind: fleetBehind,
         x, y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp,
         wx: 0, wy: 0, retargetT: 0, fireT: t + Math.random() * 0.8,
         hp: 2 + (Math.random() < 0.5 ? 1 : 0),
@@ -2752,10 +2768,10 @@ function fxGalacticBattle() {
   return made;
 }
 function ufoExplode(u) {
-  sparks.push({ kind: 'boom', x: u.x, y: u.y, vx: 0, vy: 0, life: 0, max: 1.1, hue: u.kind });
+  sparks.push({ kind: 'boom', behind: u.behind, x: u.x, y: u.y, vx: 0, vy: 0, life: 0, max: 1.1, hue: u.kind });
   for (let k = 0; k < 12; k++) {
     const a = Math.random() * Math.PI * 2, sp = 60 + Math.random() * 200;
-    sparks.push({ kind: 'ember', x: u.x, y: u.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+    sparks.push({ kind: 'ember', behind: u.behind, x: u.x, y: u.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
                   life: 0, max: 0.9 + Math.random() * 0.6, hue: Math.random() });
   }
 }
@@ -2793,7 +2809,7 @@ function updateUfos(dt) {
           const dl = d || 1;
           if (lasers.length < CAPS.laser) {
             lasers.push({ x: u.x, y: u.y + 4, dx: (v.x - u.x) / dl, dy: (v.y - u.y) / dl,
-                          speed: 700, kind: u.kind, target: v, life: 0 });
+                          speed: 700, kind: u.kind, behind: u.behind, target: v, life: 0 });
           }
           u.fireT = t + 0.5 + Math.random() * 0.9;
         }
@@ -2824,7 +2840,7 @@ function updateUfos(dt) {
         tgt.vx += L.dx * 130; tgt.vy += L.dy * 130;
         for (let k2 = 0; k2 < 5; k2++) {
           const a2 = Math.random() * Math.PI * 2, sp2 = 40 + Math.random() * 120;
-          sparks.push({ kind: 'ember', x: tgt.x, y: tgt.y,
+          sparks.push({ kind: 'ember', behind: tgt.behind, x: tgt.x, y: tgt.y,
                         vx: Math.cos(a2) * sp2, vy: Math.sin(a2) * sp2,
                         life: 0, max: 0.5 + Math.random() * 0.4, hue: Math.random() });
         }
@@ -2836,6 +2852,9 @@ function updateUfos(dt) {
 }
 function drawUfos() {
   for (const L of lasers) {
+    /* a bolt has to live on the same layer as the ship that fired it, or it
+       crosses in front of the skull while its shooter is hidden behind it */
+    dctx = L.behind ? tctx : DUST_CTX;
     const c = UFO_KINDS[L.kind].laser;
     dctx.strokeStyle = `rgba(${c},0.9)`;
     dctx.lineWidth = 3; dctx.lineCap = 'round';
@@ -2851,6 +2870,7 @@ function drawUfos() {
     dctx.stroke();
   }
   for (const u of ufos) {
+    dctx = u.behind ? tctx : DUST_CTX;
     const K = UFO_KINDS[u.kind];
     const bank = Math.max(-0.6, Math.min(0.6, u.vx * (t < u.jukeT ? 0.004 : 0.002)));
     dctx.save();
@@ -2905,7 +2925,7 @@ function fxAlebrije() {
   /* a spirit dragon sails across the deep background */
   const fromLeft = Math.random() < 0.5;
   sparks.push({
-    kind: 'alebrije',
+    kind: 'alebrije', behind: pickDepth(),
     x: fromLeft ? -260 : W + 260, y: H * (0.12 + Math.random() * 0.45),
     vx: (fromLeft ? 1 : -1) * (85 + Math.random() * 50), vy: 0,
     life: 0, max: (W + 520) / 85 + 4, hue: Math.random(), ph: Math.random() * 7,
@@ -3375,13 +3395,24 @@ function spawnEvent() {
 }
 
 function drawDust(dt) {
+  dctx = DUST_CTX;
   dctx.clearRect(0, 0, W * DPR, H * DPR);
   dctx.save();
   dctx.scale(DPR, DPR);
   dctx.globalCompositeOperation = 'lighter';
 
+  /* The tunnel canvas is already drawn and its transform is back to identity by
+     the time we get here (drawTunnel -> drawHero -> drawDust), so anything we
+     paint on it now lands on top of the tunnel skulls and underneath the hero
+     face. Match the dust canvas's transform and blend so a spark looks
+     identical on either layer. */
+  tctx.save();
+  tctx.scale(DPR, DPR);
+  tctx.globalCompositeOperation = 'lighter';
+
   updateUfos(dt);
   drawUfos();
+  dctx = DUST_CTX;
 
   /* event sparks */
   for (let k = sparks.length - 1; k >= 0; k--) {
@@ -3389,6 +3420,7 @@ function drawDust(dt) {
     sp.life += dt;
     if (sp.life < 0) continue;                       // staggered entry (meteor shower)
     if (sp.life > sp.max) { sparks.splice(k, 1); continue; }
+    dctx = sp.behind ? tctx : DUST_CTX;      // depth, decided at spawn
     const fade = 1 - sp.life / sp.max;
     sp.x += sp.vx * dt; sp.y += sp.vy * dt;
     if (sp.kind === 'comet') {
@@ -3412,7 +3444,7 @@ function drawDust(dt) {
       }
       if (Math.random() < 0.35 && sp.trail.length > 4) {          // shed debris
         const p = sp.trail[sp.trail.length - 3];
-        sparks.push({ kind: 'ember', x: p.x, y: p.y,
+        sparks.push({ kind: 'ember', behind: sp.behind, x: p.x, y: p.y,
                       vx: (Math.random() - 0.5) * 40, vy: (Math.random() - 0.5) * 40 + 20,
                       life: 0, max: 0.8 + Math.random() * 0.7, hue: Math.random() });
       }
@@ -3641,7 +3673,7 @@ function drawDust(dt) {
         /* stardust wake shed from the body */
         if (Math.random() < 0.5) {
           const wp2 = P[(Math.random() * n) | 0];
-          sparks.push({ kind: 'ember', x: wp2.x, y: wp2.y + 6,
+          sparks.push({ kind: 'ember', behind: sp.behind, x: wp2.x, y: wp2.y + 6,
                         vx: (Math.random() - 0.5) * 24, vy: 12 + Math.random() * 26,
                         life: 0, max: 0.7 + Math.random() * 0.6, hue: Math.random() });
         }
@@ -3793,6 +3825,7 @@ function drawDust(dt) {
       dctx.restore();
     }
   }
+  dctx = DUST_CTX;               // motes and everything below stay in front
   const moteStep = Math.max(1, Math.round([1, 1, 2, 3, 6][qLevel()] / CFG.dustCount));
   for (let mi = 0; mi < motes.length; mi += moteStep) {
     const m = motes[mi];
@@ -3824,6 +3857,7 @@ function drawDust(dt) {
 
   drawCursorCandle(dt);
   dctx.restore();
+  tctx.restore();                // balances the save() opened for behind-sparks
 }
 
 /* ── the cursor is a candle; moths gather when you rest ── */
