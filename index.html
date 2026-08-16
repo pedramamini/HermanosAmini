@@ -927,6 +927,7 @@
     <span class="db-chev" aria-hidden="true">&#9662;</span>
   </button>
   <div id="cfgSliders" class="collapsed"></div>
+  <button id="cfgRestyle" class="reset">&#127922;&nbsp; surprise me with a new look</button>
   <div class="cfgsec">3 &middot; save it</div>
   <div class="galrow">
     <input id="galName" type="text" maxlength="28" placeholder="name it (PG) and share" autocomplete="off">
@@ -4750,6 +4751,27 @@ const HELP_ROWS = [
 })();
 /* photo lives on the I key now; the bar button was retired for the gear */
 document.getElementById('settings').addEventListener('click', () => togglePanel(cfgPanel));
+/* The config panel's status line, usable from outside the buildCfg IIFE.
+   The inner say() stays for everything already wired to it; this is the same
+   element and the same timeout discipline. */
+let cfgStatusT = null;
+function cfgStatusSay(msg) {
+  const el = document.getElementById('cfgStatus');
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(cfgStatusT);
+  cfgStatusT = setTimeout(() => el.classList.remove('show'), 2600);
+}
+
+document.getElementById('cfgRestyle').addEventListener('click', () => {
+  fxRestyle();
+  /* name what it landed on, so rolling again toward a look you like is a
+     choice rather than a blind pull */
+  const BG = ['smoke', 'galaxy', 'aurora', 'candlelight', 'the void'];
+  cfgStatusSay(`new look: palette ${CFG.palette}, ${BG[CFG.bgMode] || 'smoke'} background`);
+});
+
 (function dialsFold() {
   const btn = document.getElementById('cfgToggleSliders');
   const box = document.getElementById('cfgSliders');
