@@ -14,9 +14,7 @@ with the music.
 ## Where this came from
 
 [**Neema Amini**](https://aminiconant.com) sent his brother
-[**Pedram Amini**](https://pedramamini.com) a three-hour downtempo mix —
-*Ritmos De Los Muertos* by [J. Pool](https://www.youtube.com/watch?v=2Yza5xXfezc) —
-built for Día de los Muertos, the day you remember the people you've lost and
+[**Pedram Amini**](https://pedramamini.com) a three-hour downtempo mix, *Ritmos De Los Muertos* by [J. Pool](https://www.youtube.com/watch?v=2Yza5xXfezc), built for Día de los Muertos, the day you remember the people you've lost and
 keep them alive by saying their names.
 
 Pedram is a security researcher who mostly builds things that break other
@@ -51,8 +49,7 @@ in it.
 **The catch, and it's on purpose:** Pedram is the artist. Anyone can ask;
 nothing is built until he comments on the issue and approves it. That gate is
 enforced by CI, not by good manners. See
-[ART_DIRECTION.md](ART_DIRECTION.md) for what will and won't be accepted —
-short version, the two themes (Día de los Muertos and deep space) don't bend,
+[ART_DIRECTION.md](ART_DIRECTION.md) for what will and won't be accepted, short version, the two themes (Día de los Muertos and deep space) don't bend,
 and the music stays Latin downtempo.
 
 ---
@@ -66,7 +63,7 @@ python3 -m http.server 8765     # open http://localhost:8765
 ```
 
 One self-contained `index.html`. No build step, no dependencies, no framework.
-It runs silently without audio — see [Audio](#audio) below.
+It runs silently without audio, see [Audio](#audio) below.
 
 ## Play with it
 
@@ -97,7 +94,7 @@ at the paths in `index.html`.
 ## Contributing
 
 Read [ART_DIRECTION.md](ART_DIRECTION.md) first. It's short and it's the whole
-deal. Then open an issue describing what you want to see — as a viewer, not as
+deal. Then open an issue describing what you want to see, as a viewer, not as
 code. If it fits the piece and Pedram approves it, it gets built.
 
 ## Releases

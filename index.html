@@ -342,7 +342,7 @@
   .sheetbody { display: contents; }
 
   /* ═══════════════════════════════════════════════════════════════
-     MOBILE MENUS — every panel becomes a full-screen frosted sheet
+     MOBILE MENUS, every panel becomes a full-screen frosted sheet
      A 500px card pinned to the bottom-right corner is off-screen on a
      390px phone: the sliders, the buttons and the gallery rows all fall
      past the right edge. Under 760px (or any short landscape phone) each
@@ -573,6 +573,60 @@
   }
   /* until the count loads it shows a star glyph; no layout jump either way */
   #ghcount { min-width: 10px; font-variant-numeric: tabular-nums; }
+  /* ── idea capture modal ── */
+  #ideaModal {
+    position: fixed; inset: 0; z-index: 30; display: none;
+    align-items: center; justify-content: center; padding: 20px;
+    background: rgba(4,1,10,.72);
+    backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px);
+  }
+  #ideaModal.show { display: flex; }
+  #ideaCard {
+    position: relative; width: 100%; max-width: 430px;
+    padding: 30px 28px 24px; border-radius: 18px; text-align: center;
+    color: #f5eadf; font-family: 'Space Grotesk', sans-serif;
+    background: linear-gradient(180deg, rgba(30,10,48,.97), rgba(12,4,24,.98));
+    border: 1px solid rgba(255,179,71,.3);
+    box-shadow: 0 24px 70px rgba(0,0,0,.7), 0 0 0 1px rgba(255,47,160,.12) inset;
+    animation: ideaIn .34s cubic-bezier(.16,1,.3,1);
+  }
+  @keyframes ideaIn { from { opacity: 0; transform: translateY(16px) scale(.97); } }
+  .ideaglyph { font-size: 30px; line-height: 1; margin-bottom: 10px; filter: drop-shadow(0 0 14px rgba(255,47,160,.6)); }
+  .ideaeyebrow {
+    font-size: 10px; letter-spacing: .26em; text-transform: uppercase;
+    color: #ffb347; margin-bottom: 10px;
+  }
+  .ideatitle {
+    margin: 0 0 12px; font-family: 'Anton', Impact, sans-serif;
+    font-size: 26px; letter-spacing: .03em; color: #f5eadf;
+  }
+  .ideabody { margin: 0 0 14px; font-size: 13px; line-height: 1.62; color: rgba(245,234,223,.74); }
+  .ideaquote {
+    margin: 0 0 16px; padding: 11px 14px; text-align: left;
+    font-size: 13px; font-style: italic; line-height: 1.5; color: #f5eadf;
+    background: rgba(255,47,160,.1); border-left: 3px solid #ff2fa0; border-radius: 7px;
+    max-height: 92px; overflow-y: auto;
+  }
+  #ideaEmail {
+    width: 100%; box-sizing: border-box; padding: 11px 13px; margin-bottom: 10px;
+    background: rgba(245,234,223,.08); color: #f5eadf;
+    border: 1px solid rgba(245,234,223,.24); border-radius: 9px;
+    font-family: inherit; font-size: 13px; outline: none; text-align: center;
+  }
+  #ideaEmail:focus { border-color: rgba(145,70,255,.85); }
+  .idearow { display: flex; gap: 9px; }
+  .idearow button {
+    flex: 1; padding: 12px 0; border-radius: 9px; cursor: pointer;
+    font-family: inherit; font-size: 13px; font-weight: 500; letter-spacing: .05em;
+    color: #fff; border: 1px solid rgba(255,255,255,.2);
+    background: linear-gradient(180deg, rgba(145,70,255,.95), rgba(110,45,210,.95));
+    box-shadow: 0 2px 0 rgba(60,20,120,.8);
+  }
+  .idearow button.ghost {
+    background: rgba(245,234,223,.09); box-shadow: none;
+    border-color: rgba(245,234,223,.22); color: rgba(245,234,223,.7);
+  }
+  .ideafine { margin-top: 12px; font-size: 10.5px; line-height: 1.5; color: rgba(245,234,223,.42); }
   #hud {
     top: 16px; left: 16px; z-index: 16; display: none;
     font-family: 'SF Mono', 'Menlo', monospace; font-size: 11px;
@@ -605,13 +659,31 @@
 <div id="wordmark" class="ui"><span id="wm-stack">SKLZ<span id="wm-fill" aria-hidden="true">SKLZ</span></span><small>ritmos de los muertos</small></div>
 <div id="tag" class="ui">una obra psicod&eacute;lica de los hermanos amini</div>
 <div id="hud" class="ui"></div>
-<div id="credit" class="ui">music &middot; j. pool &mdash; latin &amp; world downtempo</div>
+<div id="credit" class="ui">music &middot; j. pool: latin &amp; world downtempo</div>
 <div id="tools" class="ui" title="tools">&#128296;</div>
 <div id="settings" class="ui ctl" title="settings &amp; presets">&#9881;</div>
 <div id="mic" class="ui ctl" title="voice control">&#127908;</div>
 <div id="help" class="ui ctl" title="controls">?</div>
 <div id="mute" class="ui ctl" title="mute">&#9835;</div>
 
+<div id="ideaModal" class="ui">
+  <div id="ideaCard">
+    <div class="ideaglyph">&#9760;</div>
+    <div class="ideaeyebrow">the skulls heard something</div>
+    <h2 class="ideatitle">Was that an idea?</h2>
+    <p class="ideabody">The piece can&rsquo;t do that yet. If you want, it becomes a
+      public request on the board. Pedram reviews every one himself: if he
+      approves it, an agent builds it, it ships, and the art comes back changed.</p>
+    <div class="ideaquote" id="ideaQuote"></div>
+    <input id="ideaEmail" type="email" maxlength="120" placeholder="email (only to tell you when it ships)" autocomplete="email">
+    <div class="idearow">
+      <button id="ideaSend">send it</button>
+      <button id="ideaSkip" class="ghost">no thanks</button>
+    </div>
+    <div class="ideafine">One mail when it lands, one when it ships. Nothing else, ever.
+      Leave it blank to send anonymously.</div>
+  </div>
+</div>
 <div id="helpPanel" class="panel">
   <h2>CONTROLS</h2>
   <table id="helpTable">
@@ -678,10 +750,10 @@
 /* ═══════════════════════════════════════════════════════════════════
    SKLZ · Ritmos de los Muertos
    Four stacked layers, back to front:
-     1. #nebula — WebGL domain-warped fbm clouds + starfield (half-res)
-     2. #tunnel — infinite exponential zoom of pre-rendered calaveras
-     3. #hero   — large center skull, god rays, glowing sockets, third eye
-     4. #dust   — parallax ember/petal particles
+     1. #nebula, WebGL domain-warped fbm clouds + starfield (half-res)
+     2. #tunnel, infinite exponential zoom of pre-rendered calaveras
+     3. #hero, large center skull, god rays, glowing sockets, third eye
+     4. #dust, parallax ember/petal particles
    Audio drives bass energy into every layer.
    ═══════════════════════════════════════════════════════════════════ */
 
@@ -867,7 +939,7 @@ function applyPalette() {
 }
 
 /* ─────────────────────────────────────────────
-   AUDIO — element + analyser, bass envelope
+   AUDIO, element + analyser, bass envelope
    ───────────────────────────────────────────── */
 const music = document.getElementById('music');
 music.volume = 0;
@@ -935,7 +1007,7 @@ function sampleAudio() {
 }
 
 /* ─────────────────────────────────────────────
-   LAYER 1 — NEBULA (WebGL, rendered at half res)
+   LAYER 1, NEBULA (WebGL, rendered at half res)
    ───────────────────────────────────────────── */
 const nebCanvas = document.getElementById('nebula');
 const gl = nebCanvas.getContext('webgl', { antialias: false, depth: false });
@@ -997,7 +1069,7 @@ void main(){
   float minf = exp(-dot(md, md) * 14.) * u_mstr;
   uv += (vec2(-md.y, md.x) * 1.4 + md * .9) * minf * .18;
 
-  /* domain-warped fbm — two passes of drift */
+  /* domain-warped fbm, two passes of drift */
   vec2 q = vec2(fbm(uv * 2.2 + t), fbm(uv * 2.2 + vec2(5.2, 1.3) - t * .7));
   vec2 r = vec2(fbm(uv * 2.2 + 3.5 * q + vec2(1.7, 9.2) + t * .5),
                 fbm(uv * 2.2 + 3.5 * q + vec2(8.3, 2.8) - t * .3));
@@ -1063,7 +1135,7 @@ const uNbright = gl.getUniformLocation(prog, 'u_nbright');
 const uVig = gl.getUniformLocation(prog, 'u_vig');
 
 /* ─────────────────────────────────────────────
-   CALAVERA SPRITE — procedural sugar skull
+   CALAVERA SPRITE, procedural sugar skull
    drawn once per hue variant onto offscreen canvases
    ───────────────────────────────────────────── */
 function drawSkull(ctx, S, opt) {
@@ -1162,7 +1234,7 @@ function drawSkull(ctx, S, opt) {
     ctx.lineWidth = 8; ctx.strokeStyle = opt.bone3; ctx.stroke();
   }
 
-  /* nose — inverted heart */
+  /* nose, inverted heart */
   if (!opt.animFace) {
     ctx.beginPath();
     ctx.moveTo(0, 215);
@@ -1253,7 +1325,7 @@ function makeSkullSprite(size, opt) {
   return c;
 }
 
-/* tunnel variants — ornament triples, glow baked in. Eye rings and teeth are
+/* tunnel variants, ornament triples, glow baked in. Eye rings and teeth are
    excluded from the bake and drawn live so they can spin and chatter.
    Everything here is rebuilt whenever the palette changes. */
 const RING_UNITS = 500;
@@ -1348,7 +1420,7 @@ function skullOutlinePath(ctx, d) {
 }
 
 /* ─────────────────────────────────────────────
-   LIVING FACE — the hero's eyes, rings, nose,
+   LIVING FACE, the hero's eyes, rings, nose,
    teeth, and spirals are drawn live each frame
    ───────────────────────────────────────────── */
 const face = {
@@ -1521,7 +1593,7 @@ function drawSpiralLive(side) {
 }
 
 /* ─────────────────────────────────────────────
-   LAYER 2 — INFINITE TUNNEL
+   LAYER 2, INFINITE TUNNEL
    ───────────────────────────────────────────── */
 const tunCanvas = document.getElementById('tunnel');
 const tctx = tunCanvas.getContext('2d');
@@ -1665,7 +1737,7 @@ function drawTunnel(dt) {
 }
 
 /* ─────────────────────────────────────────────
-   LAYER 3 — HERO SKULL (god rays, sockets, third eye)
+   LAYER 3, HERO SKULL (god rays, sockets, third eye)
    ───────────────────────────────────────────── */
 const heroCanvas = document.getElementById('hero');
 const hctx = heroCanvas.getContext('2d');
@@ -1725,7 +1797,7 @@ function drawHero(dt) {
   face.spiralRot += dt * (CFG.spiralSpeed * tempoMul + face.spiralSpin + beatPulse * CFG.ringBeatKick * 0.55);
   face.spiralSpin *= Math.exp(-dt * 1.5);
 
-  /* god rays — rotating gold fan behind the skull (shed at Q3+) */
+  /* god rays, rotating gold fan behind the skull (shed at Q3+) */
   if (qLevel() < 3) {
   hctx.save();
   hctx.globalCompositeOperation = 'lighter';
@@ -1815,7 +1887,7 @@ function drawHero(dt) {
   }
   hctx.restore();
 
-  /* socket glow — skull-space socket centers: (±178,-60), third eye (0,-300)
+  /* socket glow, skull-space socket centers: (±178,-60), third eye (0,-300)
      sprite spans 1600px for 1200 units → unit = 1600/1200 px, drawn centered
      at (0.5, 0.52) of sprite → offset in skull units = (0, 0.02*1200=24) up */
   const U = sY * (1600 / 1200);
@@ -1852,7 +1924,7 @@ function drawHero(dt) {
   }
   hctx.restore();
 
-  /* third eye — living eye in the forehead rosette */
+  /* third eye, living eye in the forehead rosette */
   const ex = 0, ey = (-300 + 24) * U, er = 58 * U;
   let blink = (() => {             // periodic blink, ~ every 5.2 s
     const c = t % 5.2;
@@ -1932,7 +2004,7 @@ function drawHero(dt) {
 }
 
 /* ─────────────────────────────────────────────
-   LAYER 4 — DUST (embers + petals, two planes)
+   LAYER 4, DUST (embers + petals, two planes)
    ───────────────────────────────────────────── */
 const dustCanvas = document.getElementById('dust');
 const dctx = dustCanvas.getContext('2d');
@@ -1950,7 +2022,7 @@ for (let i = 0; i < 130; i++) {
   });
 }
 /* ─────────────────────────────────────────────
-   RANDOM EVENTS — shooting stars, petal bursts,
+   RANDOM EVENTS, shooting stars, petal bursts,
    spontaneous skull tumbles, rainbow third eye
    ───────────────────────────────────────────── */
 let nextEventT = 10;
@@ -2342,11 +2414,36 @@ const VOICE_MAP = [
   [['teeth', 'dientes', 'chatter'],               () => { face.chatterUntil = t + 1.6; }],
   [['stare', 'mirada', 'angry'],                  () => { stare.until = t + 3.2; }],
 ];
+/* Commands are short imperatives ("comet", "grito", "supernova"). Ideas are
+   sentences: "I wish the skulls left petals behind them". The trap is that an
+   idea NAMES the things it is about, and those nouns are the command
+   vocabulary, so plain keyword matching fires a petal burst and never hears
+   the request. Intent therefore wins over vocabulary: if it is phrased as a
+   wish and is long enough to be a sentence, it is an idea, whatever nouns it
+   happens to contain. */
+const IDEA_CUES = [
+  'i wish', 'wish it', 'wish the', 'wish there', 'would be cool',
+  'would be sick', 'would be nice', 'would be great', 'would be dope',
+  'it would', 'what if', 'how about', 'you should', 'it should',
+  'there should', 'needs a', 'needs some', 'needs to', 'imagine',
+  'can you add', 'could you add', 'can it', 'could it', 'can we',
+  'i want', 'i would love', "i'd love", 'id love', 'wouldnt it',
+  "wouldn't it", 'be cool if', 'be great if', 'my idea',
+];
+function looksLikeAnIdea(lower) {
+  const flat = lower.replace(/[^a-z' ]/g, ' ').replace(/\s+/g, ' ').trim();
+  const n = flat.split(' ').filter(Boolean).length;
+  return n >= 4 && IDEA_CUES.some(c => flat.includes(c));
+}
 function handleVoice(text) {
-  text = text.toLowerCase();
+  const lower = text.toLowerCase();
+
+  /* intent first, so a described feature is never mistaken for a command */
+  if (looksLikeAnIdea(lower)) { captureIdea(text.trim()); return 0; }
+
   let fired = 0;
   for (const [words, fn] of VOICE_MAP) {
-    if (words.some(w => text.includes(w))) { fn(); fired++; }
+    if (words.some(w => lower.includes(w))) { fn(); fired++; }
   }
   return fired;
 }
@@ -2404,7 +2501,7 @@ function updateHud() {
     `\ngovernor ${CFG.perfMode === 0 ? 'auto' : 'manual'}  dpr ${DPR.toFixed(1)}  bpm ${bpm ? bpm.toFixed(0) : '--'}`;
 }
 
-/* weighted event table — everything a key can do, plus the sky show */
+/* weighted event table, everything a key can do, plus the sky show */
 const EVENTS = [
   [3.0, fxShootingStar],
   [2.5, fxPetalBurst],
@@ -2951,7 +3048,7 @@ function drawCursorCandle(dt) {
 }
 
 /* ─────────────────────────────────────────────
-   LIQUID LOGO — rainbow pours into SKLZ, crests,
+   LIQUID LOGO, rainbow pours into SKLZ, crests,
    oozes over the top, then drains back out
    ───────────────────────────────────────────── */
 const wmFill = document.getElementById('wm-fill');
@@ -3259,10 +3356,10 @@ function toggleText() {
 }
 
 /* ─────────────────────────────────────────────
-   GRITOS — 13 yells, loaded sequentially once
+   GRITOS, 13 yells, loaded sequentially once
    the music starts; G cycles through in order
    ───────────────────────────────────────────── */
-/* curated list — survivors of Pedram's isolated-scream cull + new candidates */
+/* curated list, survivors of Pedram's isolated-scream cull + new candidates */
 const GRITO_FILES = ['01', '04', '06', '07', '10', '12', '14', '15', '16', '19'];
 const gritos = [];
 let gritoIdx = 0;
@@ -3316,10 +3413,16 @@ function grito() {
 }
 
 /* ─────────────────────────────────────────────
-   PANELS — help + live config with copy-JSON
+   PANELS, help + live config with copy-JSON
    ───────────────────────────────────────────── */
 const helpBtn = document.getElementById('help');
 const helpPanel = document.getElementById('helpPanel');
+const ideaModal = document.getElementById('ideaModal');
+const ideaQuote = document.getElementById('ideaQuote');
+const ideaEmail = document.getElementById('ideaEmail');
+const ideaSend  = document.getElementById('ideaSend');
+const ideaSkip  = document.getElementById('ideaSkip');
+
 const cfgPanel = document.getElementById('cfgPanel');
 function togglePanel(p) {
   const was = p.classList.contains('show');
@@ -3675,6 +3778,8 @@ addEventListener('keydown', e => {
   if (!musicStarted && music.paused) startMusic();
   const k = e.key.toLowerCase();
   if (k === 'escape') {
+    /* idea modal sits on top of everything and closes first */
+    if (ideaModal.classList.contains('show')) { closeIdea(); return; }
     /* gallery -> config -> help -> closed */
     const gal = document.getElementById('galPanel');
     if (gal && gal.classList.contains('show')) {
@@ -3731,6 +3836,44 @@ applyToggles({ skipVoice: true });   // restored toggles take effect (voice need
    Posts to the Worker, which stores it and (once Resend + a GH token are
    wired) files a public issue and emails the requester. The email is optional
    and only used to tell them when their request actually ships. */
+/* ── idea capture ──
+   Voice heard something the piece cannot do. Rather than dropping it, we ask
+   whether it was a wish and take an email so the person learns when it ships.
+   The email is optional on purpose: a request is worth filing either way. */
+let ideaPending = '';
+function captureIdea(text) {
+  if (!text || ideaModal.classList.contains('show')) return;
+  ideaPending = text.slice(0, 600);
+  ideaQuote.textContent = '\u201c' + ideaPending + '\u201d';
+  ideaEmail.value = localStorage.getItem('sklz.email.v1') || '';
+  ideaModal.classList.add('show');
+}
+function closeIdea() { ideaModal.classList.remove('show'); ideaPending = ''; }
+
+ideaSkip.addEventListener('click', closeIdea);
+ideaModal.addEventListener('click', e => { if (e.target === ideaModal) closeIdea(); });
+
+ideaSend.addEventListener('click', async () => {
+  const email = (ideaEmail.value || '').trim();
+  if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(email)) {
+    ideaEmail.focus(); ideaEmail.style.borderColor = '#ff2fa0'; return;
+  }
+  const body = ideaPending;
+  ideaSend.textContent = 'sending...'; ideaSend.disabled = true;
+  try {
+    const r = await fetch(GALLERY_API.replace('/presets', '/requests'), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ request: body, email, config: galConfigPayload() })
+    });
+    if (!r.ok) throw new Error('rejected');
+    if (email) { try { localStorage.setItem('sklz.email.v1', email); } catch (_) {} }
+    ideaSend.textContent = email ? 'sent \u2713 check your mail' : 'sent \u2713';
+    setTimeout(() => { closeIdea(); ideaSend.textContent = 'send it'; ideaSend.disabled = false; }, 1400);
+  } catch (_) {
+    ideaSend.textContent = 'try again'; ideaSend.disabled = false;
+  }
+});
+
 (function requestBox() {
   const txt = document.getElementById('reqText');
   const mail = document.getElementById('reqEmail');

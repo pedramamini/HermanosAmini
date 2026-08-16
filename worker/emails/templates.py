@@ -37,11 +37,31 @@ _SHELL = """\
          style="max-width:560px;background:{CARD};border:1px solid rgba(245,234,223,.14);
                 border-radius:16px;overflow:hidden;">
 
+   <!-- papel picado: the punched-paper banner strung over every ofrenda.
+        Built from text glyphs because email clients block SVG and background
+        images, and a row of tiny images would be blocked-by-default too. -->
+   <tr><td style="padding:0;background:linear-gradient(90deg,{MAGENTA},{VIOLET},{TEAL},{GOLD},{MAGENTA});height:4px;line-height:4px;font-size:0;">&nbsp;</td></tr>
+   <tr><td align="center" style="padding:9px 0 7px;background:{CARD};
+              font:400 13px/1 Helvetica,Arial,sans-serif;letter-spacing:.5em;
+              color:rgba(245,234,223,.34);">
+     &#9670;&nbsp;&#10052;&nbsp;&#9670;&nbsp;&#10052;&nbsp;&#9670;&nbsp;&#10052;&nbsp;&#9670;&nbsp;&#10052;&nbsp;&#9670;
+   </td></tr>
+
    <tr><td style="padding:0;">
      <a href="{SITE}" style="text-decoration:none;">
        <img src="{OG}" width="560" alt="SKLZ"
             style="display:block;width:100%;max-width:560px;height:auto;border:0;">
      </a>
+   </td></tr>
+
+   <!-- marigold row: cempas&uacute;chil are what the dead follow home -->
+   <tr><td align="center" style="padding:12px 0 2px;background:{CARD};
+              font:400 15px/1 Helvetica,Arial,sans-serif;letter-spacing:.34em;">
+     <span style="color:{GOLD};">&#10048;</span>
+     <span style="color:{MAGENTA};">&#10048;</span>
+     <span style="color:{GOLD};">&#10048;</span>
+     <span style="color:{TEAL};">&#10048;</span>
+     <span style="color:{GOLD};">&#10048;</span>
    </td></tr>
 
    <tr><td style="padding:26px 30px 8px;">
@@ -73,7 +93,25 @@ _SHELL = """\
      </div>
    </td></tr>
 
-   <tr><td align="center" style="padding:0 30px 26px;">
+   <!-- the signature: two calaveras for two brothers -->
+   <tr><td align="center" style="padding:4px 30px 0;">
+     <div style="font:400 22px/1 Helvetica,Arial,sans-serif;letter-spacing:.16em;">
+       <span style="color:{MAGENTA};">&#9760;</span><span style="color:{TEAL};">&#9760;</span>
+     </div>
+     <div style="margin-top:11px;font:400 20px/1 'Brush Script MT','Segoe Script',cursive;
+                 color:{GOLD};letter-spacing:.02em;">
+       Hermanos Amini
+     </div>
+   </td></tr>
+
+   <tr><td align="center" style="padding:14px 30px 8px;">
+     <div style="font:400 13px/1 Helvetica,Arial,sans-serif;letter-spacing:.42em;
+                 color:rgba(245,234,223,.26);">
+       &#10048;&nbsp;&#9670;&nbsp;&#10048;&nbsp;&#9670;&nbsp;&#10048;
+     </div>
+   </td></tr>
+
+   <tr><td align="center" style="padding:6px 30px 22px;">
      <div style="font:400 10px/1.5 Helvetica,Arial,sans-serif;letter-spacing:.24em;
                  text-transform:uppercase;color:rgba(245,234,223,.42);">
        una obra psicod&eacute;lica de los hermanos amini
@@ -83,6 +121,8 @@ _SHELL = """\
        &nbsp;&middot;&nbsp; los que amamos nunca mueren
      </div>
    </td></tr>
+
+   <tr><td style="padding:0;background:linear-gradient(90deg,{GOLD},{TEAL},{VIOLET},{MAGENTA},{GOLD});height:4px;line-height:4px;font-size:0;">&nbsp;</td></tr>
 
   </table>
  </td></tr>
@@ -106,7 +146,8 @@ def _quote_block(text):
 def _render(**kw):
     kw.setdefault("quote", "")
     return _SHELL.format(BG=BG, CARD=CARD, INK=INK, DIM=DIM, GOLD=GOLD,
-                         TEAL=TEAL, VIOLET=VIOLET, SITE=SITE, OG=OG, **kw)
+                         TEAL=TEAL, VIOLET=VIOLET, MAGENTA=MAGENTA,
+                         SITE=SITE, OG=OG, **kw)
 
 
 def received(request_text, issue_url=None, issue_number=None):
@@ -119,7 +160,7 @@ def received(request_text, issue_url=None, issue_number=None):
         body=(f"Your idea is now {ref} on the piece&rsquo;s public board, where "
               f"anyone can see it and argue with it."
               f"<p style='margin:14px 0 0;'>Next it goes to the artist. Pedram "
-              f"reviews every request himself &mdash; nothing gets built until he "
+              f"reviews every request himself: nothing gets built until he "
               f"says so. If he approves it, an agent implements it, it gets "
               f"tagged and deployed, and <strong style='color:{INK};'>we&rsquo;ll "
               f"email you the moment it&rsquo;s live in the art.</strong></p>"),
@@ -144,7 +185,7 @@ def shipped(request_text, issue_url=None, issue_number=None, version=None):
               f"running right now at hermanosamini.com, along with everything "
               f"everyone else has added."
               f"<p style='margin:14px 0 0;'>Go look for it. Turn the sound on. "
-              f"And if it sparks the next idea, the request box is still open &mdash; "
+              f"And if it sparks the next idea, the request box is still open: "
               f"that&rsquo;s the whole point of this thing.</p>"),
         quote=_quote_block(request_text),
         cta="See it live",

@@ -1,4 +1,4 @@
-# Art Direction — the rules that do not bend
+# Art Direction, the rules that do not bend
 
 Read this before writing a line of code. It exists because this is **a piece of
 art with an owner**, not a community sandbox. Contributions extend the piece;
@@ -17,10 +17,10 @@ downtempo, reacting to the music.
 
 Two themes hold it together, and **both must survive every change**:
 
-1. **Día de los Muertos** — calaveras, marigolds, ofrenda warmth, alebrije
+1. **Día de los Muertos**, calaveras, marigolds, ofrenda warmth, alebrije
    spirits, gritos, Spanish text. Reverent, celebratory, never gory. It is a
    holiday about love for the dead, not horror.
-2. **Deep space** — nebula, starfield, comets, auroras, supernovas, the sense
+2. **Deep space**, nebula, starfield, comets, auroras, supernovas, the sense
    of drifting somewhere vast and slow.
 
 If a proposed change reads as neither, it is out of scope no matter how good it
@@ -112,7 +112,7 @@ checks the actor.
 
 This is not bureaucracy. He is the artist; he accepts or declines the
 recommendation. Agents: if an issue lacks that approval, **do not start
-work on it** — not even "just a draft PR."
+work on it**, not even "just a draft PR."
 
 ---
 
