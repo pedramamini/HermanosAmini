@@ -56,6 +56,12 @@ jobs:
               return;
             }
 
+            // `needs-artist-approval` and `approved` contradict each other; clear
+            // the stale one so the board reads at a glance.
+            await github.rest.issues.removeLabel({
+              ...context.repo, issue_number: issue, name: 'needs-artist-approval'
+            }).catch(() => {});
+
             await github.rest.issues.createComment({
               ...context.repo, issue_number: issue,
               body: `Approved by @${actor} of the Hermanos Amini. This issue is now ` +
