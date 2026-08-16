@@ -1104,6 +1104,7 @@ const CFG_SCHEMA = {
   smokeStir:      [0.6,   0,     4,    0.1,   'smoke cursor stir'],
   smokeDecay:     [0.3,   0.05,  3,    0.05,  'smoke stir fade rate'],
   skullSize:      [1.0,   0.5,   1.8,  0.05,  'hero skull size'],
+  breatheRate:    [8,     2,     40,   1,     'breathing pace (per min)'],
   rayLength:      [1.0,   0.3,   2.5,  0.05,  'starburst length'],
   rayCount:       [14,    6,     28,   2,     'starburst rays'],
   smokeScale:     [1.0,   0.4,   3,    0.1,   'smoke marble size'],
@@ -1149,6 +1150,8 @@ const CFG_TOGGLES = {
   autoEvents:  [1, 0, 1, 1, 'random events', 'toggle'],
   voiceOn:     [0, 0, 1, 1, 'voice control', 'toggle'],
   beatSync:    [1, 0, 1, 1, 'sync to the beat', 'toggle'],
+  skullOnTop:  [0, 0, 1, 1, 'skull always on top', 'toggle'],
+  skullBreathe:[0, 0, 1, 1, 'skull breathing', 'toggle'],
   hudOn:       [0, 0, 1, 1, 'fps monitor', 'toggle'],
 };
 Object.assign(CFG_SCHEMA, CFG_TOGGLES);
@@ -2383,7 +2386,12 @@ function drawHero(dt) {
   hctx.scale(DPR, DPR);
   hctx.translate(W / 2, H / 2 - H * 0.02);
 
-  const base = Math.min(W, H) * 0.46 * CFG.skullSize;
+  /* breathing: a slow whole-skull swell. The amplitude eases in and out over
+     ~a second so flipping the toggle mid-cycle never pops the size. */
+  breatheK += ((CFG.skullBreathe ? 1 : 0) - breatheK) * Math.min(1, dt * 1.5);
+  const breathe = 1 + breatheK * 0.11 * Math.sin(t * (CFG.breatheRate / 60) * Math.PI * 2);
+
+  const base = Math.min(W, H) * 0.46 * CFG.skullSize * breathe;
   const s = (base / 1600) * (1 + bassSm * 0.055);
 
   /* the fourth wall: every 5-10 min it stops, locks eyes with you, and glares */
@@ -2656,6 +2664,9 @@ const DUST_CTX = dctx;
    them slip behind the skull is what makes the scene feel like it has volume
    rather than being one flat plane of stickers. */
 const BEHIND_ODDS = 0.45;
+/* CFG.skullOnTop overrides this at DRAW time (the || in each dctx pick), not
+   here at spawn time, so flipping the toggle moves everything already alive
+   behind the skull instantly and restores each spark's rolled depth on off. */
 const pickDepth = () => Math.random() < BEHIND_ODDS;
 const motes = [];
 for (let i = 0; i < 130; i++) {
@@ -3031,7 +3042,7 @@ function drawUfos() {
   for (const L of lasers) {
     /* a bolt has to live on the same layer as the ship that fired it, or it
        crosses in front of the skull while its shooter is hidden behind it */
-    dctx = L.behind ? tctx : DUST_CTX;
+    dctx = (L.behind || CFG.skullOnTop) ? tctx : DUST_CTX;
     const c = UFO_KINDS[L.kind].laser;
     dctx.strokeStyle = `rgba(${c},0.9)`;
     dctx.lineWidth = 3; dctx.lineCap = 'round';
@@ -3047,7 +3058,7 @@ function drawUfos() {
     dctx.stroke();
   }
   for (const u of ufos) {
-    dctx = u.behind ? tctx : DUST_CTX;
+    dctx = (u.behind || CFG.skullOnTop) ? tctx : DUST_CTX;
     const K = UFO_KINDS[u.kind];
     const bank = Math.max(-0.6, Math.min(0.6, u.vx * (t < u.jukeT ? 0.004 : 0.002)));
     dctx.save();
@@ -3202,6 +3213,7 @@ function savePhoto() {
 
 /* ── the fourth wall: rarely, it notices you ── */
 const stare = { next: 0, until: -1, k: 0 };
+let breatheK = 0;                 // smoothed skull-breathing engage, 0..1
 
 /* ── voice control: speak a keyword, trigger the effect ── */
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -3658,7 +3670,7 @@ function drawDust(dt) {
     sp.life += dt;
     if (sp.life < 0) continue;                       // staggered entry (meteor shower)
     if (sp.life > sp.max) { sparks.splice(k, 1); continue; }
-    dctx = sp.behind ? tctx : DUST_CTX;      // depth, decided at spawn
+    dctx = (sp.behind || CFG.skullOnTop) ? tctx : DUST_CTX;  // depth: spawn roll, or forced behind
     const fade = 1 - sp.life / sp.max;
     sp.x += sp.vx * dt; sp.y += sp.vy * dt;
     if (sp.kind === 'comet') {
@@ -4063,7 +4075,8 @@ function drawDust(dt) {
       dctx.restore();
     }
   }
-  dctx = DUST_CTX;               // motes and everything below stay in front
+  // motes and everything below stay in front, unless the skull owns the top
+  dctx = CFG.skullOnTop ? tctx : DUST_CTX;
   const moteStep = Math.max(1, Math.round([1, 1, 2, 3, 6][qLevel()] / CFG.dustCount));
   for (let mi = 0; mi < motes.length; mi += moteStep) {
     const m = motes[mi];
