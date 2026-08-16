@@ -99,6 +99,13 @@ They close on each other, open fire, juke incoming lasers, and take two or three
 hits to go down. It runs about half a minute and the last fleet standing cruises
 off. `Shift`+`Q` calls it off early.
 
+### Everything at Once
+
+Ask the chat for "everything" (or say "fiesta") and the piece fires the whole
+catalogue in a 1.5 second crescendo: grito, comet, UFOs, aurora, supernova,
+meteor shower, petals, an alebrije, a skull flood, and a three-fleet battle.
+Every population cap still applies, so it saturates rather than melting down.
+
 ### Gesture Percussion
 
 Touching the face plays it. The eye rings shake a maraca, the cheek spirals

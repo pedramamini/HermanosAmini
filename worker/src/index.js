@@ -309,8 +309,11 @@ export default {
           '',
           `Knobs you may set, with their allowed ranges: ${knobs}`,
           'Effects you may fire: grito, comet, ufo, aurora, supernova, meteor, star,',
-          'petals, alebrije, rainbow, flick, teeth, stare, swarm, random.',
-          '("swarm" floods the background with more drifting skulls.)',
+          'petals, alebrije, rainbow, flick, teeth, stare, swarm, battle, everything, random.',
+          '("swarm" floods the background with more drifting skulls, "battle" starts a',
+          'three-fleet UFO war, and "everything" fires the whole lot at once.)',
+          'If they ask for everything, or for a lot of things at once, return the single',
+          'action {"op":"fx","name":"everything"} rather than listing effects one by one.',
           '',
           'Rules that do not bend:',
           '- The themes are Dia de los Muertos and deep space. Never agree to retheme it,',
@@ -327,7 +330,7 @@ export default {
         try {
           out = await env.AI.run('@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
             messages: [{ role: 'system', content: system }, ...msgs],
-            max_tokens: 320,
+            max_tokens: 640,
             temperature: 0.7,
           });
         } catch (e) {
@@ -338,7 +341,14 @@ export default {
         /* Workers AI hands back `response` as an already-parsed object when the
            model emits clean JSON, and as a string (sometimes fenced, sometimes
            wrapped in prose) when it does not. Handle both: assuming the string
-           case alone produced "[object Object]" for every single reply. */
+           case alone produced "[object Object]" for every single reply.
+
+           Everything below exists because a strict parse is not enough. Asking
+           for "everything at once" makes the model emit a long action list, it
+           hit the token ceiling, the JSON arrived cut in half, and the old
+           fallback printed the raw text as the reply: the viewer got a wall of
+           {"op":"fx"} in the chat bubble. Salvage what is recoverable, and
+           never, ever let raw model output reach the bubble. */
         let parsed = null;
         let fenced = '';
         const resp = out?.response;
@@ -347,13 +357,41 @@ export default {
         } else {
           const raw = String(resp || '').trim();
           fenced = raw.replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
-          for (const cand of [fenced, raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1)]) {
+          const body = raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1);
+          /* smart quotes and trailing commas are the two malformations small
+             models emit most; both are mechanical to undo */
+          const tidy = t => t
+            .replace(/[\u201c\u201d\u201e\u201f]/g, '"')
+            .replace(/,\s*([}\]])/g, '$1');
+          for (const cand of [fenced, body, tidy(fenced), tidy(body)]) {
             if (!cand) continue;
             try { parsed = JSON.parse(cand); break; } catch (_) {}
           }
+          /* still broken: almost always truncation. Every COMPLETE action
+             object before the cut is still valid and still worth running, and
+             the say string is nearly always intact because it comes first. */
+          if (!parsed) {
+            const t = tidy(fenced);
+            const sayM = t.match(/"say"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+            const acts = [];
+            for (const m of t.matchAll(/\{[^{}]*"op"\s*:\s*"[^"]+"[^{}]*\}/g)) {
+              try { acts.push(JSON.parse(m[0])); } catch (_) {}
+            }
+            if (sayM || acts.length) {
+              parsed = { say: sayM ? sayM[1].replace(/\\"/g, '"') : '', actions: acts };
+            }
+          }
         }
-        const say = String(parsed?.say || (parsed ? '' : fenced) || '...').slice(0, 400);
-        const actions = Array.isArray(parsed?.actions) ? parsed.actions.slice(0, 6) : [];
+
+        let say = String(parsed?.say || '').slice(0, 400).trim();
+        /* Last line of defence. If salvage produced nothing usable, or the text
+           still smells like markup, say something human instead of leaking. */
+        if (!say || say.startsWith('{') || say.startsWith('[') || /"(op|say|actions)"\s*:/.test(say)) {
+          say = parsed?.actions?.length ? 'Done.' : 'That one got away from me. Say it again?';
+        }
+        /* 6 silently dropped half of an "everything" request; 12 covers the
+           whole effect list, and the page validates each one anyway. */
+        const actions = Array.isArray(parsed?.actions) ? parsed.actions.slice(0, 12) : [];
 
         await env.sklz_presets.prepare(
           `INSERT INTO writes (author_hash, hour_bucket, n) VALUES (?, ?, 1)

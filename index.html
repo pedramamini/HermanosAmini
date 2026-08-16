@@ -2837,6 +2837,27 @@ function drawUfos() {
     dctx.restore();
   }
 }
+/* ── everything at once ──
+   "Trigger everything" was forcing the agent to enumerate a dozen actions,
+   which is what overran the token ceiling and truncated its JSON in the first
+   place. One named effect is cheaper for the model and better for the art:
+   staggered by a few frames so it lands as a crescendo instead of a single
+   muddy flash, and routed through the same spawners so every CAP still holds. */
+function fxEverything() {
+  const burst = [
+    () => grito(), fxComet, fxUfo, fxAurora, fxSupernova, fxMeteorShower,
+    fxShootingStar, fxPetalBurst, fxAlebrije, fxFlickRandom,
+    () => { rainbowEyeUntil = t + 6; },
+    () => { face.chatterUntil = t + 2.2; },
+    () => { face.noseBurst = t + 1.4; heartBurst(W / 2, H / 2); },
+    () => { stare.until = t + 3.2; },
+    () => spawnSkull(10),
+    fxGalacticBattle,
+  ];
+  burst.forEach((fn, i) => setTimeout(() => { try { fn(); } catch (_) {} }, i * 90));
+  return burst.length;
+}
+
 function fxGrito() { if (gritos.length && !music.paused && !muted) grito(); }
 
 function fxAlebrije() {
@@ -2936,6 +2957,7 @@ const VOICE_MAP = [
   [['petal', 'petals', 'flores', 'flowers'],      fxPetalBurst],
   [['alebrije', 'dragon'],                        fxAlebrije],
   [['rainbow', 'arcoiris'],                       () => { rainbowEyeUntil = t + 5; }],
+  [['everything', 'todo', 'fiesta', 'all at once'], fxEverything],
   [['battle', 'war', 'batalla', 'guerra'],        fxGalacticBattle],
   [['swarm', 'flood', 'horde', 'enjambre'],       () => spawnSkull(8)],
   [['skull', 'calavera', 'flick'],                fxFlickRandom],
@@ -3093,6 +3115,7 @@ const CHAT_FX = {
   random: randomEffect,
   swarm: () => spawnSkull(8),
   battle: fxGalacticBattle,
+  everything: fxEverything,
   rainbow: () => { rainbowEyeUntil = t + 5; },
   teeth:   () => { face.chatterUntil = t + 1.6; },
   stare:   () => { stare.until = t + 3.2; },
