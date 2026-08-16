@@ -132,6 +132,15 @@
      only in a tooltip nobody hovers on a wall display */
   #mute.off { color: rgba(245,234,223,.42); border-color: rgba(245,234,223,.14); }
   #mute.off:hover { color: #f5eadf; border-color: rgba(245,234,223,.55); }
+  /* the red slash: drawn by CSS so the glyph underneath stays the note */
+  #mute { position: fixed; }
+  #mute.off::after {
+    content: ""; position: absolute; left: 9px; right: 9px; top: 50%;
+    height: 2px; background: #ff2f60; border-radius: 1px;
+    transform: rotate(-45deg);
+    box-shadow: 0 0 5px rgba(255,47,96,.7);
+    pointer-events: none;
+  }
   /* the hammer tray is a mobile affordance; desktop shows all four buttons */
   #tools { display: none; }
   #mute { right: 24px; }
@@ -3270,6 +3279,10 @@ function toggleVoice() { setVoiceMode(voiceMode ? 0 : 1); }
 
 micBtn.addEventListener('click', e => {
   e.stopPropagation();
+  /* one surface at a time: opening the mic closes the gear/help panels,
+     exactly as opening them closes the mic's menu */
+  document.querySelectorAll('.panel').forEach(x => { x.classList.remove('show'); x.style.transform = ''; });
+  document.body.classList.remove('sheet-open');
   if (chatOpen) { chatDock.classList.toggle('min'); return; }
   voiceMenu.classList.toggle('show');
 });
@@ -4384,7 +4397,9 @@ function syncMuteIcon() {
      wasteful and a flicker risk */
   if (key === muteIconState) return;
   muteIconState = key;
-  muteBtn.innerHTML = on ? '&#9835;' : '&#215;';
+  /* the glyph is always the note; silence is the note with a line through
+     it, which is the symbol everyone already knows from every mute button */
+  muteBtn.innerHTML = '&#9835;';
   muteBtn.title = on ? 'mute' : muted ? 'unmute' : 'play the music';
   muteBtn.classList.toggle('off', !on);
 }
@@ -4489,6 +4504,7 @@ function togglePanel(p) {
     x.classList.remove('show');
     x.style.transform = '';                 // drop any leftover drag offset
   });
+  voiceMenu.classList.remove('show');       // gear/help also dismiss the mic popover
   if (!was) p.classList.add('show');
   /* phones hide the floating controls behind an open sheet */
   document.body.classList.toggle('sheet-open', !!document.querySelector('.panel.show'));
@@ -4925,14 +4941,17 @@ addEventListener('keydown', e => {
       else { chatDock.classList.add('min'); }
       return;
     }
-    /* gallery -> config -> help -> closed */
+    /* Escape closes what is open. The one exception: the gallery is a
+       drill-in FROM the config panel, so it steps back there rather than
+       dumping you at the art. Config and help just close; the old chain
+       (config -> help -> closed) surprised people with a panel they never
+       asked for. */
     const gal = document.getElementById('galPanel');
     if (gal && gal.classList.contains('show')) {
       gal.classList.remove('show');
       cfgPanel.classList.add('show');
     } else if (cfgPanel.classList.contains('show')) {
       cfgPanel.classList.remove('show');
-      helpPanel.classList.add('show');
     } else if (helpPanel.classList.contains('show')) {
       helpPanel.classList.remove('show');
     }
