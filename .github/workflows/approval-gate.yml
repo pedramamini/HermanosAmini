@@ -1,0 +1,68 @@
+name: Approval gate
+
+# The artist decides what gets built. This enforces it mechanically so a
+# well-meaning agent (or a stranger with triage rights) cannot self-approve.
+#
+# An issue counts as APPROVED only when BOTH are true:
+#   1. Pedram Amini has commented on it, and
+#   2. Pedram Amini applied the `approved` label.
+# Anyone else adding `approved` gets it stripped back off automatically.
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  issues: write
+
+jobs:
+  verify:
+    if: github.event.label.name == 'approved'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Only the artist may approve
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const ARTIST = 'pedramamini';
+            const actor = context.payload.sender.login;
+            const issue = context.payload.issue.number;
+
+            if (actor.toLowerCase() !== ARTIST) {
+              await github.rest.issues.removeLabel({
+                ...context.repo, issue_number: issue, name: 'approved'
+              }).catch(() => {});
+              await github.rest.issues.createComment({
+                ...context.repo, issue_number: issue,
+                body: `Removed \`approved\`: only @${ARTIST} can approve work on this piece. ` +
+                      `Anyone may open and discuss issues, but the artist accepts the ` +
+                      `recommendation before anything is built. See ART_DIRECTION.md.`
+              });
+              core.setFailed(`approved applied by ${actor}, not the artist`);
+              return;
+            }
+
+            // Label is legitimate. Confirm he also left a comment, per the rule.
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              ...context.repo, issue_number: issue, per_page: 100
+            });
+            const spoke = comments.some(c => c.user.login.toLowerCase() === ARTIST);
+
+            if (!spoke) {
+              await github.rest.issues.createComment({
+                ...context.repo, issue_number: issue,
+                body: `\`approved\` is set, but the gate also wants a comment from ` +
+                      `@${ARTIST} saying what he actually wants built. Agents: ` +
+                      `hold until that exists.`
+              });
+              core.setFailed('approved label present but no comment from the artist');
+              return;
+            }
+
+            await github.rest.issues.createComment({
+              ...context.repo, issue_number: issue,
+              body: `Approved by the artist. This issue is now eligible to be built.\n\n` +
+                    `Implementation must obey ART_DIRECTION.md: keep both themes, ` +
+                    `add rather than replace, declare a population cap, no new ` +
+                    `dependencies, no committed audio.`
+            });

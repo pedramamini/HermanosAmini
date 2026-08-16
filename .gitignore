@@ -1,0 +1,44 @@
+# NOTE: git does NOT support trailing comments on a pattern line. A line like
+# "  .secret-url   # my note  " is treated as a literal filename and silently
+# matches nothing. Keep every comment on its own line.
+
+# ── secrets ──────────────────────────────────────────────────────────────
+# unlisted source-bundle path
+.secret-url
+# carries SALT; publish worker/wrangler.toml.example instead
+worker/wrangler.toml
+worker/.dev.vars
+.env
+.env.*
+*.pem
+*.key
+id_rsa*
+.wrangler/
+
+# ── internal ops: infra ids, private host, unlisted URLs ─────────────────
+CLAUDE.md
+README-NEEMA.md
+# deploy.sh carries the private origin host and the unlisted source path
+deploy.sh
+
+# ── third-party audio: NOT ours to redistribute ──────────────────────────
+# The mix is "Ritmos De Los Muertos" by J. Pool and the gritos are sourced
+# clips. The art streams them from our own origin; the repo must never carry
+# or redistribute them. See ART_DIRECTION.md "Audio and rights".
+*.mp3
+*.m4a
+*.webm
+*.wav
+*.ogg
+gritos/
+ritmos-de-los-muertos.*
+
+# ── build + scratch ──────────────────────────────────────────────────────
+sklz-source.zip
+frames/
+thumb.png
+thumb.webp
+clip*.mp4
+*.log
+node_modules/
+.DS_Store

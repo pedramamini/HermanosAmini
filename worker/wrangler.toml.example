@@ -1,0 +1,12 @@
+name = "sklz-presets"
+main = "src/index.js"
+compatibility_date = "2026-08-01"
+workers_dev = true
+
+[[d1_databases]]
+binding = "sklz_presets"
+database_name = "sklz-presets"
+database_id = "your-d1-database-id"
+
+[vars]
+SALT = "change-me-any-random-string"

@@ -1,0 +1,3640 @@
+<!DOCTYPE html>
+<html lang="es" translate="no">
+<head>
+<meta charset="UTF-8">
+<meta name="google" content="notranslate">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>SKLZ &middot; Ritmos de los Muertos</title>
+<meta name="description" content="Una obra psicod&eacute;lica de los Hermanos Amini. An infinite Dia de los Muertos altar: endless skull tunnel, a living third eye, nebula smoke, three hours of Latin downtempo.">
+<meta property="og:title" content="SKLZ &middot; Ritmos de los Muertos">
+<meta property="og:description" content="Una obra psicod&eacute;lica de los Hermanos Amini. An infinite Dia de los Muertos altar: endless skull tunnel, a living third eye, nebula smoke, three hours of Latin downtempo.">
+<meta property="og:image" content="https://pedramamini.com/dropbox/sklz/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:url" content="https://pedramamini.com/dropbox/sklz/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="SKLZ">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="SKLZ &middot; Ritmos de los Muertos">
+<meta name="twitter:description" content="Una obra psicod&eacute;lica de los Hermanos Amini.">
+<meta name="twitter:image" content="https://pedramamini.com/dropbox/sklz/og.jpg">
+<meta name="theme-color" content="#160724">
+<meta name="author" content="The Amini Brothers">
+<meta name="artist" content="Una obra psicod&eacute;lica de los Hermanos Amini">
+<meta name="keywords" content="una obra psicodelica de los hermanos amini, hermanos amini, dia de los muertos, psychedelic art, generative art, sugar skulls">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💀</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Space+Grotesk:wght@300;500&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; background: #06030f; }
+  canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+  #nebula   { z-index: 1; }
+  #tunnel   { z-index: 2; }
+  #hero     { z-index: 3; }
+  #dust     { z-index: 4; }
+
+  .ui { position: fixed; z-index: 10; color: #f5eadf; font-family: 'Space Grotesk', sans-serif; }
+
+  #eyebrow {
+    top: 4vh; left: 0; right: 0; text-align: center;
+    font-size: clamp(10px, 1.1vw, 14px); font-weight: 300;
+    letter-spacing: .55em; text-indent: .55em; text-transform: uppercase;
+    color: rgba(245, 234, 223, .55);
+    pointer-events: none;
+  }
+  /* zen mode: every word off the screen, art only. Panels stay usable. */
+  body.notext #eyebrow, body.notext #wordmark, body.notext #tag,
+  body.notext #credit, body.notext #hud { opacity: 0 !important; }
+  #eyebrow, #tag, #credit, #wordmark { transition: opacity .6s; }
+  #wordmark {
+    bottom: 5vh; left: 0; right: 0; text-align: center; pointer-events: none;
+    font-family: 'Anton', Impact, sans-serif;
+    font-size: clamp(64px, 13vw, 220px); line-height: .9;
+    letter-spacing: .12em; text-indent: .12em;
+    color: #f5eadf;
+    text-shadow: 0 0 40px rgba(255, 47, 160, .45), 0 0 120px rgba(47, 232, 208, .25);
+  }
+  #wordmark small {
+    display: block; font-family: 'Space Grotesk', sans-serif; font-weight: 300;
+    font-size: clamp(9px, 1vw, 13px); letter-spacing: .5em; text-indent: .5em;
+    text-transform: uppercase; margin-top: 1.2em; color: rgba(245, 234, 223, .5);
+  }
+  #wm-stack { position: relative; display: inline-block; }
+  #wm-fill {
+    position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(105deg, #ff004c, #ff8a00, #ffe600, #38ff5e, #00cfff, #9146FF, #ff004c);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    text-shadow: none;
+  }
+  #tag {
+    bottom: 1.2vh; left: 0; right: 0; text-align: center; pointer-events: none;
+    font-size: clamp(8px, .75vw, 10px); font-weight: 300;
+    letter-spacing: .42em; text-indent: .42em; text-transform: uppercase;
+    color: rgba(245, 234, 223, .38);
+  }
+  #gate .tagline {
+    font-size: clamp(9px, .9vw, 11px); letter-spacing: .35em; text-indent: .35em;
+    color: rgba(245, 234, 223, .4);
+  }
+
+  /* ── Enter gate ─────────────────────────────────────── */
+  #gate {
+    position: fixed; inset: 0; z-index: 20;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 2.2rem; cursor: pointer;
+    background: radial-gradient(ellipse at center, rgba(6,3,15,.55) 0%, rgba(6,3,15,.92) 100%);
+    backdrop-filter: blur(2px);
+    transition: opacity 1.8s ease, visibility 1.8s;
+  }
+  #gate.gone { opacity: 0; visibility: hidden; pointer-events: none; }
+  #gate h1 {
+    font-family: 'Anton', Impact, sans-serif; color: #f5eadf;
+    font-size: clamp(48px, 9vw, 140px); letter-spacing: .14em; text-indent: .14em;
+    text-shadow: 0 0 60px rgba(255, 47, 160, .6);
+    animation: breathe 4s ease-in-out infinite;
+  }
+  #gate p {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 300;
+    color: rgba(245,234,223,.65); font-size: clamp(11px, 1.2vw, 15px);
+    letter-spacing: .45em; text-indent: .45em; text-transform: uppercase;
+  }
+  #gate .ring {
+    width: 74px; height: 74px; border-radius: 50%;
+    border: 1px solid rgba(245,234,223,.35);
+    display: grid; place-items: center;
+    animation: pulse-ring 2.4s ease-out infinite;
+  }
+  #gate .ring::after { content: "▶"; color: rgba(245,234,223,.8); font-size: 18px; margin-left: 4px; }
+  @keyframes breathe { 0%,100% { transform: scale(1); } 50% { transform: scale(1.035); } }
+  @keyframes pulse-ring {
+    0% { box-shadow: 0 0 0 0 rgba(255,47,160,.45); }
+    100% { box-shadow: 0 0 0 26px rgba(255,47,160,0); }
+  }
+
+  .ctl {
+    bottom: 24px; width: 44px; height: 44px;
+    display: grid; place-items: center; cursor: pointer;
+    border: 1px solid rgba(245,234,223,.25); border-radius: 50%;
+    background: rgba(6,3,15,.4); font-size: 16px; user-select: none;
+    transition: border-color .3s;
+  }
+  .ctl:hover { border-color: rgba(245,234,223,.7); }
+  #mute { right: 24px; }
+  #help { right: 80px; font-family: 'Space Grotesk', sans-serif; font-weight: 500; }
+  #mic { right: 136px; font-size: 14px; }
+  #settings { right: 192px; font-size: 17px; }
+  #mic.listening {
+    border-color: #ff2fa0;
+    box-shadow: 0 0 14px rgba(255,47,160,.8);
+    animation: mic-pulse 1.6s ease-out infinite;
+  }
+  @keyframes mic-pulse {
+    0% { box-shadow: 0 0 0 0 rgba(255,47,160,.5); }
+    100% { box-shadow: 0 0 0 16px rgba(255,47,160,0); }
+  }
+
+  /* candle cursor: hide the OS pointer over the art, keep it on UI
+     (only where a real pointer exists; touch devices keep defaults) */
+  @media (pointer: fine) { body { cursor: none; } }
+  .ctl, .panel, .panel * , #gate { cursor: pointer; }
+  .panel, .panel * { cursor: auto; }
+  .panel input[type=range], .panel button, #gate { cursor: pointer; }
+
+
+  .panel {
+    position: fixed; z-index: 15; right: 24px; bottom: 80px;
+    max-height: 82vh; overflow-y: auto; width: auto; min-width: 500px;
+    background: rgba(10,5,22,.45); border: 1px solid rgba(245,234,223,.16);
+    border-radius: 14px; padding: 18px 26px; color: #f5eadf;
+    font-family: 'Space Grotesk', sans-serif; font-size: 13px;
+    backdrop-filter: blur(10px); display: none;
+  }
+  .panel.show { display: block; }
+  .panel h2 {
+    font-family: 'Anton', Impact, sans-serif; font-size: 16px;
+    letter-spacing: .18em; margin-bottom: 12px; color: #ffb347;
+  }
+  .panel table { border-collapse: separate; border-spacing: 0 4px; width: 100%; }
+  .panel th {
+    text-align: left; font-weight: 300; font-size: 10px;
+    letter-spacing: .25em; text-transform: uppercase;
+    color: rgba(245,234,223,.4); padding: 0 2px 4px;
+  }
+  .panel th:first-child { text-align: right; padding-right: 18px; }
+  .panel td { padding: 0 2px; vertical-align: middle; white-space: nowrap; }
+  .panel td:first-child { padding-right: 18px; text-align: right; }
+  .panel td:nth-child(3) { color: #2fe8d0; font-style: italic; opacity: .85; padding-left: 16px; }
+  /* keycap: sculpted like a real key, and clickable */
+  .panel kbd {
+    display: inline-block; min-width: 34px; text-align: center;
+    font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
+    font-size: 12px; font-weight: 600; color: #efe8f5;
+    padding: 6px 9px 8px;
+    background: linear-gradient(180deg, #46405a 0%, #322b45 55%, #292238 100%);
+    border: 1px solid #16101f;
+    border-radius: 7px;
+    box-shadow:
+      0 4px 0 #1c1530,                       /* key side */
+      0 6px 8px rgba(0,0,0,.55),             /* cast shadow */
+      inset 0 1px 0 rgba(255,255,255,.22),   /* top bevel */
+      inset 0 -2px 3px rgba(0,0,0,.45),      /* bottom curve */
+      inset 2px 0 3px rgba(255,255,255,.05), /* left sheen */
+      inset -2px 0 3px rgba(0,0,0,.25);      /* right shade */
+    text-shadow: 0 1px 1px rgba(0,0,0,.7);
+    cursor: pointer; user-select: none;
+    transition: transform .06s, box-shadow .06s, background .06s;
+  }
+  .panel kbd:hover {
+    background: linear-gradient(180deg, #554d6e 0%, #3d3555 55%, #322a46 100%);
+  }
+  .panel kbd:active, .panel kbd.pressed {
+    transform: translateY(3px);
+    box-shadow:
+      0 1px 0 #1c1530, 0 2px 3px rgba(0,0,0,.5),
+      inset 0 1px 0 rgba(255,255,255,.12),
+      inset 0 -1px 2px rgba(0,0,0,.4);
+    background: linear-gradient(180deg, #2c2540 0%, #241d33 100%);
+  }
+  #cfgPanel { width: 420px; }
+  #cfgSliders {
+    display: grid; grid-template-columns: 43% 1fr 46px;
+    align-items: center; column-gap: 10px; row-gap: 9px;
+    margin-top: 10px;
+  }
+  /* Each dial is wrapped in a .dial row so phones can restack it. `contents`
+     keeps the wrapper out of the way here: label/control/value still land in
+     the 3-column grid above. */
+  #cfgSliders .dial { display: contents; }
+  /* the dials are the biggest block in the panel; keep them folded away so
+     load / save / reset stay visible without scrolling */
+  #cfgSliders.collapsed { display: none; }
+  #cfgPanel label {
+    color: rgba(245,234,223,.72); text-align: right;
+    font-size: 12px; white-space: nowrap;
+  }
+  #cfgPanel .val {
+    text-align: right; color: #2fe8d0; font-size: 12px;
+    font-family: 'SF Mono', 'Menlo', monospace;
+  }
+  #cfgPanel input[type=range] {
+    -webkit-appearance: none; appearance: none; width: 100%; height: 3px;
+    background: linear-gradient(90deg, rgba(145,70,255,.8), rgba(47,232,208,.5));
+    border-radius: 2px; outline: none;
+  }
+  #cfgPanel input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 15px; height: 15px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #fff, #c9a0ff 40%, #9146FF);
+    border: 1px solid rgba(255,255,255,.5);
+    box-shadow: 0 0 8px rgba(145,70,255,.8), 0 1px 3px rgba(0,0,0,.6);
+    cursor: pointer;
+  }
+  #cfgPanel button {
+    margin-top: 14px; width: 100%; padding: 9px 0; cursor: pointer;
+    background: linear-gradient(180deg, rgba(145,70,255,.9), rgba(110,45,210,.9));
+    color: #fff; border: 1px solid rgba(255,255,255,.2); border-radius: 8px;
+    font-family: 'Space Grotesk', sans-serif; font-weight: 500; font-size: 12px;
+    letter-spacing: .08em;
+    box-shadow: 0 2px 0 rgba(60,20,120,.8), inset 0 1px 0 rgba(255,255,255,.2);
+  }
+  #cfgPanel button.reset {
+    background: rgba(245,234,223,.1); margin-top: 8px;
+    box-shadow: none; border-color: rgba(245,234,223,.25);
+  }
+  /* toggle switch: sits in the slider column of the config grid */
+  #cfgPanel .sw {
+    position: relative; width: 40px; height: 20px; border-radius: 11px;
+    background: rgba(245,234,223,.14); border: 1px solid rgba(245,234,223,.22);
+    cursor: pointer; transition: background .2s, border-color .2s;
+  }
+  #cfgPanel .sw::after {
+    content: ''; position: absolute; top: 2px; left: 2px;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: rgba(245,234,223,.6);
+    transition: transform .2s, background .2s;
+  }
+  #cfgPanel .sw.on {
+    background: rgba(145,70,255,.55); border-color: rgba(200,160,255,.6);
+  }
+  #cfgPanel .sw.on::after {
+    transform: translateX(20px);
+    background: radial-gradient(circle at 35% 30%, #fff, #c9a0ff);
+    box-shadow: 0 0 8px rgba(145,70,255,.9);
+  }
+  /* gallery: publish row, tabs, and the ranked list */
+  /* numbered step headers inside the settings panel */
+  #cfgPanel .cfgsec {
+    margin: 16px 0 6px; font-size: 10px; letter-spacing: .22em;
+    text-transform: uppercase; color: #ffb347; opacity: .85;
+    border-bottom: 1px solid rgba(255,179,71,.2); padding-bottom: 4px;
+  }
+  #cfgPanel .cfgsec:first-child { margin-top: 4px; }
+  #cfgPanel .galrow { display: flex; gap: 8px; margin-top: 4px; }
+  #cfgPanel .galrow input {
+    flex: 1; min-width: 0; padding: 8px 10px;
+    background: rgba(245,234,223,.08); color: #f5eadf;
+    border: 1px solid rgba(245,234,223,.25); border-radius: 8px;
+    font-family: 'Space Grotesk', sans-serif; font-size: 12px; outline: none;
+  }
+  #cfgPanel .galrow input:focus { border-color: rgba(145,70,255,.8); }
+  #cfgPanel .galrow button { margin-top: 0; width: auto; padding: 8px 16px; }
+  #galPanel { width: 420px; }
+  #galTabs { display: flex; gap: 16px; margin-bottom: 10px; }
+  .galtab {
+    cursor: pointer; font-size: 11px; letter-spacing: .18em; text-transform: uppercase;
+    color: rgba(245,234,223,.4); padding-bottom: 3px; border-bottom: 1px solid transparent;
+  }
+  .galtab.on { color: #ffb347; border-bottom-color: #ffb347; }
+  .galitem {
+    display: flex; align-items: center; gap: 10px; padding: 7px 2px;
+    border-bottom: 1px solid rgba(245,234,223,.08);
+  }
+  .galitem .rank { width: 20px; color: rgba(245,234,223,.35); font-size: 11px; text-align: right; }
+  .galitem .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .galitem .ct { color: #2fe8d0; font-size: 11px; font-family: 'SF Mono', Menlo, monospace; }
+  .galitem button {
+    margin: 0; width: auto; padding: 4px 12px; font-size: 11px;
+    background: rgba(145,70,255,.35); border: 1px solid rgba(200,160,255,.4);
+    border-radius: 6px; color: #f5eadf; cursor: pointer;
+    font-family: 'Space Grotesk', sans-serif;
+  }
+  .galitem button:hover { background: rgba(145,70,255,.6); }
+  /* status toast. It lives on <body>, NOT inside a panel: a message fired from
+     the gallery used to render inside the (closed) config panel and was never
+     seen. Fixed + centered means it is legible from any panel, on any screen. */
+  #cfgStatus {
+    position: fixed; z-index: 40; left: 50%; bottom: 26px;
+    transform: translate(-50%, 12px);
+    padding: 10px 20px; border-radius: 999px;
+    max-width: min(86vw, 430px); text-align: center;
+    background: rgba(10,5,22,.9); border: 1px solid rgba(47,232,208,.35);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 8px 26px rgba(0,0,0,.5);
+    font-family: 'Space Grotesk', sans-serif; font-size: 12px; color: #2fe8d0;
+    opacity: 0; pointer-events: none;
+    transition: opacity .25s, transform .3s cubic-bezier(.16,1,.3,1);
+  }
+  #cfgStatus.show { opacity: 1; transform: translate(-50%, 0); }
+
+  /* ── sheet chrome ──
+     Injected into every panel by JS, but invisible on desktop: `display:contents`
+     on the body wrapper makes the desktop panel lay out exactly as it did before
+     the wrapper existed. Only the mobile query below gives it a shape. */
+  .sheetbar { display: none; }
+  .sheetbody { display: contents; }
+
+  /* ═══════════════════════════════════════════════════════════════
+     MOBILE MENUS — every panel becomes a full-screen frosted sheet
+     A 500px card pinned to the bottom-right corner is off-screen on a
+     390px phone: the sliders, the buttons and the gallery rows all fall
+     past the right edge. Under 760px (or any short landscape phone) each
+     panel takes the entire viewport, slides up with a spring, and every
+     target grows to a thumb. Desktop is untouched.
+     ═══════════════════════════════════════════════════════════════ */
+  @media (max-width: 760px), (max-height: 460px) and (pointer: coarse) {
+
+    /* the sheet shell */
+    .panel, #cfgPanel, #galPanel {
+      position: fixed; inset: 0; top: 0; right: 0; bottom: 0; left: 0;
+      width: 100%; min-width: 0; max-width: none;
+      height: 100dvh; max-height: none;
+      margin: 0; padding: 0; border: 0; border-radius: 0;
+      background: rgba(9,4,20,.74);
+      backdrop-filter: blur(26px) saturate(1.35);
+      -webkit-backdrop-filter: blur(26px) saturate(1.35);
+      display: flex; flex-direction: column;
+      opacity: 0; visibility: hidden;
+      transform: translate3d(0, 100%, 0);
+      transition: transform .42s cubic-bezier(.16,1,.3,1),
+                  opacity .24s ease,
+                  visibility 0s linear .42s;
+      overflow: hidden; overscroll-behavior: contain;
+    }
+    /* display must be restated: the base `.panel.show { display: block }` is a
+       higher-specificity selector and would otherwise undo the flex column */
+    .panel.show, #cfgPanel.show, #galPanel.show {
+      display: flex; flex-direction: column;
+      opacity: 1; visibility: visible; transform: translate3d(0, 0, 0);
+      transition: transform .46s cubic-bezier(.16,1,.3,1),
+                  opacity .2s ease, visibility 0s linear 0s;
+    }
+    /* while a finger is on the sheet, position tracks the finger 1:1 */
+    .panel.dragging { transition: none; }
+
+    /* top bar: grabber, title, and a thumb-sized close */
+    .sheetbar {
+      display: block; flex: 0 0 auto;
+      padding: 8px 14px 10px;
+      padding-top: calc(8px + env(safe-area-inset-top));
+      background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,0));
+      border-bottom: 1px solid rgba(245,234,223,.12);
+      touch-action: none;   /* the bar is the drag handle, never a scroller */
+      user-select: none; -webkit-user-select: none;
+    }
+    .grabber {
+      width: 42px; height: 4px; border-radius: 3px; margin: 0 auto 12px;
+      background: rgba(245,234,223,.3);
+    }
+    .sheetrow { display: flex; align-items: center; gap: 10px; }
+    .sheettitle {
+      flex: 1; min-width: 0; margin: 0;
+      font-family: 'Anton', Impact, sans-serif; font-size: 17px;
+      letter-spacing: .16em; color: #ffb347; text-transform: uppercase;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .sheetclose, .sheetback {
+      flex: 0 0 auto; width: 42px; height: 42px; border-radius: 50%;
+      display: grid; place-items: center; padding: 0;
+      background: rgba(245,234,223,.09);
+      border: 1px solid rgba(245,234,223,.22);
+      color: #f5eadf; font-size: 17px; line-height: 1; cursor: pointer;
+      transition: transform .16s cubic-bezier(.34,1.56,.64,1), background .16s;
+    }
+    .sheetclose:active, .sheetback:active {
+      transform: scale(.86); background: rgba(145,70,255,.45);
+    }
+    .sheetback { font-size: 22px; }
+
+    /* the scrolling body */
+    .sheetbody {
+      display: block; flex: 1 1 auto; min-height: 0;
+      overflow-y: auto; -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      padding: 14px 20px calc(44px + env(safe-area-inset-bottom));
+    }
+    .panel .sheetbody > h2 { display: none; }   /* the bar carries the title */
+
+    /* content rises in, top-down, once the sheet lands */
+    .panel.show .sheetbody > * {
+      animation: sheet-rise .46s cubic-bezier(.16,1,.3,1) backwards;
+    }
+    .panel.show .sheetbody > *:nth-child(1) { animation-delay: .12s; }
+    .panel.show .sheetbody > *:nth-child(2) { animation-delay: .16s; }
+    .panel.show .sheetbody > *:nth-child(3) { animation-delay: .20s; }
+    .panel.show .sheetbody > *:nth-child(4) { animation-delay: .24s; }
+    .panel.show .sheetbody > *:nth-child(5) { animation-delay: .28s; }
+    .panel.show .sheetbody > *:nth-child(6) { animation-delay: .32s; }
+    .panel.show .sheetbody > *:nth-child(n+7) { animation-delay: .36s; }
+    @keyframes sheet-rise {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: none; }
+    }
+
+    /* CONTROLS: the 3-column table wraps into a key + two stacked lines */
+    #helpPanel table { border-spacing: 0; }
+    #helpPanel thead { display: none; }
+    #helpPanel tbody, #helpPanel table { display: block; width: 100%; }
+    #helpPanel tr {
+      display: grid; grid-template-columns: auto 1fr;
+      align-items: center; column-gap: 15px;
+      padding: 9px 0; border-bottom: 1px solid rgba(245,234,223,.08);
+    }
+    #helpPanel td { display: block; padding: 0; white-space: normal; }
+    #helpPanel td:first-child { grid-row: 1 / 3; text-align: left; padding-right: 0; }
+    #helpPanel td:nth-child(2) { font-size: 14.5px; color: #f5eadf; }
+    #helpPanel td:nth-child(3) { padding-left: 0; font-size: 12px; }
+    .panel kbd {
+      min-width: 46px; font-size: 14px; padding: 12px 12px 14px; border-radius: 9px;
+    }
+
+    /* SETTINGS: one dial per row, full-width track, thumb you can actually grab */
+    #cfgSliders { display: block; grid-template-columns: none; margin-top: 6px; }
+    #cfgSliders .dial {
+      display: grid; grid-template-columns: 1fr auto;
+      align-items: center; column-gap: 12px; row-gap: 8px;
+      padding: 12px 0; border-bottom: 1px solid rgba(245,234,223,.07);
+    }
+    #cfgSliders .dial > label {
+      grid-column: 1; grid-row: 1;
+      text-align: left; white-space: normal; font-size: 14px;
+    }
+    #cfgSliders .dial > .val { grid-column: 2; grid-row: 1; font-size: 13px; }
+    #cfgSliders .dial > span:not(.val) { display: none; }   /* grid spacer */
+    #cfgPanel .dial > input[type=range] {
+      grid-column: 1 / -1; grid-row: 2; height: 5px;
+    }
+    #cfgPanel .dial > input[type=range]::-webkit-slider-thumb {
+      width: 28px; height: 28px;
+    }
+    #cfgPanel .dial > .sw {
+      grid-column: 2; grid-row: 1; justify-self: end;
+      width: 54px; height: 30px; border-radius: 16px;
+    }
+    #cfgPanel .dial > .sw::after { width: 22px; height: 22px; top: 3px; left: 3px; }
+    #cfgPanel .dial > .sw.on::after { transform: translateX(24px); }
+
+    #cfgPanel button, .panel button {
+      padding: 15px 0; font-size: 14px; border-radius: 12px; margin-top: 10px;
+    }
+    #cfgPanel .cfgsec { font-size: 11px; margin: 22px 0 8px; }
+    #cfgPanel .galrow { flex-direction: column; gap: 10px; }
+    #cfgPanel .galrow input { padding: 14px 14px; font-size: 16px; }  /* 16px: iOS will not zoom */
+    #cfgPanel .galrow button { width: 100%; padding: 15px 0; margin-top: 0; }
+
+    /* GALLERY: roomier rows, real tap targets */
+    #galTabs { gap: 22px; margin-bottom: 4px; }
+    .galtab { font-size: 13px; padding: 10px 0; }
+    .galitem { padding: 13px 2px; gap: 12px; }
+    .galitem .nm { font-size: 15px; }
+    .galitem button { padding: 10px 18px; font-size: 13px; border-radius: 9px; margin-top: 0; }
+
+    /* controls clear the home indicator, and get out of the way of a sheet */
+    .ctl {
+      bottom: calc(22px + env(safe-area-inset-bottom));
+      transition: opacity .25s, transform .3s cubic-bezier(.16,1,.3,1), border-color .3s;
+    }
+    body.sheet-open .ctl {
+      opacity: 0; pointer-events: none; transform: translateY(14px);
+    }
+    #cfgStatus { bottom: calc(88px + env(safe-area-inset-bottom)); font-size: 13px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .panel, .panel.show, .panel.show .sheetbody > * {
+      transition-duration: .01ms !important; animation: none !important;
+    }
+  }
+
+  #hud {
+    top: 16px; left: 16px; z-index: 16; display: none;
+    font-family: 'SF Mono', 'Menlo', monospace; font-size: 11px;
+    color: #2fe8d0; background: rgba(10,5,22,.5);
+    border: 1px solid rgba(47,232,208,.25); border-radius: 8px;
+    padding: 8px 12px; line-height: 1.6; white-space: pre;
+    backdrop-filter: blur(6px);
+  }
+  #hud.show { display: block; }
+  #credit {
+    bottom: 28px; left: 24px; font-size: 10px; font-weight: 300;
+    letter-spacing: .2em; text-transform: uppercase;
+    color: rgba(245,234,223,.35); pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="nebula"></canvas>
+<canvas id="tunnel"></canvas>
+<canvas id="hero"></canvas>
+<canvas id="dust"></canvas>
+
+<div id="eyebrow" class="ui">los que amamos nunca mueren</div>
+<div id="wordmark" class="ui"><span id="wm-stack">SKLZ<span id="wm-fill" aria-hidden="true">SKLZ</span></span><small>ritmos de los muertos</small></div>
+<div id="tag" class="ui">una obra psicod&eacute;lica de los hermanos amini</div>
+<div id="hud" class="ui"></div>
+<div id="credit" class="ui">music &middot; j. pool &mdash; latin &amp; world downtempo</div>
+<div id="settings" class="ui ctl" title="settings &amp; presets">&#9881;</div>
+<div id="mic" class="ui ctl" title="voice control">&#127908;</div>
+<div id="help" class="ui ctl" title="controls">?</div>
+<div id="mute" class="ui ctl" title="mute">&#9835;</div>
+
+<div id="helpPanel" class="panel">
+  <h2>CONTROLS</h2>
+  <table id="helpTable">
+    <thead><tr><th></th><th>action</th><th>&#127908; say</th></tr></thead>
+    <tbody></tbody>
+  </table>
+  <p style="margin-top:10px;color:rgba(245,234,223,.4)">click a key to try it &middot; eyes follow clicks &middot; face parts react &middot; skulls flick</p>
+</div>
+
+<div id="cfgPanel" class="panel">
+  <h2>SETTINGS &amp; PRESETS</h2>
+  <div class="cfgsec">1 &middot; load a preset</div>
+  <button id="galBrowse">browse the gallery</button>
+  <button id="cfgLoad" class="reset">restore my saved board</button>
+  <div class="cfgsec">2 &middot; configure it</div>
+  <button id="cfgToggleSliders" class="reset">show the dials <span id="cfgCount"></span></button>
+  <div id="cfgSliders" class="collapsed"></div>
+  <div class="cfgsec">3 &middot; save it</div>
+  <div class="galrow">
+    <input id="galName" type="text" maxlength="28" placeholder="name it (PG) and share" autocomplete="off">
+    <button id="galPublish">share</button>
+  </div>
+  <button id="cfgSave" class="reset">save privately to this browser</button>
+  <button id="cfgCopy" class="reset">copy settings JSON</button>
+  <div class="cfgsec">4 &middot; start over</div>
+  <button id="cfgReset" class="reset">reset defaults</button>
+</div>
+
+<div id="galPanel" class="panel">
+  <h2>THE GALLERY</h2>
+  <div id="galTabs">
+    <span class="galtab on" data-sort="top">most played</span>
+    <span class="galtab" data-sort="new">newest</span>
+  </div>
+  <div id="galList">loading...</div>
+</div>
+
+<!-- toast: body-level on purpose, see #cfgStatus in the stylesheet -->
+<div id="cfgStatus"></div>
+
+<div id="gate">
+  <h1>SKLZ</h1>
+  <div class="ring"></div>
+  <p>enter the other side</p>
+  <p class="tagline">una obra psicod&eacute;lica de los hermanos amini</p>
+</div>
+
+<audio id="music" loop preload="auto" crossorigin="anonymous">
+  <source src="ritmos-de-los-muertos.webm" type='audio/webm; codecs="opus"'>
+  <source src="ritmos-de-los-muertos.m4a"  type="audio/mp4">
+</audio>
+
+<script>
+'use strict';
+/* ═══════════════════════════════════════════════════════════════════
+   SKLZ · Ritmos de los Muertos
+   Four stacked layers, back to front:
+     1. #nebula — WebGL domain-warped fbm clouds + starfield (half-res)
+     2. #tunnel — infinite exponential zoom of pre-rendered calaveras
+     3. #hero   — large center skull, god rays, glowing sockets, third eye
+     4. #dust   — parallax ember/petal particles
+   Audio drives bass energy into every layer.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── performance: a 5-level quality ladder + FPS governor ──
+   Q0 everything ... Q4 old-TV survival mode. The governor walks DOWN a level
+   whenever fps can't hold ~32, and back UP after sustained headroom, so any
+   device converges on the richest version it can actually run.
+   Q1: lower res.  Q2: static tunnel skull faces, half dust ("lite").
+   Q3: nebula at half framerate + no god rays + fewer skulls + no candle trail.
+   Q4: nebula near-frozen, third of the skulls, minimal dust, no day/night. */
+const IS_TOUCH = matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 1;
+const IS_IOS = /iPad|iPhone|iPod|Android/.test(navigator.userAgent)
+  || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);   // iPadOS masquerades as Mac
+const IS_TV = /smart-?tv|smarttv|tizen|webos|web0s|netcast|viera|bravia|googletv|appletv|roku|hbbtv/i.test(navigator.userAgent);
+let quality = IS_TV ? 3 : (IS_IOS || (IS_TOUCH && (navigator.hardwareConcurrency || 4) <= 6)) ? 2 : 0;
+let fpsAvg = 60, govLowT = -1, govHighT = -1, lastGovT = 0;
+const Q_DPR  = [2, 1.5, 1.2, 1.0, 1.0];
+const Q_NEB  = [0.5, 0.4, 0.35, 0.25, 0.2];
+const Q_NAME = ['full', 'high', 'lite', 'low', 'survival'];
+
+let DPR = Math.min(window.devicePixelRatio || 1, Q_DPR[quality]);
+let W = innerWidth, H = innerHeight;
+
+/* tunnel skull scale: the sprite size is viewport-independent, so on a phone
+   the same skulls that read as a field on desktop swallow the whole screen and
+   bury the hero. Shrink them by the short edge, floored so they never vanish. */
+let TUN_SCALE = 1;
+function tunScale() {
+  TUN_SCALE = Math.min(1, Math.max(0.4, Math.min(W, H) / 820));
+}
+tunScale();
+
+/* ── CFG: every tunable, editable live via the C panel ──
+   schema: key -> [default, min, max, step, label] */
+const CFG_SCHEMA = {
+  tunnelSpeed:    [0.030, 0.005, 0.12, 0.005, 'tunnel zoom speed'],
+  tunnelBassBoost:[0.9,   0,     3,    0.1,   'tunnel bass boost'],
+  tunnelBreath:   [0.06,  0,     0.3,  0.01,  'tunnel beat breath'],
+  skullSpinMax:   [0.30,  0,     2,    0.05,  'skull spin max'],
+  beatSensitivity:[1.3,   1.05,  2,    0.05,  'beat sensitivity'],
+  beatDecay:      [6,     1,     15,   0.5,   'beat pulse decay'],
+  ringSpeed:      [0.14,  0,     1,    0.02,  'eye ring speed'],
+  ringBeatKick:   [1.6,   0,     6,    0.2,   'ring beat kick'],
+  spiralSpeed:    [0.09,  0,     1,    0.02,  'cheek spiral speed'],
+  raySpeed:       [0.07,  0,     0.4,  0.01,  'sunbeam speed'],
+  nosePulse:      [0.3,   0,     1,    0.05,  'nose beat thump'],
+  teethClack:     [0.12,  0,     0.5,  0.02,  'teeth beat clack'],
+  pupilBeat:      [0.2,   0,     0.6,  0.05,  'pupil beat snap'],
+  smokeStir:      [0.6,   0,     4,    0.1,   'smoke cursor stir'],
+  smokeDecay:     [0.3,   0.05,  3,    0.05,  'smoke stir fade rate'],
+  skullSize:      [1.0,   0.5,   1.8,  0.05,  'hero skull size'],
+  rayLength:      [1.0,   0.3,   2.5,  0.05,  'starburst length'],
+  rayCount:       [14,    6,     28,   2,     'starburst rays'],
+  smokeScale:     [1.0,   0.4,   3,    0.1,   'smoke marble size'],
+  smokeDrift:     [1.0,   0.1,   4,    0.1,   'smoke drift speed'],
+  tunnelCount:    [56,    12,    56,   4,     'tunnel skull count'],
+  starDensity:    [1.0,   0.2,   2.5,  0.1,   'star density'],
+  dustCount:      [1.0,   0.2,   2,    0.1,   'dust particles'],
+  gazeRange:      [1.0,   0.3,   2,    0.1,   'pupil travel range'],
+  wanderPace:     [1.0,   0.3,   3,    0.1,   'eye wander pace'],
+  tempoRef:       [96,    60,    140,  2,     'tempo ref BPM'],
+  dayCycleMin:    [10,    2,     30,   1,     'day/night cycle (min)'],
+  perfMode:       [0,     0,     2,    1,     'perf: 0 auto 1 full 2 lite'],
+  tempoMax:       [1.8,   1,     3,    0.1,   'tempo speed cap'],
+  eventMinGap:    [7,     1,     30,   1,     'event gap min (s)'],
+  eventMaxGap:    [20,    2,     60,   1,     'event gap max (s)'],
+  liquidFill:     [11,    2,     30,   1,     'logo travel time (s)'],
+  liquidRest:     [6,     0,     20,   1,     'logo dwell max (s)'],
+  musicVolume:    [0.9,   0,     1,    0.05,  'music volume'],
+  gritoVolume:    [1.0,   0,     1,    0.05,  'grito volume'],
+  /* ── color ── */
+  palette:        [0,     0,     7,    1,     'palette (0-7)'],
+  hueShift:       [0,   -180,  180,    5,     'ornament hue shift'],
+  satMul:         [1.0,   0,     2,    0.05,  'ornament saturation'],
+  boneHue:        [0,   -180,  180,    5,     'bone hue'],
+  boneSat:        [1.0,   0,     2,    0.05,  'bone saturation'],
+  nebulaHue:      [0,   -180,  180,    5,     'smoke hue shift'],
+  nebulaSat:      [1.0,   0,     2,    0.05,  'smoke saturation'],
+  bgBright:       [1.0,   0.2,   2,    0.05,  'smoke brightness'],
+  vignette:       [0.4,   0,     1.2,  0.05,  'vignette'],
+  /* ── feel ── */
+  flickForce:     [1.0,   0.2,   3,    0.1,   'flick strength'],
+  socketGlow:     [1.0,   0,     2.5,  0.1,   'eye socket glow'],
+  auraSize:       [1.0,   0,     2.5,  0.1,   'skull aura'],
+  petalCount:     [12,    4,     20,   1,     'eye petals'],
+};
+/* toggles live in CFG too, so they save and restore with everything else.
+   [default, 0, 1, 1, label, 'toggle'] renders a switch instead of a slider. */
+const CFG_TOGGLES = {
+  textOn:      [1, 0, 1, 1, 'show text', 'toggle'],
+  musicOn:     [1, 0, 1, 1, 'music on', 'toggle'],
+  autoEvents:  [1, 0, 1, 1, 'random events', 'toggle'],
+  voiceOn:     [0, 0, 1, 1, 'voice control', 'toggle'],
+  hudOn:       [0, 0, 1, 1, 'fps monitor', 'toggle'],
+};
+Object.assign(CFG_SCHEMA, CFG_TOGGLES);
+const CFG = {};
+for (const k in CFG_SCHEMA) CFG[k] = CFG_SCHEMA[k][0];
+
+/* ── persistence: settings survive a refresh ──
+   Saved values are validated against the schema (right key, finite number,
+   clamped to range) so a stale or hand-edited entry can never break the art. */
+const CFG_STORE = 'sklz.cfg.v1';
+const BUILD_ID = '__BUILD_ID__';       /* stamped by deploy.sh on every push */
+function cfgApply(obj) {
+  let n = 0;
+  for (const k in obj) {
+    if (!(k in CFG_SCHEMA)) continue;
+    const v = parseFloat(obj[k]);
+    if (!isFinite(v)) continue;
+    const [, min, max] = CFG_SCHEMA[k];
+    CFG[k] = Math.max(min, Math.min(max, v));
+    n++;
+  }
+  return n;
+}
+function cfgSave() {
+  try { localStorage.setItem(CFG_STORE, JSON.stringify(CFG)); return true; }
+  catch (_) { return false; }            // private mode / quota
+}
+function cfgLoad() {
+  try {
+    const raw = localStorage.getItem(CFG_STORE);
+    if (!raw) return 0;
+    return cfgApply(JSON.parse(raw));
+  } catch (_) { return 0; }              // corrupt json: fall back to defaults
+}
+function cfgClear() {
+  try { localStorage.removeItem(CFG_STORE); } catch (_) {}
+}
+const CFG_RESTORED = cfgLoad();          // apply before anything reads CFG
+
+/* ── palette ── */
+/* ── palette engine ──
+   PAL is derived, not fixed: a named base palette plus hue / saturation /
+   bone-warmth transforms. Sprites bake these colors in, so changing any of
+   them re-bakes (debounced); the live-drawn face reads PAL every frame. */
+const PALETTES = [
+  { n: 'muertos', a: ['#ff2fa0', '#2fe8d0', '#ffb347', '#9146FF'], bone: 40 },
+  { n: 'ember',   a: ['#ff5722', '#ffc107', '#ff2d55', '#ff8a3d'], bone: 32 },
+  { n: 'ice',     a: ['#4fc3f7', '#b388ff', '#80ffea', '#5c6bc0'], bone: 205 },
+  { n: 'acid',    a: ['#c6ff00', '#00e5ff', '#ff4081', '#76ff03'], bone: 70 },
+  { n: 'noir',    a: ['#e0e0e0', '#9e9e9e', '#ffffff', '#616161'], bone: 0 },
+  { n: 'candy',   a: ['#ff6ec7', '#7afcff', '#fff97a', '#b967ff'], bone: 330 },
+  { n: 'jade',    a: ['#00e676', '#00bfa5', '#ffd54f', '#1de9b6'], bone: 90 },
+  { n: 'blood',   a: ['#ff1744', '#d500f9', '#ff8a80', '#880e4f'], bone: 350 },
+];
+function hex2hsl(hex) {
+  const r = parseInt(hex.slice(1, 3), 16) / 255,
+        g = parseInt(hex.slice(3, 5), 16) / 255,
+        b = parseInt(hex.slice(5, 7), 16) / 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+  let h = 0;
+  if (d) {
+    if (mx === r) h = ((g - b) / d) % 6;
+    else if (mx === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+  }
+  h *= 60; if (h < 0) h += 360;
+  const l = (mx + mn) / 2;
+  const s = d ? d / (1 - Math.abs(2 * l - 1)) : 0;
+  return [h, s, l];
+}
+const hsl = (h, s, l) => `hsl(${((h % 360) + 360) % 360} ${Math.max(0, Math.min(100, s * 100)).toFixed(1)}% ${Math.max(0, Math.min(100, l * 100)).toFixed(1)}%)`;
+function shiftHex(hex, dh, sMul) {
+  const [h, s, l] = hex2hsl(hex);
+  return hsl(h + dh, s * sMul, l);
+}
+const PAL = {};
+function applyPalette() {
+  const p = PALETTES[Math.max(0, Math.min(PALETTES.length - 1, Math.round(CFG.palette)))];
+  const dh = CFG.hueShift, sm = CFG.satMul;
+  PAL.magenta = shiftHex(p.a[0], dh, sm);
+  PAL.teal    = shiftHex(p.a[1], dh, sm);
+  PAL.gold    = shiftHex(p.a[2], dh, sm);
+  PAL.violet  = shiftHex(p.a[3], dh, sm);
+  /* bone runs on its own hue so skulls can stay ivory in a wild palette */
+  const bh = p.bone + CFG.boneHue, bs = CFG.boneSat;
+  PAL.bone1 = hsl(bh, 0.62 * bs, 0.90);
+  PAL.bone2 = hsl(bh, 0.60 * bs, 0.67);
+  PAL.bone3 = hsl(bh, 0.45 * bs, 0.37);
+  PAL.dark  = hsl(275 + dh, 0.55, 0.08);
+}
+
+/* ─────────────────────────────────────────────
+   AUDIO — element + analyser, bass envelope
+   ───────────────────────────────────────────── */
+const music = document.getElementById('music');
+music.volume = 0;
+let actx = null, analyser = null, freq = null;
+let bass = 0, bassSm = 0, mids = 0;
+
+/* beat detection: bass-energy onset vs a running average */
+let beatPulse = 0;           // 1.0 on a detected beat, decays fast
+let beatAvg = 0, lastBeatT = -9, beatCount = 0;
+
+/* BPM tracking: median of recent inter-beat intervals -> tempo multiplier.
+   1.0 is the floor (current speeds); faster music accelerates the scene. */
+const beatGaps = [];
+let bpm = 0, tempoMul = 1, tempoT = 0;   // tempoT: clock that runs faster with the music
+function updateTempo(gap) {
+  if (gap < 0.25 || gap > 2) return;         // reject off-grid intervals
+  beatGaps.push(gap);
+  if (beatGaps.length > 10) beatGaps.shift();
+  if (beatGaps.length < 4) return;
+  const sorted = [...beatGaps].sort((a, b) => a - b);
+  bpm = 60 / sorted[sorted.length >> 1];
+}
+let gateGone = false;
+
+/* ── mouse state: position (0..1), movement energy, last-move time ── */
+const mouse = { x: .5, y: .5, str: 0, lastMove: -99 };
+addEventListener('pointermove', e => {
+  const nx = e.clientX / W, ny = e.clientY / H;
+  mouse.str = Math.min(1.5, mouse.str + Math.hypot(nx - mouse.x, ny - mouse.y) * 24);
+  mouse.x = nx; mouse.y = ny; mouse.lastMove = t;
+});
+
+function initAudio() {
+  if (actx) return;
+  actx = new (window.AudioContext || window.webkitAudioContext)();
+  const src = actx.createMediaElementSource(music);
+  analyser = actx.createAnalyser();
+  analyser.fftSize = 512;
+  analyser.smoothingTimeConstant = 0.7;
+  freq = new Uint8Array(analyser.frequencyBinCount);
+  src.connect(analyser);
+  analyser.connect(actx.destination);
+}
+function sampleAudio() {
+  if (!analyser) { // idle breathing when silent
+    bassSm = 0.18 + 0.12 * Math.sin(t * 0.7);
+    mids = 0.1;
+    return;
+  }
+  analyser.getByteFrequencyData(freq);
+  let b = 0; for (let i = 1; i < 9; i++) b += freq[i];
+  bass = (b / 8) / 255;
+  let m = 0; for (let i = 20; i < 60; i++) m += freq[i];
+  mids = (m / 40) / 255;
+  bassSm += (bass - bassSm) * 0.12;
+
+  /* onset: bass jumps above its ~1.5s running average, min 250ms apart */
+  beatAvg += (bass - beatAvg) * 0.012;
+  if (bass > beatAvg * CFG.beatSensitivity && bass > 0.12 && t - lastBeatT > 0.25) {
+    beatPulse = 1;
+    updateTempo(t - lastBeatT);
+    lastBeatT = t;
+    beatCount++;
+  }
+}
+
+/* ─────────────────────────────────────────────
+   LAYER 1 — NEBULA (WebGL, rendered at half res)
+   ───────────────────────────────────────────── */
+const nebCanvas = document.getElementById('nebula');
+const gl = nebCanvas.getContext('webgl', { antialias: false, depth: false });
+
+const VSH = `attribute vec2 p; void main(){ gl_Position = vec4(p,0.,1.); }`;
+const FSH = `
+precision highp float;
+uniform vec2  u_res;
+uniform float u_time;
+uniform float u_bass;
+uniform vec2  u_mouse;
+uniform float u_mstr;
+uniform float u_scale;
+uniform float u_drift;
+uniform float u_stars;
+uniform float u_nhue;
+uniform float u_nsat;
+uniform float u_nbright;
+uniform float u_vig;
+
+float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float noise(vec2 p){
+  vec2 i = floor(p), f = fract(p);
+  vec2 u = f*f*(3.-2.*f);
+  return mix(mix(hash(i), hash(i+vec2(1,0)), u.x),
+             mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), u.x), u.y);
+}
+float fbm(vec2 p){
+  float v = 0., a = .5;
+  mat2 r = mat2(.8, .6, -.6, .8);
+  for(int i = 0; i < 5; i++){ v += a * noise(p); p = r * p * 2.02; a *= .5; }
+  return v;
+}
+vec3 stars(vec2 uv, float t){
+  vec3 c = vec3(0.);
+  for(int l = 0; l < 2; l++){
+    float sc = l == 0 ? 60. : 130.;
+    vec2 gp = uv * sc;
+    vec2 id = floor(gp);
+    vec2 f  = fract(gp) - .5;
+    float h = hash(id);
+    if(h > 1. - .07 * u_stars){
+      vec2 off = vec2(hash(id + 7.1), hash(id + 3.7)) - .5;
+      float d = length(f - off * .6);
+      float tw = .55 + .45 * sin(t * (1.5 + h * 4.) + h * 40.);
+      float s = smoothstep(.12, .0, d) * tw;
+      c += vec3(.9, .85, 1.) * s * (l == 0 ? 1. : .5);
+    }
+  }
+  return c;
+}
+void main(){
+  vec2 uv = (gl_FragCoord.xy - .5 * u_res) / u_res.y;
+  uv /= u_scale;                                  /* marble size: bigger scale = broader swirls */
+  float t = u_time * .03 * u_drift;
+
+  /* cursor stirs the smoke: local bulge + swirl, decaying with mouse energy */
+  vec2 md = uv - u_mouse;
+  float minf = exp(-dot(md, md) * 14.) * u_mstr;
+  uv += (vec2(-md.y, md.x) * 1.4 + md * .9) * minf * .18;
+
+  /* domain-warped fbm — two passes of drift */
+  vec2 q = vec2(fbm(uv * 2.2 + t), fbm(uv * 2.2 + vec2(5.2, 1.3) - t * .7));
+  vec2 r = vec2(fbm(uv * 2.2 + 3.5 * q + vec2(1.7, 9.2) + t * .5),
+                fbm(uv * 2.2 + 3.5 * q + vec2(8.3, 2.8) - t * .3));
+  float f = fbm(uv * 2.2 + 3.5 * r);
+
+  vec3 deep    = vec3(.024, .012, .06);
+  vec3 violet  = vec3(.23, .08, .38);
+  vec3 pink    = vec3(.88, .34, .68);
+  vec3 tealC   = vec3(.18, .78, .72);
+
+  vec3 col = deep;
+  col = mix(col, violet, clamp(f * f * 2.4, 0., 1.));
+  col = mix(col, pink,   clamp(length(q) * 1.05, 0., 1.) * smoothstep(.2, .8, f) * (uv.y * .5 + .68));
+  col = mix(col, tealC,  clamp(r.y * r.y * 1.5, 0., 1.) * smoothstep(.35, .85, f) * (1. - (uv.y * .5 + .5) * .55) * .9);
+
+  col *= .7 + .95 * f;
+  col *= 1. + u_bass * .4;                        /* breathe with the low end */
+  col += stars(uv + vec2(0., t * .15), u_time) * (1. - smoothstep(.3, .75, f));
+  col *= 1. - u_vig * dot(uv, uv);               /* vignette */
+
+  /* palette controls: rotate hue, push saturation, scale brightness */
+  float ang = radians(u_nhue);
+  float cs = cos(ang), sn = sin(ang);
+  mat3 hueRot = mat3(
+    0.213 + cs * 0.787 - sn * 0.213, 0.213 - cs * 0.213 + sn * 0.143, 0.213 - cs * 0.213 - sn * 0.787,
+    0.715 - cs * 0.715 - sn * 0.715, 0.715 + cs * 0.285 + sn * 0.140, 0.715 - cs * 0.715 + sn * 0.715,
+    0.072 - cs * 0.072 + sn * 0.928, 0.072 - cs * 0.072 - sn * 0.283, 0.072 + cs * 0.928 + sn * 0.072);
+  col = hueRot * col;
+  float lum = dot(col, vec3(0.299, 0.587, 0.114));
+  col = mix(vec3(lum), col, u_nsat);
+  col *= u_nbright;
+
+  gl_FragColor = vec4(max(col, 0.0), 1.);
+}`;
+
+function makeProgram(gl, vs, fs) {
+  const c = (t, s) => { const sh = gl.createShader(t); gl.shaderSource(sh, s); gl.compileShader(sh); return sh; };
+  const p = gl.createProgram();
+  gl.attachShader(p, c(gl.VERTEX_SHADER, vs));
+  gl.attachShader(p, c(gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(p);
+  return p;
+}
+const prog = makeProgram(gl, VSH, FSH);
+gl.useProgram(prog);
+const buf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+const locP = gl.getAttribLocation(prog, 'p');
+gl.enableVertexAttribArray(locP);
+gl.vertexAttribPointer(locP, 2, gl.FLOAT, false, 0, 0);
+const uRes = gl.getUniformLocation(prog, 'u_res');
+const uTime = gl.getUniformLocation(prog, 'u_time');
+const uBass = gl.getUniformLocation(prog, 'u_bass');
+const uMouse = gl.getUniformLocation(prog, 'u_mouse');
+const uMstr = gl.getUniformLocation(prog, 'u_mstr');
+const uScale = gl.getUniformLocation(prog, 'u_scale');
+const uDrift = gl.getUniformLocation(prog, 'u_drift');
+const uStars = gl.getUniformLocation(prog, 'u_stars');
+const uNhue = gl.getUniformLocation(prog, 'u_nhue');
+const uNsat = gl.getUniformLocation(prog, 'u_nsat');
+const uNbright = gl.getUniformLocation(prog, 'u_nbright');
+const uVig = gl.getUniformLocation(prog, 'u_vig');
+
+/* ─────────────────────────────────────────────
+   CALAVERA SPRITE — procedural sugar skull
+   drawn once per hue variant onto offscreen canvases
+   ───────────────────────────────────────────── */
+function drawSkull(ctx, S, opt) {
+  // Coordinate space: 1000 x 1200, origin at center of cranium
+  const k = S / 1200;
+  ctx.save();
+  ctx.translate(S * 0.5, S * 0.52);
+  ctx.scale(k, k);
+
+  const A1 = opt.a1, A2 = opt.a2, A3 = opt.a3;
+
+  if (opt.glow) { // baked aura for tunnel sprites
+    const g = ctx.createRadialGradient(0, 0, 100, 0, 0, 620);
+    /* alpha via globalAlpha, NOT hex suffixes: palette colors are hsl() now */
+    g.addColorStop(0, opt.glowColor);
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.save();
+    ctx.globalAlpha = 0.33;
+    ctx.fillStyle = g;
+    ctx.fillRect(-620, -620, 1240, 1240);
+    ctx.restore();
+  }
+
+  /* skull outline: dome + cheeks + jaw */
+  const skullPath = () => {
+    ctx.beginPath();
+    ctx.moveTo(0, 560);                               // chin
+    ctx.bezierCurveTo(-150, 560, -195, 505, -205, 420); // left jaw
+    ctx.bezierCurveTo(-215, 350, -250, 330, -290, 285); // left cheek notch
+    ctx.bezierCurveTo(-360, 210, -390, 120, -390, 0);   // left temple
+    ctx.bezierCurveTo(-390, -270, -215, -440, 0, -440); // dome left→top
+    ctx.bezierCurveTo(215, -440, 390, -270, 390, 0);    // dome top→right
+    ctx.bezierCurveTo(390, 120, 360, 210, 290, 285);    // right temple
+    ctx.bezierCurveTo(250, 330, 215, 350, 205, 420);    // right cheek notch
+    ctx.bezierCurveTo(195, 505, 150, 560, 0, 560);      // right jaw → chin
+    ctx.closePath();
+  };
+
+  skullPath();
+  const bg = ctx.createRadialGradient(0, -120, 60, 0, 40, 640);
+  bg.addColorStop(0, opt.bone1);
+  bg.addColorStop(0.72, opt.bone2);
+  bg.addColorStop(1, opt.bone3);
+  ctx.fillStyle = bg;
+  ctx.fill();
+  ctx.lineWidth = 10;
+  ctx.strokeStyle = opt.bone3;
+  ctx.stroke();
+
+  ctx.save();
+  skullPath();
+  ctx.clip();
+
+  /* dome sutures */
+  ctx.lineWidth = 4; ctx.globalAlpha = 0.53; ctx.strokeStyle = opt.bone3;
+  ctx.beginPath(); ctx.moveTo(0, -440);
+  for (let y = -440; y < -260; y += 24) ctx.lineTo(((y / 24) % 2 ? 10 : -10), y);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  /* ── eye sockets: dark wells ringed with petals ── */
+  if (!opt.animFace) for (const sx of [-1, 1]) {
+    const ex = sx * 178, ey = -60, er = 128;
+    if (!opt.ringSeparate) {
+      // petals
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2;
+        ctx.save();
+        ctx.translate(ex + Math.cos(a) * (er + 26), ey + Math.sin(a) * (er + 26));
+        ctx.rotate(a + Math.PI / 2);
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 22, 44, 0, 0, Math.PI * 2);
+        ctx.fillStyle = i % 2 ? A1 : A2;
+        ctx.globalAlpha = 0.92;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.restore();
+      }
+      // dot ring
+      for (let i = 0; i < 18; i++) {
+        const a = (i / 18) * Math.PI * 2 + 0.12;
+        ctx.beginPath();
+        ctx.arc(ex + Math.cos(a) * (er + 74), ey + Math.sin(a) * (er + 74), 7, 0, Math.PI * 2);
+        ctx.fillStyle = A3;
+        ctx.fill();
+      }
+    }
+    // socket
+    const sg = ctx.createRadialGradient(ex, ey, 20, ex, ey, er);
+    sg.addColorStop(0, '#000');
+    sg.addColorStop(1, opt.dark);
+    ctx.beginPath();
+    ctx.arc(ex, ey, er, 0, Math.PI * 2);
+    ctx.fillStyle = sg;
+    ctx.fill();
+    ctx.lineWidth = 8; ctx.strokeStyle = opt.bone3; ctx.stroke();
+  }
+
+  /* nose — inverted heart */
+  if (!opt.animFace) {
+    ctx.beginPath();
+    ctx.moveTo(0, 215);
+    ctx.bezierCurveTo(-58, 130, -20, 105, 0, 150);
+    ctx.bezierCurveTo(20, 105, 58, 130, 0, 215);
+    ctx.closePath();
+    ctx.fillStyle = opt.dark;
+    ctx.fill();
+    ctx.lineWidth = 6; ctx.strokeStyle = A1; ctx.stroke();
+  }
+
+  /* forehead rosette (third-eye seat) */
+  ctx.save();
+  ctx.translate(0, -300);
+  for (let ring = 0; ring < 2; ring++) {
+    const n = ring ? 8 : 12, rr = ring ? 46 : 78, pr = ring ? 26 : 34;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + ring * 0.3;
+      ctx.save();
+      ctx.translate(Math.cos(a) * rr, Math.sin(a) * rr * 0.82);
+      ctx.rotate(a + Math.PI / 2);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, pr * 0.42, pr, 0, 0, Math.PI * 2);
+      ctx.fillStyle = ring ? A2 : A1;
+      ctx.globalAlpha = 0.9;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+  }
+  ctx.beginPath(); ctx.arc(0, 0, 40, 0, Math.PI * 2);
+  ctx.fillStyle = opt.thirdEyeHole ? opt.dark : A3;
+  ctx.fill();
+  ctx.lineWidth = 5; ctx.strokeStyle = opt.bone3; ctx.stroke();
+  ctx.restore();
+
+  /* cheek spirals */
+  if (!opt.animFace) for (const sx of [-1, 1]) {
+    ctx.save();
+    ctx.translate(sx * 275, 165);
+    ctx.beginPath();
+    for (let a = 0; a < Math.PI * 3.6; a += 0.12) {
+      const rr = 6 + a * 12;
+      const x = Math.cos(a * sx) * rr, y = Math.sin(a * sx) * rr;
+      a === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.lineWidth = 9; ctx.lineCap = 'round';
+    ctx.strokeStyle = A2;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /* teeth */
+  if (!opt.animFace && !opt.liveTeeth) {
+    const tw = 260, th = 96, ty = 348;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(-tw / 2, ty, tw, th, 34); else ctx.rect(-tw / 2, ty, tw, th);
+    ctx.fillStyle = opt.bone1;
+    ctx.fill();
+    ctx.lineWidth = 7; ctx.strokeStyle = opt.bone3; ctx.stroke();
+    ctx.lineWidth = 5;
+    for (let i = 1; i < 6; i++) {
+      const x = -tw / 2 + (tw / 6) * i;
+      ctx.beginPath(); ctx.moveTo(x, ty + 6); ctx.lineTo(x, ty + th - 6); ctx.stroke();
+    }
+    ctx.beginPath(); ctx.moveTo(-tw / 2, ty + th / 2); ctx.lineTo(tw / 2, ty + th / 2);
+    ctx.save(); ctx.globalAlpha = 0.67; ctx.strokeStyle = opt.bone3; ctx.stroke(); ctx.restore();
+  }
+
+  /* chin diamond + dots */
+  ctx.beginPath();
+  ctx.moveTo(0, 470); ctx.lineTo(26, 502); ctx.lineTo(0, 534); ctx.lineTo(-26, 502);
+  ctx.closePath(); ctx.fillStyle = A1; ctx.fill();
+  for (const sx of [-1, 1]) for (let i = 0; i < 3; i++) {
+    ctx.beginPath();
+    ctx.arc(sx * (58 + i * 34), 500 - i * 9, 8, 0, Math.PI * 2);
+    ctx.fillStyle = A3; ctx.fill();
+  }
+
+  ctx.restore(); // clip
+  ctx.restore();
+}
+
+function makeSkullSprite(size, opt) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  drawSkull(c.getContext('2d'), size, opt);
+  return c;
+}
+
+/* tunnel variants — ornament triples, glow baked in. Eye rings and teeth are
+   excluded from the bake and drawn live so they can spin and chatter.
+   Everything here is rebuilt whenever the palette changes. */
+const RING_UNITS = 500;
+let VCONF = [], VARIANTS = [], VARIANTS_STATIC = [], RINGS = [], HERO_SPRITE = null;
+
+function buildRingSprite(v) {
+  const S = RING_UNITS * 0.3, c = document.createElement('canvas');
+  c.width = c.height = S;
+  const ctx = c.getContext('2d');
+  ctx.translate(S / 2, S / 2); ctx.scale(0.3, 0.3);
+  const er = 128, NP = Math.max(4, Math.round(CFG.petalCount));
+  for (let i = 0; i < NP; i++) {
+    const a = (i / NP) * Math.PI * 2;
+    ctx.save();
+    ctx.translate(Math.cos(a) * (er + 26), Math.sin(a) * (er + 26));
+    ctx.rotate(a + Math.PI / 2);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 22, 44, 0, 0, Math.PI * 2);
+    ctx.fillStyle = i % 2 ? v.a1 : v.a2;
+    ctx.globalAlpha = 0.92; ctx.fill(); ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+  for (let i = 0; i < 18; i++) {
+    const a = (i / 18) * Math.PI * 2 + 0.12;
+    ctx.beginPath();
+    ctx.arc(Math.cos(a) * (er + 74), Math.sin(a) * (er + 74), 7, 0, Math.PI * 2);
+    ctx.fillStyle = v.a3; ctx.fill();
+  }
+  /* punch out the socket so the ring sits AROUND the dark well, matching the
+     original bake order (socket painted over petal tips) */
+  ctx.globalCompositeOperation = 'destination-out';
+  ctx.beginPath(); ctx.arc(0, 0, er + 4, 0, Math.PI * 2); ctx.fill();
+  return c;
+}
+
+function rebuildSprites() {
+  applyPalette();
+  VCONF = [
+    { a1: PAL.magenta, a2: PAL.teal,    a3: PAL.gold,    glowColor: PAL.magenta },
+    { a1: PAL.teal,    a2: PAL.violet,  a3: PAL.magenta, glowColor: PAL.teal },
+    { a1: PAL.gold,    a2: PAL.magenta, a3: PAL.teal,    glowColor: PAL.gold },
+    { a1: PAL.violet,  a2: PAL.gold,    a3: PAL.magenta, glowColor: PAL.violet },
+  ];
+  const bone = { bone1: PAL.bone1, bone2: PAL.bone2, bone3: PAL.bone3, dark: PAL.dark };
+  VARIANTS = VCONF.map(v => makeSkullSprite(360, {
+    ...bone, glow: true, thirdEyeHole: false, ringSeparate: true, liveTeeth: true, ...v
+  }));
+  /* complete bakes (rings + teeth included) for lite mode's static skulls */
+  VARIANTS_STATIC = VCONF.map(v => makeSkullSprite(360, {
+    ...bone, glow: true, thirdEyeHole: false, ...v
+  }));
+  RINGS = VCONF.map(buildRingSprite);
+  HERO_SPRITE = makeSkullSprite(1600, {
+    ...bone, a1: PAL.magenta, a2: PAL.teal, a3: PAL.gold,
+    glow: false, thirdEyeHole: true, animFace: true
+  });
+}
+rebuildSprites();
+
+/* re-baking 10 canvases is ~40ms, far too slow to run per slider tick */
+const PALETTE_KEYS = ['palette','hueShift','satMul','boneHue','boneSat','petalCount'];
+let repaintT = null;
+function schedulePaletteRebuild() {
+  clearTimeout(repaintT);
+  repaintT = setTimeout(rebuildSprites, 120);
+}
+
+/* per-skull chatter schedule: seeded episodes every few seconds */
+const skullChat = Array.from({ length: 56 }, (_, i) => {
+  const h = Math.abs(Math.sin(i * 91.7 + 47.3) * 43758.5453) % 1;
+  return { period: 5 + h * 10, dur: 0.8 + h * 0.8, off: h * 20 };
+});
+
+
+/* Skull outline with an elongated lower jaw. d = how far the chin drops.
+   Used for both the yell clip and the bone fill that backs the open mouth,
+   because the baked sprite's chin stops at y=560 and a full gape reaches
+   y~594, which is exactly why the mouth was getting cut off. */
+function skullOutlinePath(ctx, d) {
+  d = d || 0;
+  ctx.beginPath();
+  ctx.moveTo(0, 560 + d);
+  ctx.bezierCurveTo(-150, 560 + d, -195, 505 + d * 0.85, -205, 420 + d * 0.55);
+  ctx.bezierCurveTo(-215, 350 + d * 0.3, -250, 330 + d * 0.15, -290, 285);
+  ctx.bezierCurveTo(-360, 210, -390, 120, -390, 0);
+  ctx.bezierCurveTo(-390, -270, -215, -440, 0, -440);
+  ctx.bezierCurveTo(215, -440, 390, -270, 390, 0);
+  ctx.bezierCurveTo(390, 120, 360, 210, 290, 285);
+  ctx.bezierCurveTo(250, 330 + d * 0.15, 215, 350 + d * 0.3, 205, 420 + d * 0.55);
+  ctx.bezierCurveTo(195, 505 + d * 0.85, 150, 560 + d, 0, 560 + d);
+  ctx.closePath();
+}
+
+/* ─────────────────────────────────────────────
+   LIVING FACE — the hero's eyes, rings, nose,
+   teeth, and spirals are drawn live each frame
+   ───────────────────────────────────────────── */
+const face = {
+  gazeX: 0, gazeY: 0, gazeUntil: -1,       // click-look target (screen px)
+  wx: 0, wy: 0, nextWander: 0,             // wander target (hero-local px)
+  curX: 0, curY: 0,                        // eased current look point
+  ringRot: 0, ringSpin: 0,
+  spiralRot: 0, spiralSpin: 0,
+  chatterUntil: -1, noseBurst: -1, nextChatter: 0,
+  yellStart: -9, yellUntil: -9
+};
+/* 0..1 envelope: snaps the jaw open, holds while the clip plays, eases shut */
+function yellAmt() {
+  if (t > face.yellUntil) return 0;
+  const inP = Math.min(1, (t - face.yellStart) / 0.12);          // fast open
+  const outP = Math.min(1, (face.yellUntil - t) / 0.45);         // slower close
+  return Math.min(inP, outP) * (1 - Math.pow(1 - Math.min(inP, outP), 2));
+}
+let heroS = 1, heroBob = 0;
+
+function toSkullUnits(cx, cy) {
+  const k = heroS * (4 / 3);
+  return [(cx - W / 2) / k, (cy - (H / 2 - H * 0.02 + heroBob)) / k - 24];
+}
+function heartBurst(cx, cy) {
+  if (!canSpawn('heart', 10)) return;
+  for (let k = 0; k < 10; k++) {
+    const a = -Math.PI / 2 + (Math.random() - 0.5) * 1.6, sp = 120 + Math.random() * 200;
+    sparks.push({ kind: 'heart', x: cx, y: cy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+                  life: 0, max: 1.8, ph: Math.random() * 7, hue: Math.random() });
+  }
+}
+function faceHit(cx, cy) {
+  const u = toSkullUnits(cx, cy), ux = u[0], uy = u[1];
+  const d = (x, y) => Math.hypot(ux - x, uy - y);
+  if (d(0, -300) < 120)  { rainbowEyeUntil = t + 5; return true; }          // third eye
+  if (d(-178, -60) < 190 || d(178, -60) < 190) { face.ringSpin += 10; return true; } // eye rings
+  if (d(0, 165) < 85)    { face.noseBurst = t + 1.2; heartBurst(cx, cy); return true; }
+  if (Math.abs(ux) < 155 && uy > 325 && uy < 470) { face.chatterUntil = t + 1.6; return true; }
+  if (d(-275, 165) < 95) { face.spiralSpin += 12; return true; }
+  if (d(275, 165) < 95)  { face.spiralSpin -= 12; return true; }
+  return false;
+}
+
+function drawEyeAssembly(side) {
+  const ex = side * 178, ey = -60, er = 128;
+  const rot = face.ringRot * side * 2.2;             // left and right counter-rotate
+  const NP = Math.max(4, Math.round(CFG.petalCount));
+  for (let i = 0; i < NP; i++) {
+    const a = (i / NP) * Math.PI * 2 + rot;
+    hctx.save();
+    hctx.translate(ex + Math.cos(a) * (er + 26), ey + Math.sin(a) * (er + 26));
+    hctx.rotate(a + Math.PI / 2);
+    hctx.beginPath();
+    hctx.ellipse(0, 0, 22, 44, 0, 0, Math.PI * 2);
+    hctx.fillStyle = i % 2 ? PAL.magenta : PAL.teal;
+    hctx.globalAlpha = 0.92; hctx.fill(); hctx.globalAlpha = 1;
+    hctx.restore();
+  }
+  for (let i = 0; i < 18; i++) {                     // dot ring counter-spins vs petals
+    const a = (i / 18) * Math.PI * 2 + 0.12 - rot * 0.55;
+    hctx.beginPath();
+    hctx.arc(ex + Math.cos(a) * (er + 74), ey + Math.sin(a) * (er + 74), 7, 0, Math.PI * 2);
+    hctx.fillStyle = PAL.gold; hctx.fill();
+  }
+  const sg = hctx.createRadialGradient(ex, ey, 20, ex, ey, er);
+  sg.addColorStop(0, '#000'); sg.addColorStop(1, PAL.dark);
+  hctx.beginPath(); hctx.arc(ex, ey, er, 0, Math.PI * 2);
+  hctx.fillStyle = sg; hctx.fill();
+  hctx.lineWidth = 8; hctx.strokeStyle = PAL.bone3; hctx.stroke();
+}
+function drawNoseLive() {
+  let sc = 1 + 0.07 * Math.sin(t * 2.3) + bassSm * 0.1 + beatPulse * CFG.nosePulse;
+  if (t < face.noseBurst) sc += 0.5 * (face.noseBurst - t) / 1.2;
+  hctx.save();
+  hctx.translate(0, 160); hctx.scale(sc, sc); hctx.translate(0, -160);
+  hctx.beginPath();
+  hctx.moveTo(0, 215);
+  hctx.bezierCurveTo(-58, 130, -20, 105, 0, 150);
+  hctx.bezierCurveTo(20, 105, 58, 130, 0, 215);
+  hctx.closePath();
+  hctx.fillStyle = PAL.dark; hctx.fill();
+  hctx.lineWidth = 6; hctx.strokeStyle = PAL.magenta; hctx.stroke();
+  hctx.restore();
+}
+function drawTeethLive() {
+  const tw = 260, th = 96, ty = 348;
+  const y = yellAmt();
+
+  if (y > 0.01) {
+    /* YELL: the mouth opens into a dark cavern, the two rows of teeth split
+       apart and ride the jaw, and the throat glows with the shout. */
+    const gape = 150 * y * (1 + beatPulse * 0.12);   // how far the jaw drops
+    const wide = 1 + 0.20 * y;                       // mouth widens a little
+    const mw = tw * wide, mh = th + gape;
+    const myTop = ty - 6 * y;
+    hctx.save();
+    /* cavern */
+    hctx.beginPath();
+    if (hctx.roundRect) hctx.roundRect(-mw / 2, myTop, mw, mh, 40 + 26 * y);
+    else hctx.rect(-mw / 2, myTop, mw, mh);
+    const cav = hctx.createRadialGradient(0, myTop + mh * 0.55, 4, 0, myTop + mh * 0.55, mh * 0.9);
+    cav.addColorStop(0, '#3a0a14');                  // lit throat
+    cav.addColorStop(0.45, '#160308');
+    cav.addColorStop(1, '#080103');
+    hctx.fillStyle = cav; hctx.fill();
+    hctx.lineWidth = 7; hctx.strokeStyle = PAL.bone3; hctx.stroke();
+    /* the shout itself: a hot glow climbing out of the throat on the beat */
+    hctx.save();
+    hctx.globalCompositeOperation = 'lighter';
+    const gy = myTop + mh * 0.62;
+    const gg = hctx.createRadialGradient(0, gy, 0, 0, gy, mh * (0.5 + beatPulse * 0.25));
+    gg.addColorStop(0, `rgba(255,120,60,${0.5 * y})`);
+    gg.addColorStop(0.5, `rgba(255,47,160,${0.22 * y})`);
+    gg.addColorStop(1, 'rgba(255,47,160,0)');
+    hctx.fillStyle = gg;
+    hctx.beginPath(); hctx.arc(0, gy, mh * (0.5 + beatPulse * 0.25), 0, Math.PI * 2); hctx.fill();
+    hctx.restore();
+    /* upper + lower tooth rows, separated by the gape */
+    const rowH = th * 0.46;
+    for (const row of [0, 1]) {
+      const ry = row ? myTop + mh - rowH : myTop;
+      hctx.beginPath();
+      if (hctx.roundRect) hctx.roundRect(-mw / 2, ry, mw, rowH, row ? [0, 0, 34, 34] : [34, 34, 0, 0]);
+      else hctx.rect(-mw / 2, ry, mw, rowH);
+      hctx.fillStyle = PAL.bone1; hctx.fill();
+      hctx.lineWidth = 6; hctx.strokeStyle = PAL.bone3; hctx.stroke();
+      hctx.lineWidth = 4;
+      for (let i = 1; i < 6; i++) {
+        const x = -mw / 2 + (mw / 6) * i;
+        hctx.beginPath(); hctx.moveTo(x, ry + 3); hctx.lineTo(x, ry + rowH - 3); hctx.stroke();
+      }
+    }
+    hctx.restore();
+    return;
+  }
+
+  const sq = t < face.chatterUntil
+    ? 1 + 0.16 * Math.sin(t * 26)
+    : 1 + 0.035 * Math.sin(t * 1.9) + beatPulse * CFG.teethClack;
+  hctx.save();
+  hctx.translate(0, ty + th / 2); hctx.scale(1, sq); hctx.translate(0, -(ty + th / 2));
+  hctx.beginPath();
+  if (hctx.roundRect) hctx.roundRect(-tw / 2, ty, tw, th, 34); else hctx.rect(-tw / 2, ty, tw, th);
+  hctx.fillStyle = PAL.bone1; hctx.fill();
+  hctx.lineWidth = 7; hctx.strokeStyle = PAL.bone3; hctx.stroke();
+  hctx.lineWidth = 5;
+  for (let i = 1; i < 6; i++) {
+    const x = -tw / 2 + (tw / 6) * i;
+    hctx.beginPath(); hctx.moveTo(x, ty + 6); hctx.lineTo(x, ty + th - 6); hctx.stroke();
+  }
+  hctx.beginPath(); hctx.moveTo(-tw / 2, ty + th / 2); hctx.lineTo(tw / 2, ty + th / 2);
+  hctx.save(); hctx.globalAlpha = 0.67; hctx.strokeStyle = PAL.bone3; hctx.stroke(); hctx.restore();
+  hctx.restore();
+}
+function drawSpiralLive(side) {
+  hctx.save();
+  hctx.translate(side * 275, 165);
+  hctx.rotate(face.spiralRot * side * 3);
+  hctx.beginPath();
+  for (let a = 0; a < Math.PI * 3.6; a += 0.12) {
+    const rr = 6 + a * 12;
+    const x = Math.cos(a * side) * rr, y = Math.sin(a * side) * rr;
+    a === 0 ? hctx.moveTo(x, y) : hctx.lineTo(x, y);
+  }
+  hctx.lineWidth = 9; hctx.lineCap = 'round';
+  hctx.strokeStyle = PAL.teal;
+  hctx.stroke();
+  hctx.restore();
+}
+
+/* ─────────────────────────────────────────────
+   LAYER 2 — INFINITE TUNNEL
+   ───────────────────────────────────────────── */
+const tunCanvas = document.getElementById('tunnel');
+const tctx = tunCanvas.getContext('2d');
+const GOLDEN = Math.PI * (3 - Math.sqrt(5));
+const N_SKULLS = 56;
+let zoomT = 0;
+
+/* flick physics: i -> {x,y,vx,vy,rot,vr,age}; screen-space hit boxes */
+const skullFx = new Map();
+const skullPos = new Array(N_SKULLS);
+
+/* per-skull idle spin: seeded 0.17-1.0 of CFG.skullSpinMax, random direction */
+const skullSpin = Array.from({ length: N_SKULLS }, (_, i) => {
+  const h = Math.abs(Math.sin(i * 127.1 + 311.7) * 43758.5453) % 1;
+  const dir = (Math.abs(Math.sin(i * 269.5 + 183.3) * 43758.5453) % 1) < 0.5 ? -1 : 1;
+  return dir * (0.17 + h * 0.83);
+});
+
+function flickAt(cx, cy) {
+  let best = -1, bestD = -1;
+  for (let i = 0; i < N_SKULLS; i++) {
+    const p = skullPos[i];
+    if (!p) continue;
+    const dx = cx - p.x, dy = cy - p.y;
+    if (dx * dx + dy * dy < p.r * p.r && p.d > bestD) { best = i; bestD = p.d; }
+  }
+  if (best < 0) return false;
+  const p = skullPos[best];
+  const ang = Math.atan2(p.y - cy, p.x - cx);   // push away from the finger
+  const sp = (480 + Math.random() * 420) * CFG.flickForce;
+  const prev = skullFx.get(best);               // re-flick continues from where it landed
+  skullFx.set(best, {
+    x: prev ? prev.x : 0, y: prev ? prev.y : 0,
+    vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - 120,
+    rot: prev ? prev.rot : 0, vr: (Math.random() < .5 ? -1 : 1) * (11 + Math.random() * 15)
+  });
+  return true;
+}
+addEventListener('pointerdown', e => {
+  if (!gateGone) return;
+  if (e.target.closest && e.target.closest('.panel, .ctl')) return;  // UI clicks stay UI clicks
+  face.gazeX = e.clientX; face.gazeY = e.clientY; face.gazeUntil = t + 2.2;  // eyes snap to the click
+  if (faceHit(e.clientX, e.clientY)) return;    // face parts eat the click
+  flickAt(e.clientX, e.clientY);
+});
+
+function drawTunnel(dt) {
+  tctx.clearRect(0, 0, W * DPR, H * DPR);
+  tctx.save();
+  tctx.scale(DPR, DPR);
+  tctx.translate(W / 2, H / 2);
+
+  zoomT += dt * CFG.tunnelSpeed * tempoMul * (1 + bassSm * CFG.tunnelBassBoost);
+  const rot = t * 0.045;
+  const maxR = Math.hypot(W, H) * 0.62;
+
+  // painter's order: far first
+  const order = [];
+  const nTun = Math.min(N_SKULLS, Math.round(CFG.tunnelCount));
+  for (let i = 0; i < nTun; i++) {
+    const d = (i / N_SKULLS + zoomT) % 1;
+    order.push([d, i]);
+  }
+  order.sort((a, b) => a[0] - b[0]);
+
+  skullPos.fill(null);
+  for (const [d, i] of order) {
+    const ang = i * GOLDEN + rot + Math.sin(i * 3.7) * 0.35;
+    const ease = d * d * d;                     // exponential approach
+    const R = 60 + ease * maxR;
+    let x = Math.cos(ang) * R;
+    let y = Math.sin(ang) * R * 0.85;
+    const s = (0.05 + ease * 2.3) * TUN_SCALE;
+    const alpha = Math.min(1, d * 7) * Math.min(1, (1 - d) * 3.4) * 0.85;
+    if (alpha <= 0.01) continue;
+
+    /* flick displacement: damped velocity + tumble */
+    let fxRot = 0;
+    const fx = skullFx.get(i);
+    if (fx) {
+      /* throw physics: momentum bleeds off, then the skull STAYS where it landed */
+      fx.x += fx.vx * dt; fx.y += fx.vy * dt;
+      const damp = Math.exp(-dt * 2.6);
+      fx.vx *= damp;
+      fx.vy = fx.vy * damp + (Math.abs(fx.vy) > 8 ? 260 * dt : 0);  // gravity only while moving
+      fx.rot += fx.vr * dt; fx.vr *= Math.exp(-dt * 1.9);
+      x += fx.x; y += fx.y; fxRot = fx.rot;
+    }
+
+    const q3 = qLevel();
+    if (q3 >= 3 && i % (q3 === 3 ? 2 : 3) !== 0 && !skullFx.has(i)) continue;  // thin the crowd
+    const lite = isLite();
+    const spr = (lite ? VARIANTS_STATIC : VARIANTS)[i % VARIANTS.length];
+    const beatS = 1 + beatPulse * CFG.tunnelBreath;    // whole tunnel breathes on the beat
+    const px = spr.width * s * beatS;
+    skullPos[i] = { x: W / 2 + x, y: H / 2 + y, r: px * 0.34, d };
+    tctx.save();
+    tctx.translate(x, y);
+    /* lite: fixed seeded tilt, no continuous spin */
+    tctx.rotate((lite ? skullSpin[i] * 0.5 : tempoT * skullSpin[i] * CFG.skullSpinMax + Math.sin(t * 0.4 + i * 1.7) * 0.06) + fxRot);
+    tctx.globalAlpha = alpha;
+    tctx.drawImage(spr, -px / 2, -px / 2, px, px);
+    if (lite) { tctx.restore(); continue; }            // static face, done
+
+    /* live face: spinning petal rings + chattering teeth (skull-space maps
+       to (u*f, 0.02*px + v*f) since the sprite bakes its center at 0.52) */
+    const f = px / 1200;
+    const ring = RINGS[i % RINGS.length];
+    const rw = RING_UNITS * f;
+    const ringRot = t * skullSpin[i] * 2.4;
+    for (const sd of [-1, 1]) {
+      tctx.save();
+      tctx.translate(sd * 178 * f, 0.02 * px + -60 * f);
+      tctx.rotate(ringRot * sd);                        // eyes counter-rotate
+      tctx.drawImage(ring, -rw / 2, -rw / 2, rw, rw);
+      tctx.restore();
+    }
+    const ch = skullChat[i];
+    const chatting = ((t + ch.off) % ch.period) < ch.dur;
+    const sq = chatting ? 1 + 0.3 * Math.sin(t * 25 + i * 3) : 1 + 0.03 * Math.sin(t * 1.8 + i);
+    const tw2 = 260 * f, th2 = 96 * f, r2 = 34 * f;
+    tctx.save();
+    tctx.translate(0, 0.02 * px + 396 * f);
+    tctx.scale(1, sq);
+    tctx.beginPath();
+    if (tctx.roundRect) tctx.roundRect(-tw2 / 2, -th2 / 2, tw2, th2, r2); else tctx.rect(-tw2 / 2, -th2 / 2, tw2, th2);
+    tctx.fillStyle = PAL.bone1; tctx.fill();
+    tctx.lineWidth = 7 * f; tctx.strokeStyle = PAL.bone3; tctx.stroke();
+    tctx.lineWidth = 5 * f;
+    for (let vi = 1; vi < 6; vi++) {
+      const vx = -tw2 / 2 + (tw2 / 6) * vi;
+      tctx.beginPath(); tctx.moveTo(vx, -th2 / 2 + 6 * f); tctx.lineTo(vx, th2 / 2 - 6 * f); tctx.stroke();
+    }
+    tctx.beginPath(); tctx.moveTo(-tw2 / 2, 0); tctx.lineTo(tw2 / 2, 0);
+    tctx.save(); tctx.globalAlpha = 0.67; tctx.strokeStyle = PAL.bone3; tctx.stroke(); tctx.restore();
+    tctx.restore();
+
+    tctx.restore();
+  }
+  tctx.restore();
+}
+
+/* ─────────────────────────────────────────────
+   LAYER 3 — HERO SKULL (god rays, sockets, third eye)
+   ───────────────────────────────────────────── */
+const heroCanvas = document.getElementById('hero');
+const hctx = heroCanvas.getContext('2d');
+
+function drawHero(dt) {
+  hctx.clearRect(0, 0, W * DPR, H * DPR);
+  hctx.save();
+  hctx.scale(DPR, DPR);
+  hctx.translate(W / 2, H / 2 - H * 0.02);
+
+  const base = Math.min(W, H) * 0.46 * CFG.skullSize;
+  const s = (base / 1600) * (1 + bassSm * 0.055);
+
+  /* the fourth wall: every 5-10 min it stops, locks eyes with you, and glares */
+  if (gateGone && stare.next === 0) stare.next = t + 75 + Math.random() * 120;   // first one sooner
+  if (gateGone && t > stare.next) { stare.until = t + 3.2; stare.next = t + 300 + Math.random() * 300; }
+  stare.k += (((t < stare.until) ? 1 : 0) - stare.k) * Math.min(1, dt * 5);
+
+  /* yelling: the whole skull rears back, swells, and shudders */
+  const yv = yellAmt();
+  const yLean = -0.10 * yv;                              // tilt back like a howl
+  const yShake = yv * 3 * Math.sin(t * 34);              // vocal-cord shudder
+  const sY = s * (1 + 0.06 * yv + beatPulse * 0.03 * yv);
+
+  const bob = Math.sin(t * 0.6) * H * 0.008 * (1 - stare.k) - H * 0.02 * yv;
+  hctx.translate(yShake, bob);
+  if (yLean) hctx.rotate(yLean);
+  heroS = sY; heroBob = bob;
+
+  /* gaze: click target wins, else wander to a new random spot every few seconds */
+  if (t >= face.gazeUntil && t > face.nextWander) {
+    face.wx = (Math.random() - 0.5) * W * 0.8;
+    face.wy = (Math.random() - 0.55) * H * 0.7;
+    face.nextWander = t + (2.5 + Math.random() * 3.5) / CFG.wanderPace;
+  }
+  const eg = (typeof extGaze !== 'undefined') && extGaze;   // external rig overrides all
+  if (eg) { face.gazeX = eg.x; face.gazeY = eg.y; face.gazeUntil = t + 0.3; }  // third eye follows too
+  const tgtX = eg ? eg.x - W / 2 : t < face.gazeUntil ? face.gazeX - W / 2 : face.wx;
+  const tgtY = eg ? eg.y - (H / 2 - H * 0.02 + bob) : t < face.gazeUntil ? face.gazeY - (H / 2 - H * 0.02 + bob) : face.wy;
+  const gk = Math.min(1, dt * (t < face.gazeUntil ? 16 : 4));
+  face.curX += (tgtX - face.curX) * gk;
+  face.curY += (tgtY - face.curY) * gk;
+  /* staring: pupils snap dead center, straight at the viewer */
+  face.curX *= (1 - stare.k);
+  face.curY *= (1 - stare.k);
+
+  /* the hero chatters on his own, often */
+  if (gateGone && t > face.nextChatter) {
+    face.chatterUntil = t + 0.9 + Math.random() * 1.1;
+    face.nextChatter = t + 4 + Math.random() * 7;
+  }
+
+  /* ring + spiral rotation, with decaying quick-spin boosts;
+     every beat kicks the rings forward a notch */
+  face.ringRot += dt * (CFG.ringSpeed * tempoMul + face.ringSpin + beatPulse * CFG.ringBeatKick);
+  face.ringSpin *= Math.exp(-dt * 1.5);
+  face.spiralRot += dt * (CFG.spiralSpeed * tempoMul + face.spiralSpin + beatPulse * CFG.ringBeatKick * 0.55);
+  face.spiralSpin *= Math.exp(-dt * 1.5);
+
+  /* god rays — rotating gold fan behind the skull (shed at Q3+) */
+  if (qLevel() < 3) {
+  hctx.save();
+  hctx.globalCompositeOperation = 'lighter';
+  hctx.rotate(tempoT * CFG.raySpeed + Math.sin(t * 0.31) * 0.3);
+  const NRAY = Math.round(CFG.rayCount);
+  for (let i = 0; i < NRAY; i++) {
+    const a = (i / NRAY) * Math.PI * 2 + Math.sin(t * 0.8 + i * 1.3) * 0.06;
+    const w = 0.05 + 0.035 * Math.sin(i * 2.4 + t * 1.7);
+    const rayR = base * (1.45 + 0.22 * Math.sin(t * 1.1 + i * 2.1) + bassSm * 0.35 + yv * 0.5) * CFG.rayLength;
+    const g = hctx.createLinearGradient(0, 0, Math.cos(a) * rayR, Math.sin(a) * rayR);
+    const gold = i % 3 ? '255,179,71' : '255,47,160';
+    g.addColorStop(0, `rgba(${gold},${0.10 + bassSm * 0.14 + mids * 0.08})`);
+    g.addColorStop(1, `rgba(${gold},0)`);
+    hctx.fillStyle = g;
+    hctx.beginPath();
+    hctx.moveTo(0, 0);
+    hctx.arc(0, 0, rayR, a - w, a + w);
+    hctx.closePath();
+    hctx.fill();
+  }
+  hctx.restore();
+  }
+
+  /* aura */
+  hctx.save();
+  hctx.globalCompositeOperation = 'lighter';
+  const auraR = base * 1.1 * CFG.auraSize;
+  const aura = hctx.createRadialGradient(0, 0, base * 0.2, 0, 0, Math.max(1, auraR));
+  aura.addColorStop(0, `rgba(145,70,255,${0.16 + bassSm * 0.22})`);
+  aura.addColorStop(1, 'rgba(145,70,255,0)');
+  hctx.fillStyle = aura;
+  hctx.beginPath(); hctx.arc(0, 0, Math.max(1, auraR), 0, Math.PI * 2); hctx.fill();
+  hctx.restore();
+
+  /* the skull */
+  hctx.save();
+  hctx.scale(sY, sY);
+  hctx.drawImage(HERO_SPRITE, -800, -800, 1600, 1600);
+  hctx.restore();
+
+  /* living face parts, drawn in skull-unit space over the sprite,
+     clipped to the same skull outline the sprite uses */
+  hctx.save();
+  hctx.scale(sY, sY);
+  hctx.translate(0, 32);
+  hctx.scale(4 / 3, 4 / 3);
+  /* jaw drops as he yells; 0 when idle so nothing changes at rest */
+  const chinDrop = 110 * yv;
+  if (chinDrop > 0.5) {
+    /* paint the extended jaw in bone, but only below the cheek line so the
+       sprite's baked decoration above is untouched */
+    hctx.save();
+    hctx.beginPath();
+    hctx.rect(-420, 430, 840, 400);
+    hctx.clip();
+    skullOutlinePath(hctx, chinDrop);
+    const jg = hctx.createRadialGradient(0, -120, 60, 0, 40, 640);
+    jg.addColorStop(0, PAL.bone1);
+    jg.addColorStop(0.72, PAL.bone2);
+    jg.addColorStop(1, PAL.bone3);
+    hctx.fillStyle = jg;
+    hctx.fill();
+    hctx.lineWidth = 10;
+    hctx.strokeStyle = PAL.bone3;
+    hctx.stroke();
+    hctx.restore();
+  }
+  skullOutlinePath(hctx, chinDrop);
+  hctx.clip();
+  drawEyeAssembly(-1); drawEyeAssembly(1);
+  drawNoseLive();
+  drawTeethLive();
+  drawSpiralLive(-1); drawSpiralLive(1);
+  /* angry brows slam down over the sockets while it stares */
+  if (stare.k > 0.02) {
+    hctx.save();
+    hctx.lineCap = 'round';
+    hctx.lineWidth = 34;
+    hctx.strokeStyle = `rgba(35,8,20,${0.85 * stare.k})`;
+    for (const sd of [-1, 1]) {
+      hctx.beginPath();
+      hctx.moveTo(sd * 320, -230 + (1 - stare.k) * -80);
+      hctx.lineTo(sd * 60, -140 + (1 - stare.k) * -80);   // inner end lower = anger
+      hctx.stroke();
+    }
+    hctx.restore();
+  }
+  hctx.restore();
+
+  /* socket glow — skull-space socket centers: (±178,-60), third eye (0,-300)
+     sprite spans 1600px for 1200 units → unit = 1600/1200 px, drawn centered
+     at (0.5, 0.52) of sprite → offset in skull units = (0, 0.02*1200=24) up */
+  const U = sY * (1600 / 1200);
+  const sockets = [
+    { x: -178, y: -60, r: 128 },
+    { x:  178, y: -60, r: 128 },
+  ];
+  hctx.save();
+  hctx.globalCompositeOperation = 'lighter';
+  const flick = 0.75 + 0.25 * Math.sin(t * 3.1) * Math.sin(t * 1.3 + 2);
+  for (const so of sockets) {
+    const gx = so.x * U, gy = (so.y + 24) * U, gr = so.r * U * (1.25 + bassSm * 0.8) * CFG.socketGlow;
+    /* pupil offset toward the current look point */
+    const dx = face.curX - gx, dy = face.curY - gy;
+    const dl = Math.hypot(dx, dy) || 1;
+    const off = Math.min(1, dl / (H * 0.3)) * so.r * U * 0.42 * Math.min(1.1, CFG.gazeRange);
+    const px = gx + (dx / dl) * off, py = gy + (dy / dl) * off * 0.8;
+    const g = hctx.createRadialGradient(gx, gy, 0, gx, gy, gr);
+    g.addColorStop(0,   `rgba(235,170,255,${0.95 * flick})`);
+    g.addColorStop(0.35,`rgba(145,70,255,${0.7 * flick * (0.6 + bassSm)})`);
+    g.addColorStop(1,   'rgba(145,70,255,0)');
+    hctx.fillStyle = g;
+    hctx.beginPath(); hctx.arc(gx, gy, gr, 0, Math.PI * 2); hctx.fill();
+    // iris + hot core ride the gaze
+    const irisR = Math.round(200 + 55 * stare.k), irisG = Math.round(120 * (1 - stare.k)), irisB = Math.round(255 - 215 * stare.k);
+    const ig = hctx.createRadialGradient(px, py, 0, px, py, so.r * U * 0.5);
+    ig.addColorStop(0, `rgba(${irisR},${irisG},${irisB},${0.55 * flick + 0.3 * stare.k})`);
+    ig.addColorStop(1, `rgba(${Math.round(145 + 110 * stare.k)},${Math.round(70 * (1 - stare.k))},${Math.round(255 - 215 * stare.k)},0)`);
+    hctx.fillStyle = ig;
+    hctx.beginPath(); hctx.arc(px, py, so.r * U * 0.5, 0, Math.PI * 2); hctx.fill();
+    hctx.beginPath(); hctx.arc(px, py, so.r * U * 0.2 * (1 + bassSm * 0.3 + beatPulse * 0.45 - stare.k * 0.45), 0, Math.PI * 2);
+    hctx.fillStyle = `rgba(255,${Math.round(235 - 195 * stare.k)},${Math.round(255 - 215 * stare.k)},${Math.min(1, 0.9 * flick + beatPulse * 0.4)})`;
+    hctx.fill();
+  }
+  hctx.restore();
+
+  /* third eye — living eye in the forehead rosette */
+  const ex = 0, ey = (-300 + 24) * U, er = 58 * U;
+  let blink = (() => {             // periodic blink, ~ every 5.2 s
+    const c = t % 5.2;
+    if (c > 4.95) return Math.abs(Math.sin((c - 4.95) / 0.25 * Math.PI));
+    return 0;
+  })();
+  blink = Math.max(blink, stare.k * 0.45);   // narrowed, glaring lid while it stares
+  blink = Math.max(blink, yellAmt() * 0.7);  // eyes screwed shut mid-yell
+  hctx.save();
+  hctx.translate(ex, ey);
+  /* music halo around the eye */
+  hctx.save();
+  hctx.globalCompositeOperation = 'lighter';
+  const halo = hctx.createRadialGradient(0, 0, er * 0.4, 0, 0, er * 2.6);
+  halo.addColorStop(0, `rgba(255,179,71,${0.12 + bassSm * 0.3})`);
+  halo.addColorStop(1, 'rgba(255,179,71,0)');
+  hctx.fillStyle = halo;
+  hctx.beginPath(); hctx.arc(0, 0, er * 2.6, 0, Math.PI * 2); hctx.fill();
+  hctx.restore();
+  // sclera (almond)
+  hctx.beginPath();
+  hctx.ellipse(0, 0, er * 1.5, er * 0.85 * (1 - blink * 0.92), 0, 0, Math.PI * 2);
+  hctx.fillStyle = '#f2e9dc';
+  hctx.fill();
+  if (blink < 0.85) {
+    /* iris: tracks the cursor; wanders when the mouse has been idle */
+    const maxOff = er * 0.42 * Math.min(1.1, CFG.gazeRange);
+    let ix, iy;
+    const gazeActive = t < face.gazeUntil;
+    if (gazeActive || t - mouse.lastMove < 4) {
+      const heroCX = W / 2, heroCY = H / 2 - H * 0.02 + bob;
+      const dx = (gazeActive ? face.gazeX : mouse.x * W) - heroCX,
+            dy = (gazeActive ? face.gazeY : mouse.y * H) - (heroCY + ey);
+      const dl = Math.hypot(dx, dy) || 1;
+      const k = Math.min(1, dl / (H * 0.35));
+      ix = (dx / dl) * maxOff * k;
+      iy = (dy / dl) * maxOff * k * 0.55;
+    } else {
+      ix = Math.sin(t * 0.33) * er * 0.35;
+      iy = Math.cos(t * 0.21) * er * 0.16;
+    }
+    ix *= (1 - stare.k); iy *= (1 - stare.k);   // third eye locks on you too
+    let ir;
+    if (stare.k > 0.5) {
+      ir = hctx.createRadialGradient(ix, iy, er * 0.05, ix, iy, er * 0.62);
+      ir.addColorStop(0, '#3a0505');
+      ir.addColorStop(0.5, '#a01414');
+      ir.addColorStop(0.95, '#2a0404');
+    } else if (t < rainbowEyeUntil && hctx.createConicGradient) {
+      ir = hctx.createConicGradient(t * 2.5, ix, iy);
+      for (let h = 0; h <= 6; h++) ir.addColorStop(h / 6, `hsl(${(h * 60 + t * 90) % 360} 95% 55%)`);
+    } else {
+      ir = hctx.createRadialGradient(ix, iy, er * 0.05, ix, iy, er * 0.62);
+      ir.addColorStop(0, '#2a1608');
+      ir.addColorStop(0.28, '#8a4b16');
+      ir.addColorStop(0.65, '#c98a2e');
+      ir.addColorStop(0.95, '#3a2008');
+    }
+    hctx.beginPath(); hctx.ellipse(ix, iy, er * 0.62, er * 0.62 * (1 - blink * 0.9), 0, 0, Math.PI * 2);
+    hctx.fillStyle = ir; hctx.fill();
+    // pupil dilates with the music, snapping wide on each beat
+    hctx.beginPath(); hctx.arc(ix, iy, er * (0.14 + bassSm * 0.14 + beatPulse * CFG.pupilBeat), 0, Math.PI * 2);
+    hctx.fillStyle = '#0a0503'; hctx.fill();
+    // glint
+    hctx.beginPath(); hctx.arc(ix - er * 0.16, iy - er * 0.18, er * 0.08, 0, Math.PI * 2);
+    hctx.fillStyle = 'rgba(255,255,255,.85)'; hctx.fill();
+  }
+  // lids
+  hctx.lineWidth = er * 0.09;
+  hctx.strokeStyle = PAL.bone3;
+  hctx.beginPath();
+  hctx.ellipse(0, 0, er * 1.5, er * 0.85 * (1 - blink * 0.92), 0, 0, Math.PI * 2);
+  hctx.stroke();
+  hctx.restore();
+
+  hctx.restore();
+}
+
+/* ─────────────────────────────────────────────
+   LAYER 4 — DUST (embers + petals, two planes)
+   ───────────────────────────────────────────── */
+const dustCanvas = document.getElementById('dust');
+const dctx = dustCanvas.getContext('2d');
+const motes = [];
+for (let i = 0; i < 130; i++) {
+  motes.push({
+    x: Math.random(), y: Math.random(),
+    z: Math.random() < 0.5 ? 0 : 1,                // plane
+    r: 0.8 + Math.random() * 2.4,
+    vy: 0.008 + Math.random() * 0.02,
+    vx: (Math.random() - 0.5) * 0.008,
+    ph: Math.random() * Math.PI * 2,
+    kind: Math.random() < 0.72 ? 'ember' : 'petal',
+    hue: Math.random()
+  });
+}
+/* ─────────────────────────────────────────────
+   RANDOM EVENTS — shooting stars, petal bursts,
+   spontaneous skull tumbles, rainbow third eye
+   ───────────────────────────────────────────── */
+let nextEventT = 10;
+let rainbowEyeUntil = -1;
+const sparks = [];
+
+
+/* ── population caps ──
+   Every spawner is reachable from the keyboard, the voice control, the random
+   engine, the gallery, AND the public API at once, so nothing here may grow
+   without a ceiling. Hitting a cap is a no-op, never a queue: a held-down key
+   should feel saturated, not build a backlog that fires later. */
+const CAPS = {
+  aurora:   3,    // full-width ribbons; more than a few is just fog
+  alebrije: 6,    // each is a 56-segment spine, the priciest thing we draw
+  ufo:      50,   // he asked for 50; they are cheap and a swarm is funny
+  nova:     5,
+  comet:    8,
+  star:     40,   // meteor showers push this hardest
+  petal:    260,
+  ember:    300,
+  heart:    120,
+  boom:     12,
+};
+const SPARK_HARD_CAP = 700;      // backstop across every kind combined
+function countKind(kind) {
+  let n = 0;
+  for (const s of sparks) if (s.kind === kind) n++;
+  return n;
+}
+function canSpawn(kind, adding) {
+  if (sparks.length + (adding || 1) > SPARK_HARD_CAP) return false;
+  const cap = CAPS[kind];
+  return cap === undefined || countKind(kind) + (adding || 1) <= cap;
+}
+
+/* ── named effects: shared by keyboard keys and the random engine ── */
+function fxShootingStar() {
+  if (!canSpawn('star')) return;
+  const fromLeft = Math.random() < 0.5;
+  sparks.push({
+    kind: 'star',
+    x: fromLeft ? -60 : W + 60, y: Math.random() * H * 0.45,
+    vx: (fromLeft ? 1 : -1) * (900 + Math.random() * 700),
+    vy: 120 + Math.random() * 180,
+    life: 0, max: 1.3
+  });
+}
+function fxPetalBurst() {
+  if (!canSpawn('petal', 16)) return;
+  const bx = Math.random() * W, by = Math.random() * H * 0.6;
+  for (let k = 0; k < 16; k++) {
+    const a = Math.random() * Math.PI * 2, sp = 90 + Math.random() * 260;
+    sparks.push({
+      kind: 'petal', x: bx, y: by,
+      vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 80,
+      life: 0, max: 2.4, hue: Math.random(), ph: Math.random() * 7
+    });
+  }
+}
+function fxTumble() {
+  const i = (Math.random() * N_SKULLS) | 0;
+  skullFx.set(i, {
+    x: 0, y: 0, vx: (Math.random() - .5) * 220, vy: -80 - Math.random() * 120,
+    rot: 0, vr: (Math.random() < .5 ? -1 : 1) * 17
+  });
+}
+function fxFlickRandom() {
+  const p = skullPos.map((q, j) => q && { ...q, j }).filter(Boolean);
+  if (p.length) { const q = p[(Math.random() * p.length) | 0]; flickAt(q.x + 1, q.y + 1); }
+}
+function fxComet() {
+  if (!canSpawn('comet')) return;
+  const fromLeft = Math.random() < 0.5;
+  sparks.push({
+    kind: 'comet',
+    x: fromLeft ? -80 : W + 80, y: H * (0.08 + Math.random() * 0.4),
+    vx: (fromLeft ? 1 : -1) * (110 + Math.random() * 90),
+    vy: 18 + Math.random() * 30,
+    life: 0, max: 9, hue: Math.random()
+  });
+}
+function fxMeteorShower() {
+  const fromLeft = Math.random() < 0.5;
+  let n = 5 + (Math.random() * 4 | 0);
+  n = Math.min(n, Math.max(0, CAPS.star - countKind('star')));
+  if (!n) return;
+  for (let k = 0; k < n; k++) {
+    sparks.push({
+      kind: 'star',
+      x: (fromLeft ? -60 : W + 60) - (fromLeft ? 1 : -1) * Math.random() * 200,
+      y: Math.random() * H * 0.5,
+      vx: (fromLeft ? 1 : -1) * (800 + Math.random() * 800),
+      vy: 100 + Math.random() * 220,
+      life: -k * (0.25 + Math.random() * 0.3),   // staggered entry
+      max: 1.3
+    });
+  }
+}
+function fxSupernova() {
+  if (!canSpawn('nova')) return;
+  sparks.push({
+    kind: 'nova',
+    x: W * (0.15 + Math.random() * 0.7), y: H * (0.1 + Math.random() * 0.5),
+    vx: 0, vy: 0, life: 0, max: 3.2, hue: Math.random()
+  });
+}
+function fxAurora() {
+  if (!canSpawn('aurora')) return;
+  sparks.push({
+    kind: 'aurora',
+    x: 0, y: H * (0.04 + Math.random() * 0.55),
+    vx: 0, vy: 0, life: 0, max: 12, hue: Math.random(), ph: Math.random() * 7
+  });
+}
+/* ── UFO fleet: kinds, dogfights, lasers ──
+   1 UFO on screen: it just cruises through and exits.
+   2+: they dwell, wander, and when two spot each other they trade
+   laser fire until someone explodes. */
+const UFO_KINDS = [
+  { body: '#c8dceb', dome: 'rgba(150,255,200,', glow: '140,255,180', laser: '80,255,140' },   // classic
+  { body: '#e8b8c8', dome: 'rgba(255,120,140,', glow: '255,110,140', laser: '255,60,90' },    // crimson
+  { body: '#e8d9a8', dome: 'rgba(255,220,120,', glow: '255,200,90',  laser: '255,190,60' },   // gold
+];
+const ufos = [], lasers = [];
+function fxUfo() {
+  if (ufos.length >= CAPS.ufo) return;
+  /* enter from any edge: left, right, top, or low-side, at a random point */
+  const edge = Math.random();
+  let x, y, vx, vy;
+  if (edge < 0.35)      { x = -40; y = H * (0.05 + Math.random() * 0.65); vx = 70 + Math.random() * 60; vy = (Math.random() - 0.5) * 40; }
+  else if (edge < 0.7)  { x = W + 40; y = H * (0.05 + Math.random() * 0.65); vx = -(70 + Math.random() * 60); vy = (Math.random() - 0.5) * 40; }
+  else if (edge < 0.9)  { x = W * (0.1 + Math.random() * 0.8); y = -40; vx = (Math.random() - 0.5) * 120; vy = 60 + Math.random() * 50; }
+  else                  { x = W * (0.1 + Math.random() * 0.8); y = H * 0.78; vx = (Math.random() - 0.5) * 120; vy = -(50 + Math.random() * 40); }
+  ufos.push({
+    kind: (Math.random() * UFO_KINDS.length) | 0,
+    x, y, vx, vy,
+    wx: 0, wy: 0, retargetT: 0, fireT: 0,
+    hp: 2 + (Math.random() < 0.5 ? 1 : 0),        // takes 2-3 hits
+    hitT: -9, jukeT: 0,
+    ph: Math.random() * 7, born: t
+  });
+}
+function ufoExplode(u) {
+  sparks.push({ kind: 'boom', x: u.x, y: u.y, vx: 0, vy: 0, life: 0, max: 1.1, hue: u.kind });
+  for (let k = 0; k < 12; k++) {
+    const a = Math.random() * Math.PI * 2, sp = 60 + Math.random() * 200;
+    sparks.push({ kind: 'ember', x: u.x, y: u.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+                  life: 0, max: 0.9 + Math.random() * 0.6, hue: Math.random() });
+  }
+}
+function updateUfos(dt) {
+  /* dwell only while a rivalry exists; a sky of allies just cruises off */
+  const dwell = ufos.length > 1 && ufos.some(a => ufos.some(b => b.kind !== a.kind));
+  for (let i = ufos.length - 1; i >= 0; i--) {
+    const u = ufos[i];
+    if (dwell) {
+      /* wander inside the frame until fates cross */
+      if (t > u.retargetT) {
+        u.wx = W * (0.1 + Math.random() * 0.8);
+        u.wy = H * (0.08 + Math.random() * 0.5);
+        u.retargetT = t + 2 + Math.random() * 3;
+      }
+      u.vx += (u.wx - u.x) * 0.25 * dt; u.vy += (u.wy - u.y) * 0.25 * dt;
+      /* juke: an inbound laser makes the saucer sidestep hard */
+      for (const L of lasers) {
+        if (L.target !== u) continue;
+        const d2 = Math.hypot(L.x - u.x, L.y - u.y);
+        if (d2 < 280 && t > u.jukeT) {
+          const sgn = Math.random() < 0.5 ? -1 : 1;
+          u.vx += -L.dy * sgn * 260;
+          u.vy += L.dx * sgn * 260;
+          u.jukeT = t + 0.35 + Math.random() * 0.4;
+        }
+      }
+      const sp = Math.hypot(u.vx, u.vy), cap = t < u.jukeT ? 300 : 130;
+      if (sp > cap) { u.vx *= cap / sp; u.vy *= cap / sp; }
+      /* spot a rival: close enough + cooldown up -> open fire */
+      for (const v of ufos) {
+        if (v === u || v.kind === u.kind) continue;      // same kind = allies
+        const d = Math.hypot(v.x - u.x, v.y - u.y);
+        if (d < 520 && t > u.fireT) {
+          const dl = d || 1;
+          lasers.push({ x: u.x, y: u.y + 4, dx: (v.x - u.x) / dl, dy: (v.y - u.y) / dl,
+                        speed: 700, kind: u.kind, target: v, life: 0 });
+          u.fireT = t + 0.5 + Math.random() * 0.9;
+        }
+      }
+    } else {
+      /* solo: cruise through and off the screen */
+      if (Math.abs(u.vx) < 30 && Math.abs(u.vy) < 30) u.vx = (u.x > W / 2 ? 1 : -1) * 90;  // survivor departs
+      u.y += Math.sin(t * 1.4 + u.ph) * 22 * dt;
+      if (u.x > W + 60 || u.x < -60 || u.y > H + 60 || u.y < -60) { ufos.splice(i, 1); continue; }
+    }
+    u.x += u.vx * dt; u.y += u.vy * dt;
+    if (dwell) { u.x = Math.max(30, Math.min(W - 30, u.x)); u.y = Math.max(30, Math.min(H * 0.75, u.y)); }
+  }
+  for (let i = lasers.length - 1; i >= 0; i--) {
+    const L = lasers[i];
+    L.life += dt;
+    L.x += L.dx * L.speed * dt; L.y += L.dy * L.speed * dt;
+    const tgt = L.target;
+    if (ufos.includes(tgt) && Math.hypot(tgt.x - L.x, tgt.y - L.y) < 24) {
+      tgt.hp--;
+      lasers.splice(i, 1);
+      if (tgt.hp <= 0) {
+        ufoExplode(tgt);
+        ufos.splice(ufos.indexOf(tgt), 1);
+      } else {
+        /* glancing hit: shield flash, sparks, knockback */
+        tgt.hitT = t;
+        tgt.vx += L.dx * 130; tgt.vy += L.dy * 130;
+        for (let k2 = 0; k2 < 5; k2++) {
+          const a2 = Math.random() * Math.PI * 2, sp2 = 40 + Math.random() * 120;
+          sparks.push({ kind: 'ember', x: tgt.x, y: tgt.y,
+                        vx: Math.cos(a2) * sp2, vy: Math.sin(a2) * sp2,
+                        life: 0, max: 0.5 + Math.random() * 0.4, hue: Math.random() });
+        }
+      }
+      continue;
+    }
+    if (L.life > 2 || L.x < -60 || L.x > W + 60 || L.y < -60 || L.y > H + 60) lasers.splice(i, 1);
+  }
+}
+function drawUfos() {
+  for (const L of lasers) {
+    const c = UFO_KINDS[L.kind].laser;
+    dctx.strokeStyle = `rgba(${c},0.9)`;
+    dctx.lineWidth = 3; dctx.lineCap = 'round';
+    dctx.beginPath();
+    dctx.moveTo(L.x - L.dx * 26, L.y - L.dy * 26);
+    dctx.lineTo(L.x, L.y);
+    dctx.stroke();
+    dctx.strokeStyle = `rgba(255,255,255,0.7)`;
+    dctx.lineWidth = 1.2;
+    dctx.beginPath();
+    dctx.moveTo(L.x - L.dx * 18, L.y - L.dy * 18);
+    dctx.lineTo(L.x, L.y);
+    dctx.stroke();
+  }
+  for (const u of ufos) {
+    const K = UFO_KINDS[u.kind];
+    const blink = 0.5 + 0.5 * Math.sin(t * 9 + u.ph);
+    const bank = Math.max(-0.6, Math.min(0.6, u.vx * (t < u.jukeT ? 0.004 : 0.002)));
+    dctx.save();
+    dctx.translate(u.x, u.y);
+    dctx.rotate(bank);
+    /* shield flash after a glancing hit */
+    const hitAge = t - u.hitT;
+    if (hitAge < 0.35) {
+      const ha2 = 1 - hitAge / 0.35;
+      dctx.beginPath(); dctx.arc(0, 0, 26 + hitAge * 40, 0, Math.PI * 2);
+      dctx.lineWidth = 2.5 * ha2;
+      dctx.strokeStyle = `rgba(255,255,255,${0.85 * ha2})`;
+      dctx.stroke();
+      dctx.beginPath(); dctx.arc(0, 0, 24, 0, Math.PI * 2);
+      dctx.fillStyle = `rgba(${K.laser},${0.25 * ha2})`;
+      dctx.fill();
+    }
+    const gg = dctx.createRadialGradient(0, 0, 0, 0, 0, 40);
+    gg.addColorStop(0, `rgba(${K.glow},0.30)`);
+    gg.addColorStop(1, `rgba(${K.glow},0)`);
+    dctx.fillStyle = gg;
+    dctx.beginPath(); dctx.arc(0, 0, 40, 0, Math.PI * 2); dctx.fill();
+    /* saucer body with sheen */
+    const bg = dctx.createLinearGradient(0, -8, 0, 8);
+    bg.addColorStop(0, '#ffffff');
+    bg.addColorStop(0.45, K.body);
+    bg.addColorStop(1, '#5a6470');
+    dctx.beginPath(); dctx.ellipse(0, 2, 19, 6.5, 0, 0, Math.PI * 2);
+    dctx.fillStyle = bg; dctx.fill();
+    dctx.lineWidth = 1; dctx.strokeStyle = 'rgba(30,30,45,0.6)'; dctx.stroke();
+    /* dome with highlight */
+    dctx.beginPath(); dctx.ellipse(0, -4, 8.5, 6.5, 0, Math.PI, 0);
+    dctx.fillStyle = K.dome + (0.45 + 0.4 * blink) + ')'; dctx.fill();
+    dctx.beginPath(); dctx.ellipse(-2.5, -6, 2.4, 1.6, -0.5, 0, Math.PI * 2);
+    dctx.fillStyle = 'rgba(255,255,255,0.75)'; dctx.fill();
+    /* running lights chase around the rim */
+    for (let li = 0; li < 5; li++) {
+      const la = (li / 5) * Math.PI * 2 + t * 2.4;
+      dctx.beginPath();
+      dctx.ellipse(Math.cos(la) * 14, 3 + Math.sin(la) * 3.2, 1.6, 1.2, 0, 0, Math.PI * 2);
+      dctx.fillStyle = `rgba(${K.laser},${0.35 + 0.6 * ((Math.sin(la * 3 + t * 6) + 1) / 2)})`;
+      dctx.fill();
+    }
+    dctx.restore();
+  }
+}
+function fxGrito() { if (gritos.length && !music.paused && !muted) grito(); }
+
+function fxAlebrije() {
+  if (!canSpawn('alebrije')) return;
+  /* a spirit dragon sails across the deep background */
+  const fromLeft = Math.random() < 0.5;
+  sparks.push({
+    kind: 'alebrije',
+    x: fromLeft ? -260 : W + 260, y: H * (0.12 + Math.random() * 0.45),
+    vx: (fromLeft ? 1 : -1) * (85 + Math.random() * 50), vy: 0,
+    life: 0, max: (W + 520) / 85 + 4, hue: Math.random(), ph: Math.random() * 7,
+    spine: []
+  });
+}
+
+/* ── photo mode: composite all layers + brand, download PNG ── */
+const qrImg = new Image();
+qrImg.src = 'qr.png';
+function savePhoto() {
+  const c = document.createElement('canvas');
+  c.width = W * DPR; c.height = H * DPR;
+  const x = c.getContext('2d');
+  x.fillStyle = '#06030f'; x.fillRect(0, 0, c.width, c.height);
+  /* the WebGL buffer is cleared after every composite (no
+     preserveDrawingBuffer), so re-render the nebula NOW and copy it in the
+     same tick, with the live CSS filter (day/night hue + brightness) */
+  gl.uniform2f(uRes, nebCanvas.width, nebCanvas.height);
+  gl.uniform1f(uTime, t);
+  gl.uniform1f(uBass, bassSm);
+  gl.uniform2f(uMouse, (mouse.x - 0.5) * (W / H), 0.5 - mouse.y);
+  gl.uniform1f(uMstr, mouse.str * CFG.smokeStir);
+  gl.uniform1f(uScale, CFG.smokeScale);
+  gl.uniform1f(uDrift, CFG.smokeDrift);
+  gl.uniform1f(uStars, CFG.starDensity);
+  gl.uniform1f(uNhue, CFG.nebulaHue);
+  gl.uniform1f(uNsat, CFG.nebulaSat);
+  gl.uniform1f(uNbright, CFG.bgBright);
+  gl.uniform1f(uVig, CFG.vignette);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  x.filter = nebCanvas.style.filter || 'none';
+  x.drawImage(nebCanvas, 0, 0, c.width, c.height);
+  x.filter = 'none';
+  x.drawImage(tunCanvas, 0, 0);
+  x.drawImage(heroCanvas, 0, 0);
+  x.drawImage(dustCanvas, 0, 0);
+  /* gentle global lift to match perceived screen brightness */
+  x.save();
+  x.globalCompositeOperation = 'overlay';
+  x.fillStyle = 'rgba(255,255,255,0.06)';
+  x.fillRect(0, 0, c.width, c.height);
+  x.restore();
+  /* wordmark + tag, since they live in DOM */
+  x.textAlign = 'center';
+  x.fillStyle = 'rgba(245,234,223,0.95)';
+  x.font = `${0.13 * H * DPR}px Anton, Impact, sans-serif`;
+  x.fillText('SKLZ', c.width / 2, c.height * 0.90);
+  x.font = `300 ${0.011 * H * DPR}px 'Space Grotesk', sans-serif`;
+  x.fillStyle = 'rgba(245,234,223,0.55)';
+  x.fillText('U N A   O B R A   P S I C O D É L I C A   D E   L O S   H E R M A N O S   A M I N I', c.width / 2, c.height * 0.965);
+  /* the signature, bottom-left */
+  x.textAlign = 'left';
+  x.font = `italic ${0.032 * H * DPR}px 'Snell Roundhand', 'Savoye LET', cursive`;
+  x.fillStyle = 'rgba(245,234,223,0.8)';
+  x.fillText('Hermanos Amini', 0.025 * c.width, c.height * 0.955);
+  /* subtle QR back to the page, bottom-right (white-on-black, screened) */
+  if (qrImg.complete && qrImg.naturalWidth) {
+    const qs = Math.round(0.085 * Math.min(c.width, c.height));
+    x.save();
+    x.globalCompositeOperation = 'screen';
+    x.globalAlpha = 0.5;
+    x.imageSmoothingEnabled = false;
+    x.drawImage(qrImg, c.width - qs - 0.018 * c.width, c.height - qs - 0.018 * c.width, qs, qs);
+    x.restore();
+  }
+  const a = document.createElement('a');
+  a.download = 'sklz-' + Date.now() + '.png';
+  a.href = c.toDataURL('image/png');
+  a.click();
+}
+
+/* ── the fourth wall: rarely, it notices you ── */
+const stare = { next: 0, until: -1, k: 0 };
+
+/* ── voice control: speak a keyword, trigger the effect ── */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let voiceOn = false, recog = null;
+const micBtn = document.getElementById('mic');
+const VOICE_MAP = [
+  [['grito', 'greto', 'grita', 'scream', 'yell'], () => grito()],
+  [['ufo', 'ovni', 'saucer'],                     fxUfo],
+  [['random', 'sorpresa', 'surprise'],            randomEffect],
+  [['meteor', 'meteoro'],                         fxMeteorShower],
+  [['comet', 'cometa'],                           fxComet],
+  [['nova', 'supernova'],                         fxSupernova],
+  [['aurora'],                                    fxAurora],
+  [['star', 'estrella'],                          fxShootingStar],
+  [['petal', 'petals', 'flores', 'flowers'],      fxPetalBurst],
+  [['alebrije', 'dragon'],                        fxAlebrije],
+  [['rainbow', 'arcoiris'],                       () => { rainbowEyeUntil = t + 5; }],
+  [['skull', 'calavera', 'flick'],                fxFlickRandom],
+  [['teeth', 'dientes', 'chatter'],               () => { face.chatterUntil = t + 1.6; }],
+  [['stare', 'mirada', 'angry'],                  () => { stare.until = t + 3.2; }],
+];
+function handleVoice(text) {
+  text = text.toLowerCase();
+  let fired = 0;
+  for (const [words, fn] of VOICE_MAP) {
+    if (words.some(w => text.includes(w))) { fn(); fired++; }
+  }
+  return fired;
+}
+function toggleVoice() {
+  if (!SR) {                                     // Firefox etc: no Web Speech API
+    micBtn.title = 'voice control not supported in this browser';
+    micBtn.style.opacity = 0.35;
+    return;
+  }
+  voiceOn = !voiceOn;
+  micBtn.classList.toggle('listening', voiceOn);
+  if (voiceOn) {
+    recog = new SR();
+    recog.continuous = true;
+    recog.interimResults = false;
+    recog.lang = 'en-US';
+    recog.onresult = e => {
+      for (let i = e.resultIndex; i < e.results.length; i++)
+        handleVoice(e.results[i][0].transcript);
+    };
+    recog.onend = () => { if (voiceOn) { try { recog.start(); } catch (_) {} } };  // Chrome auto-stops on silence
+    recog.onerror = ev => {
+      if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') {
+        voiceOn = false;
+        micBtn.classList.remove('listening');
+        micBtn.title = 'microphone permission denied';
+      }
+    };
+    try { recog.start(); } catch (_) {}
+  } else if (recog) {
+    recog.onend = null;
+    try { recog.stop(); } catch (_) {}
+    recog = null;
+  }
+}
+micBtn.addEventListener('click', toggleVoice);
+
+/* ── FPS / quality HUD (D key) ── */
+const hudEl = document.getElementById('hud');
+const Q_SHED = [
+  'shedding: nothing',
+  'shedding: resolution',
+  'shedding: skull faces, dust/2, res',
+  'shedding: rays, candle, skulls/2, nebula 30fps',
+  'shedding: most things (survival)'
+];
+let hudNextT = 0;
+function updateHud() {
+  if (!hudEl.classList.contains('show') || t < hudNextT) return;
+  hudNextT = t + 0.25;
+  const q = qLevel();
+  hudEl.textContent =
+    `fps ${fpsAvg.toFixed(0).padStart(3)}  quality Q${q} (${Q_NAME[q]})` +
+    `\n${Q_SHED[q]}` +
+    `\ngovernor ${CFG.perfMode === 0 ? 'auto' : 'manual'}  dpr ${DPR.toFixed(1)}  bpm ${bpm ? bpm.toFixed(0) : '--'}`;
+}
+
+/* weighted event table — everything a key can do, plus the sky show */
+const EVENTS = [
+  [3.0, fxShootingStar],
+  [2.5, fxPetalBurst],
+  [2.0, fxTumble],
+  [1.2, fxFlickRandom],
+  [1.5, () => { rainbowEyeUntil = t + 5; }],
+  [1.5, () => { face.ringSpin += 9; }],
+  [1.5, () => { face.spiralSpin += (Math.random() < 0.5 ? -11 : 11); }],
+  [2.4, () => { face.chatterUntil = t + 1.6; }],
+  [1.2, () => { face.noseBurst = t + 1.2; heartBurst(W / 2, H / 2); }],
+  [1.6, fxComet],
+  [1.2, fxMeteorShower],
+  [1.0, fxSupernova],
+  [1.0, fxAurora],
+  [0.7, fxUfo],
+  [0.6, fxGrito],
+  [0.5, fxAlebrije],
+];
+const EVENTS_TOTAL = EVENTS.reduce((s, e) => s + e[0], 0);
+function randomEffect() {
+  let r = Math.random() * EVENTS_TOTAL;
+  for (const [w, fn] of EVENTS) { r -= w; if (r <= 0) { fn(); break; } }
+}
+function spawnEvent() {
+  randomEffect();
+  nextEventT = t + CFG.eventMinGap + Math.random() * Math.max(1, CFG.eventMaxGap - CFG.eventMinGap);
+}
+
+function drawDust(dt) {
+  dctx.clearRect(0, 0, W * DPR, H * DPR);
+  dctx.save();
+  dctx.scale(DPR, DPR);
+  dctx.globalCompositeOperation = 'lighter';
+
+  updateUfos(dt);
+  drawUfos();
+
+  /* event sparks */
+  for (let k = sparks.length - 1; k >= 0; k--) {
+    const sp = sparks[k];
+    sp.life += dt;
+    if (sp.life < 0) continue;                       // staggered entry (meteor shower)
+    if (sp.life > sp.max) { sparks.splice(k, 1); continue; }
+    const fade = 1 - sp.life / sp.max;
+    sp.x += sp.vx * dt; sp.y += sp.vy * dt;
+    if (sp.kind === 'comet') {
+      /* traveler with a true positional trail + shed sparkle debris */
+      sp.vy += 6 * dt;
+      sp.x += Math.sin(t * 0.9 + (sp.hue || 0) * 7) * 14 * dt;   // gentle drift curve
+      if (!sp.trail) sp.trail = [];
+      sp.trail.push({ x: sp.x, y: sp.y });
+      if (sp.trail.length > 46) sp.trail.shift();
+      const tint = sp.hue < 0.5 ? ['200,235,255', '120,180,255'] : ['255,225,200', '255,170,120'];
+      for (let q = 0; q < sp.trail.length; q++) {
+        const p = sp.trail[q];
+        const fr = q / sp.trail.length;                          // 0 = oldest
+        const a = fade * fr * fr * 0.45;
+        const rr = (1.5 + fr * 6) * 2.6;
+        const g = dctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, rr);
+        g.addColorStop(0, `rgba(${tint[0]},${a})`);
+        g.addColorStop(1, `rgba(${tint[1]},0)`);
+        dctx.fillStyle = g;
+        dctx.beginPath(); dctx.arc(p.x, p.y, rr, 0, Math.PI * 2); dctx.fill();
+      }
+      if (Math.random() < 0.35 && sp.trail.length > 4) {          // shed debris
+        const p = sp.trail[sp.trail.length - 3];
+        sparks.push({ kind: 'ember', x: p.x, y: p.y,
+                      vx: (Math.random() - 0.5) * 40, vy: (Math.random() - 0.5) * 40 + 20,
+                      life: 0, max: 0.8 + Math.random() * 0.7, hue: Math.random() });
+      }
+      const hg = dctx.createRadialGradient(sp.x, sp.y, 0, sp.x, sp.y, 24);
+      hg.addColorStop(0, `rgba(255,255,255,${0.95 * fade})`);
+      hg.addColorStop(0.35, `rgba(${tint[0]},${0.55 * fade})`);
+      hg.addColorStop(1, `rgba(${tint[1]},0)`);
+      dctx.fillStyle = hg;
+      dctx.beginPath(); dctx.arc(sp.x, sp.y, 24, 0, Math.PI * 2); dctx.fill();
+    } else if (sp.kind === 'boom') {
+      /* ufo explosion: fireball flash + double shockwave */
+      const p = sp.life / sp.max;
+      const c = UFO_KINDS[sp.hue] ? UFO_KINDS[sp.hue].laser : '255,190,60';
+      const flash = Math.max(0, 1 - p * 3.5);
+      if (flash > 0) {
+        const fg = dctx.createRadialGradient(sp.x, sp.y, 0, sp.x, sp.y, 60);
+        fg.addColorStop(0, `rgba(255,255,255,${flash})`);
+        fg.addColorStop(0.5, `rgba(${c},${flash * 0.7})`);
+        fg.addColorStop(1, `rgba(${c},0)`);
+        dctx.fillStyle = fg;
+        dctx.beginPath(); dctx.arc(sp.x, sp.y, 60, 0, Math.PI * 2); dctx.fill();
+      }
+      dctx.lineWidth = 5 * fade + 0.5;
+      dctx.strokeStyle = `rgba(${c},${0.7 * fade})`;
+      dctx.beginPath(); dctx.arc(sp.x, sp.y, 10 + p * 90, 0, Math.PI * 2); dctx.stroke();
+      dctx.lineWidth = 2 * fade + 0.3;
+      dctx.strokeStyle = `rgba(255,255,255,${0.5 * fade})`;
+      dctx.beginPath(); dctx.arc(sp.x, sp.y, 6 + p * 70, 0, Math.PI * 2); dctx.stroke();
+    } else if (sp.kind === 'alebrije') {
+      /* spirit dragon: a ribbon body following a true spine path, patterned
+         skin, layered feather wings, horned head, streamer tail */
+      const env = Math.min(1, Math.min(sp.life / 1.5, (sp.max - sp.life) / 1.5));
+      const dir = sp.vx > 0 ? 1 : -1;
+      const hue0 = sp.hue * 360, hue1 = (hue0 + 55) % 360;    // analogous iridescence
+      /* head rides a serpentine; spine records where it has been */
+      const hx = sp.x, hy = sp.y + Math.sin(t * 1.9 + sp.ph) * 30 + Math.sin(t * 0.7 + sp.ph * 2) * 14;
+      if (!sp.spine) sp.spine = [];
+      /* distance-gated sampling: ~6px per vertebra -> ~330px of body */
+      const lastP = sp.spine[sp.spine.length - 1];
+      if (!lastP || Math.hypot(hx - lastP.x, hy - lastP.y) >= 6) sp.spine.push({ x: hx, y: hy });
+      const SEG = 56;
+      if (sp.spine.length > SEG) sp.spine.shift();
+      const n = sp.spine.length;
+      if (n > 6) {
+        /* perpendiculars + width profile: neck thin, chest broad, tail taper */
+        const P = sp.spine, L = [], R = [];
+        for (let q = 0; q < n; q++) {
+          const p = P[q];
+          const pn = P[Math.min(n - 1, q + 1)], pp = P[Math.max(0, q - 1)];
+          let nx = -(pn.y - pp.y), ny = pn.x - pp.x;
+          const nl = Math.hypot(nx, ny) || 1; nx /= nl; ny /= nl;
+          const u = q / (n - 1);                       // 0 tail, 1 head
+          const wProf = (2.5 + 24 * Math.pow(u, 0.65) * (1 - Math.pow(u, 7)) + 5 * u) * (1 + bassSm * 0.1);
+          L.push([p.x + nx * wProf, p.y + ny * wProf]);
+          R.push([p.x - nx * wProf, p.y - ny * wProf]);
+        }
+        /* soft under-glow along the whole body */
+        dctx.save();
+        dctx.filter = 'blur(10px)';
+        dctx.beginPath();
+        dctx.moveTo(L[0][0], L[0][1]);
+        for (const [x, y] of L) dctx.lineTo(x, y);
+        for (let q = n - 1; q >= 0; q--) dctx.lineTo(R[q][0], R[q][1]);
+        dctx.closePath();
+        dctx.fillStyle = `hsla(${hue0} 95% 60% / ${0.35 * env})`;
+        dctx.fill();
+        dctx.restore();
+        /* body ribbon: belly-to-back gradient */
+        const mid = P[n >> 1];
+        const bodyG = dctx.createLinearGradient(mid.x, mid.y - 30, mid.x, mid.y + 30);
+        bodyG.addColorStop(0, `hsla(${hue1} 75% 60% / ${0.82 * env})`);
+        bodyG.addColorStop(0.5, `hsla(${(hue0 + 25) % 360} 70% 48% / ${0.82 * env})`);
+        bodyG.addColorStop(1, `hsla(${hue0} 65% 34% / ${0.82 * env})`);
+        dctx.beginPath();
+        dctx.moveTo(L[0][0], L[0][1]);
+        for (const [x, y] of L) dctx.lineTo(x, y);
+        for (let q = n - 1; q >= 0; q--) dctx.lineTo(R[q][0], R[q][1]);
+        dctx.closePath();
+        dctx.fillStyle = bodyG;
+        dctx.fill();
+        dctx.lineWidth = 1.5;
+        dctx.strokeStyle = `hsla(${hue1} 95% 78% / ${0.8 * env})`;
+        dctx.stroke();
+        /* alebrije patterning: dot rows + chevron bands along the spine */
+        for (let q = 3; q < n - 2; q += 3) {
+          const p = P[q], u = q / (n - 1);
+          const hueP = (hue0 + 180 + q * 8) % 360;
+          dctx.beginPath();
+          dctx.arc(p.x, p.y, 2.2 + 3 * u, 0, Math.PI * 2);
+          dctx.fillStyle = `hsla(${hueP} 95% 75% / ${0.85 * env})`;
+          dctx.fill();
+          if (q % 6 === 0) {
+            const [lx, ly] = L[q], [rx, ry] = R[q];
+            dctx.beginPath();
+            dctx.moveTo(lx * 0.35 + p.x * 0.65, ly * 0.35 + p.y * 0.65);
+            dctx.lineTo(p.x, p.y - 3);
+            dctx.lineTo(rx * 0.35 + p.x * 0.65, ry * 0.35 + p.y * 0.65);
+            dctx.lineWidth = 2;
+            dctx.strokeStyle = `hsla(${(hueP + 60) % 360} 95% 70% / ${0.7 * env})`;
+            dctx.stroke();
+          }
+        }
+        /* dorsal fin: scalloped membrane along the back half */
+        dctx.beginPath();
+        let started = false;
+        for (let q = Math.floor(n * 0.25); q < n - 4; q++) {
+          const [lx, ly] = L[q];
+          const lift = 10 + 12 * Math.sin((q / n) * Math.PI) * (1 + 0.3 * Math.sin(t * 5 + q));
+          if (!started) { dctx.moveTo(lx, ly); started = true; }
+          dctx.lineTo(lx - dir * 2, ly - lift);
+        }
+        for (let q = n - 5; q >= Math.floor(n * 0.25); q--) dctx.lineTo(L[q][0], L[q][1]);
+        dctx.closePath();
+        dctx.fillStyle = `hsla(${hue1} 90% 60% / ${0.45 * env})`;
+        dctx.fill();
+        /* tail streamers: three ribbons trailing off the oldest point */
+        const tp = P[0], tp2 = P[2] || P[0];
+        const ta = Math.atan2(tp.y - tp2.y, tp.x - tp2.x);
+        for (let st = -1; st <= 1; st++) {
+          dctx.beginPath();
+          dctx.moveTo(tp.x, tp.y);
+          for (let e2 = 1; e2 <= 5; e2++) {
+            const ex = tp.x + Math.cos(ta + st * 0.4) * e2 * 13;
+            const ey = tp.y + Math.sin(ta + st * 0.4) * e2 * 13 + Math.sin(t * 4 + e2 + st) * 5;
+            dctx.lineTo(ex, ey);
+          }
+          dctx.lineWidth = 2.5 - Math.abs(st);
+          dctx.lineCap = 'round';
+          dctx.strokeStyle = `hsla(${(hue0 + 40 * st + 360) % 360} 95% 70% / ${0.6 * env})`;
+          dctx.stroke();
+        }
+        /* wings: two layered feathered wings at the forequarter */
+        const wq = Math.floor(n * 0.66);
+        const wpx = P[wq].x, wpy = P[wq].y;
+        const flap = Math.sin(t * 5.2 + sp.ph);
+        for (const layer of [0, 1]) {
+          const span = 150 - layer * 46;
+          const lift = (100 + flap * 52) * (1 - layer * 0.3);
+          const hueW = (hue1 + layer * 30) % 360;
+          /* membrane */
+          dctx.beginPath();
+          dctx.moveTo(wpx, wpy);
+          dctx.quadraticCurveTo(wpx - dir * span * 0.4, wpy - lift * 1.35, wpx - dir * span, wpy - lift);
+          dctx.quadraticCurveTo(wpx - dir * span * 0.55, wpy - lift * 0.35, wpx, wpy);
+          const wg = dctx.createLinearGradient(wpx, wpy, wpx - dir * span, wpy - lift);
+          wg.addColorStop(0, `hsla(${hueW} 90% 60% / ${0.55 * env})`);
+          wg.addColorStop(1, `hsla(${(hueW + 50) % 360} 95% 70% / ${0.15 * env})`);
+          dctx.fillStyle = wg;
+          dctx.fill();
+          /* feather ribs */
+          for (let f = 1; f <= 4; f++) {
+            const fu = f / 5;
+            dctx.beginPath();
+            dctx.moveTo(wpx, wpy);
+            dctx.quadraticCurveTo(
+              wpx - dir * span * 0.35 * fu, wpy - lift * 1.2 * fu,
+              wpx - dir * span * fu, wpy - lift * fu * (0.9 + 0.15 * Math.sin(t * 5 + f)));
+            dctx.lineWidth = 1.2;
+            dctx.strokeStyle = `hsla(${(hueW + 40) % 360} 95% 78% / ${0.5 * env})`;
+            dctx.stroke();
+          }
+        }
+        /* head: tapered snout, open jaw, horns, whiskers, glowing eye */
+        const hp = P[n - 1], hpp = P[n - 3] || P[0];
+        const ha = Math.atan2(hp.y - hpp.y, hp.x - hpp.x);
+        dctx.save();
+        dctx.translate(hp.x, hp.y);
+        dctx.rotate(ha);
+        dctx.scale(1.5, 1.5);
+        const jaw = 0.16 + 0.13 * Math.max(0, Math.sin(t * 2.2 + sp.ph)) + beatPulse * 0.18;
+        /* skull + snout */
+        const hg2 = dctx.createLinearGradient(0, -14, 0, 14);
+        hg2.addColorStop(0, `hsla(${hue0} 90% 66% / ${0.95 * env})`);
+        hg2.addColorStop(1, `hsla(${hue1} 80% 42% / ${0.95 * env})`);
+        dctx.fillStyle = hg2;
+        dctx.beginPath();                                 // upper jaw / snout
+        dctx.moveTo(-12, -10);
+        dctx.quadraticCurveTo(16, -14, 34, -3 - jaw * 26);
+        dctx.quadraticCurveTo(36, 1 - jaw * 22, 30, 1 - jaw * 20);
+        dctx.quadraticCurveTo(10, -2, -12, 2);
+        dctx.closePath(); dctx.fill();
+        dctx.beginPath();                                 // lower jaw
+        dctx.moveTo(-10, 4);
+        dctx.quadraticCurveTo(12, 4, 28, 4 + jaw * 26);
+        dctx.quadraticCurveTo(26, 8 + jaw * 26, 20, 8 + jaw * 20);
+        dctx.quadraticCurveTo(6, 10, -10, 9);
+        dctx.closePath(); dctx.fill();
+        /* teeth */
+        dctx.fillStyle = `rgba(255,255,255,${0.9 * env})`;
+        for (let th2 = 0; th2 < 3; th2++) {
+          dctx.beginPath();
+          dctx.moveTo(14 + th2 * 6, -2 - jaw * 18);
+          dctx.lineTo(16 + th2 * 6, 2 - jaw * 6);
+          dctx.lineTo(18 + th2 * 6, -2 - jaw * 16);
+          dctx.closePath(); dctx.fill();
+        }
+        /* swept horns */
+        for (const hs of [-1, 1]) {
+          dctx.beginPath();
+          dctx.moveTo(-6, -8);
+          dctx.quadraticCurveTo(-22, -22 - hs * 4, -34 - hs * 5, -14 - hs * 10);
+          dctx.lineWidth = 3.5 - hs;
+          dctx.lineCap = 'round';
+          dctx.strokeStyle = `hsla(${(hue1 + 40) % 360} 90% 72% / ${0.9 * env})`;
+          dctx.stroke();
+        }
+        /* whiskers */
+        for (const ws of [-1, 1]) {
+          dctx.beginPath();
+          dctx.moveTo(26, ws * 2);
+          dctx.quadraticCurveTo(38, ws * 8 + Math.sin(t * 6 + ws) * 3, 52, ws * 14 + Math.sin(t * 4 + ws * 2) * 5);
+          dctx.lineWidth = 1.2;
+          dctx.strokeStyle = `hsla(${hue0} 95% 80% / ${0.7 * env})`;
+          dctx.stroke();
+        }
+        /* eye: white-hot core in a glow */
+        const eg = dctx.createRadialGradient(6, -5, 0, 6, -5, 9);
+        eg.addColorStop(0, `rgba(255,255,255,${0.95 * env})`);
+        eg.addColorStop(0.4, `hsla(${(hue0 + 60) % 360} 100% 75% / ${0.8 * env})`);
+        eg.addColorStop(1, 'rgba(255,255,255,0)');
+        dctx.fillStyle = eg;
+        dctx.beginPath(); dctx.arc(6, -5, 9, 0, Math.PI * 2); dctx.fill();
+        dctx.fillStyle = `rgba(20,5,30,${0.9 * env})`;
+        dctx.beginPath(); dctx.arc(6.5, -5, 2.2, 0, Math.PI * 2); dctx.fill();
+        dctx.restore();
+        /* stardust wake shed from the body */
+        if (Math.random() < 0.5) {
+          const wp2 = P[(Math.random() * n) | 0];
+          sparks.push({ kind: 'ember', x: wp2.x, y: wp2.y + 6,
+                        vx: (Math.random() - 0.5) * 24, vy: 12 + Math.random() * 26,
+                        life: 0, max: 0.7 + Math.random() * 0.6, hue: Math.random() });
+        }
+      }
+    } else if (sp.kind === 'ember') {
+      sp.vy += 90 * dt;
+      const col = sp.hue < 0.4 ? '255,179,71' : sp.hue < 0.7 ? '255,120,80' : '255,230,150';
+      const g = dctx.createRadialGradient(sp.x, sp.y, 0, sp.x, sp.y, 7);
+      g.addColorStop(0, `rgba(${col},${0.85 * fade})`);
+      g.addColorStop(1, `rgba(${col},0)`);
+      dctx.fillStyle = g;
+      dctx.beginPath(); dctx.arc(sp.x, sp.y, 7, 0, Math.PI * 2); dctx.fill();
+    } else if (sp.kind === 'nova') {
+      /* supernova: blinding core + diffraction spikes + chromatic shockwaves,
+         collapsing to a twinkling remnant star */
+      const p = sp.life / sp.max;
+      const ease = 1 - Math.pow(1 - p, 3);            // fast start, decelerating
+      const R = 20 + ease * Math.min(W, H) * 0.55;
+      const col = sp.hue < 0.5 ? ['255,140,200', '140,230,255'] : ['140,230,255', '255,190,120'];
+      /* core flash, bigger and slower to die */
+      const flash = Math.max(0, 1 - p * 3);
+      if (flash > 0) {
+        const fg = dctx.createRadialGradient(sp.x, sp.y, 0, sp.x, sp.y, 190);
+        fg.addColorStop(0, `rgba(255,255,255,${flash})`);
+        fg.addColorStop(0.35, `rgba(${col[0]},${flash * 0.7})`);
+        fg.addColorStop(1, `rgba(${col[0]},0)`);
+        dctx.fillStyle = fg;
+        dctx.beginPath(); dctx.arc(sp.x, sp.y, 190, 0, Math.PI * 2); dctx.fill();
+      }
+      /* diffraction spikes: 4 long + 4 short, slowly rotating, shrinking */
+      const spikeA = Math.max(0, 1 - p * 1.6);
+      if (spikeA > 0) {
+        dctx.save();
+        dctx.translate(sp.x, sp.y);
+        dctx.rotate(p * 0.3 + (sp.hue || 0));
+        for (let sk = 0; sk < 8; sk++) {
+          const long = sk % 2 === 0;
+          const len = (long ? 300 : 130) * (0.35 + ease * 0.65) * spikeA;
+          const a = (sk / 8) * Math.PI * 2;
+          const g = dctx.createLinearGradient(0, 0, Math.cos(a) * len, Math.sin(a) * len);
+          g.addColorStop(0, `rgba(255,255,255,${0.8 * spikeA})`);
+          g.addColorStop(1, 'rgba(255,255,255,0)');
+          dctx.strokeStyle = g;
+          dctx.lineWidth = long ? 3 : 1.8;
+          dctx.beginPath(); dctx.moveTo(0, 0); dctx.lineTo(Math.cos(a) * len, Math.sin(a) * len);
+          dctx.stroke();
+        }
+        dctx.restore();
+      }
+      /* chromatic double shockwave, offset hues at different radii */
+      dctx.lineWidth = 12 * fade + 1;
+      dctx.strokeStyle = `rgba(${col[0]},${0.5 * fade})`;
+      dctx.beginPath(); dctx.arc(sp.x, sp.y, R, 0, Math.PI * 2); dctx.stroke();
+      dctx.lineWidth = 6 * fade + 0.5;
+      dctx.strokeStyle = `rgba(${col[1]},${0.45 * fade})`;
+      dctx.beginPath(); dctx.arc(sp.x, sp.y, R * 0.88, 0, Math.PI * 2); dctx.stroke();
+      dctx.lineWidth = 2 * fade + 0.3;
+      dctx.strokeStyle = `rgba(255,255,255,${0.5 * fade})`;
+      dctx.beginPath(); dctx.arc(sp.x, sp.y, R * 0.94, 0, Math.PI * 2); dctx.stroke();
+      /* remnant: a small hot star twinkles at the center as the wave departs */
+      if (p > 0.3) {
+        const tw = 0.6 + 0.4 * Math.sin(t * 13 + sp.x);
+        const ra = Math.min(1, (p - 0.3) * 3) * fade;
+        const rg = dctx.createRadialGradient(sp.x, sp.y, 0, sp.x, sp.y, 16);
+        rg.addColorStop(0, `rgba(255,255,255,${0.95 * ra * tw})`);
+        rg.addColorStop(0.5, `rgba(${col[1]},${0.5 * ra * tw})`);
+        rg.addColorStop(1, `rgba(${col[1]},0)`);
+        dctx.fillStyle = rg;
+        dctx.beginPath(); dctx.arc(sp.x, sp.y, 16, 0, Math.PI * 2); dctx.fill();
+      }
+    } else if (sp.kind === 'aurora') {
+      /* northern-lights curtains: filled wavy sheets hanging from a bright edge */
+      const p = sp.life / sp.max;
+      const env = Math.sin(p * Math.PI);              // ease in and out
+      const hueBase = (sp.hue * 360 + t * 8) % 360;
+      for (let band = 0; band < 3; band++) {
+        const hue = (hueBase + band * 45) % 360;
+        const baseY = sp.y + band * 20;
+        const seg = 22;
+        /* curtain sheet: top edge waves, light falls downward and fades */
+        dctx.beginPath();
+        const topPts = [];
+        for (let x = 0; x <= W + seg; x += seg) {
+          const y = baseY
+            + Math.sin(x * 0.004 + t * 0.55 + sp.ph + band * 0.9) * 40
+            + Math.sin(x * 0.013 - t * 0.35 + sp.ph * 2 + band) * 18;
+          topPts.push([x, y]);
+        }
+        const depth = 130 + band * 30 + Math.sin(t * 0.5 + band) * 24;
+        dctx.moveTo(topPts[0][0], topPts[0][1]);
+        for (const [x, y] of topPts) dctx.lineTo(x, y);
+        for (let q = topPts.length - 1; q >= 0; q--) {
+          const [x, y] = topPts[q];
+          const rip = Math.sin(x * 0.02 + t * 1.3 + band * 2) * 14;  // ragged hem
+          dctx.lineTo(x, y + depth + rip);
+        }
+        dctx.closePath();
+        const cg = dctx.createLinearGradient(0, baseY - 30, 0, baseY + depth + 20);
+        cg.addColorStop(0, `hsla(${hue} 95% 70% / ${env * 0.26 * (1 - band * 0.2)})`);
+        cg.addColorStop(0.55, `hsla(${(hue + 25) % 360} 90% 55% / ${env * 0.10})`);
+        cg.addColorStop(1, `hsla(${(hue + 50) % 360} 90% 50% / 0)`);
+        dctx.fillStyle = cg;
+        dctx.fill();
+        /* bright crest line */
+        dctx.beginPath();
+        for (let q = 0; q < topPts.length; q++) {
+          const [x, y] = topPts[q];
+          q === 0 ? dctx.moveTo(x, y) : dctx.lineTo(x, y);
+        }
+        dctx.lineWidth = 2.5;
+        dctx.strokeStyle = `hsla(${hue} 100% 82% / ${env * 0.5 * (1 - band * 0.25)})`;
+        dctx.stroke();
+      }
+    } else if (sp.kind === 'star') {
+      const tx = sp.x - sp.vx * 0.09, ty = sp.y - sp.vy * 0.09;
+      const g = dctx.createLinearGradient(sp.x, sp.y, tx, ty);
+      g.addColorStop(0, `rgba(255,255,240,${0.95 * fade})`);
+      g.addColorStop(1, 'rgba(255,179,71,0)');
+      dctx.strokeStyle = g; dctx.lineWidth = 2.5; dctx.lineCap = 'round';
+      dctx.beginPath(); dctx.moveTo(sp.x, sp.y); dctx.lineTo(tx, ty); dctx.stroke();
+      const gg = dctx.createRadialGradient(sp.x, sp.y, 0, sp.x, sp.y, 14);
+      gg.addColorStop(0, `rgba(255,255,255,${0.8 * fade})`);
+      gg.addColorStop(1, 'rgba(255,255,255,0)');
+      dctx.fillStyle = gg;
+      dctx.beginPath(); dctx.arc(sp.x, sp.y, 14, 0, Math.PI * 2); dctx.fill();
+    } else if (sp.kind === 'heart') {         // pink hearts from the nose
+      sp.vy += 60 * dt;
+      const szh = 6 + 4 * (1 - fade);
+      dctx.save();
+      dctx.translate(sp.x, sp.y);
+      dctx.rotate(Math.sin(t * 4 + sp.ph) * 0.4);
+      dctx.scale(szh, szh);
+      dctx.beginPath();
+      dctx.moveTo(0, 0.9);
+      dctx.bezierCurveTo(-1.3, -0.4, -0.55, -1.3, 0, -0.45);
+      dctx.bezierCurveTo(0.55, -1.3, 1.3, -0.4, 0, 0.9);
+      dctx.fillStyle = `rgba(255,47,160,${0.9 * fade})`;
+      dctx.fill();
+      dctx.restore();
+    } else {                                  // petal
+      sp.vy += 230 * dt;
+      dctx.save();
+      dctx.translate(sp.x, sp.y);
+      dctx.rotate(t * 3 + sp.ph);
+      dctx.beginPath();
+      dctx.ellipse(0, 0, 3.2, 7.5, 0, 0, Math.PI * 2);
+      dctx.fillStyle = `rgba(255,${140 + (sp.hue * 60) | 0},40,${0.8 * fade})`;
+      dctx.fill();
+      dctx.restore();
+    }
+  }
+  const moteStep = Math.max(1, Math.round([1, 1, 2, 3, 6][qLevel()] / CFG.dustCount));
+  for (let mi = 0; mi < motes.length; mi += moteStep) {
+    const m = motes[mi];
+    m.y -= m.vy * dt * (m.z ? 1.6 : 0.8) * (1 + bassSm * 0.6);
+    m.x += m.vx * dt + Math.sin(t * 0.9 + m.ph) * 0.0004;
+    if (m.y < -0.05) { m.y = 1.05; m.x = Math.random(); }
+    if (m.x < -0.05) m.x = 1.05; if (m.x > 1.05) m.x = -0.05;
+    const px = m.x * W, py = m.y * H;
+    const tw = 0.5 + 0.5 * Math.sin(t * 2 + m.ph);
+    const sz = m.r * (m.z ? 1.7 : 1);
+    if (m.kind === 'ember') {
+      const col = m.hue < 0.4 ? '255,179,71' : m.hue < 0.7 ? '255,47,160' : '47,232,208';
+      const g = dctx.createRadialGradient(px, py, 0, px, py, sz * 4);
+      g.addColorStop(0, `rgba(${col},${0.5 * tw})`);
+      g.addColorStop(1, `rgba(${col},0)`);
+      dctx.fillStyle = g;
+      dctx.beginPath(); dctx.arc(px, py, sz * 4, 0, Math.PI * 2); dctx.fill();
+    } else { // marigold petal
+      dctx.save();
+      dctx.translate(px, py);
+      dctx.rotate(t * (m.z ? 0.7 : 0.4) + m.ph);
+      dctx.beginPath();
+      dctx.ellipse(0, 0, sz * 1.4, sz * 3, 0, 0, Math.PI * 2);
+      dctx.fillStyle = `rgba(255,${140 + (m.hue * 60) | 0},40,${0.35 + 0.25 * tw})`;
+      dctx.fill();
+      dctx.restore();
+    }
+  }
+
+  drawCursorCandle(dt);
+  dctx.restore();
+}
+
+/* ── the cursor is a candle; moths gather when you rest ── */
+const flameTrail = [];
+const moths = Array.from({ length: 4 }, (_, i) => ({ a: i * 1.7, r: 34 + i * 11, sp: 1.2 + i * 0.35, ph: i * 2.3 }));
+function drawCursorCandle(dt) {
+  if (!gateGone || IS_TOUCH || qLevel() >= 3) return;   // shed at Q3+
+  const cx = mouse.x * W, cy = mouse.y * H;
+  flameTrail.push({ x: cx, y: cy, life: 0 });
+  if (flameTrail.length > 26) flameTrail.shift();
+  for (let q = flameTrail.length - 1; q >= 0; q--) {
+    const p = flameTrail[q];
+    p.life += dt;
+    if (p.life > 0.8) { flameTrail.splice(q, 1); continue; }
+    const a = (1 - p.life / 0.8) * 0.35;
+    const g = dctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 9);
+    g.addColorStop(0, `rgba(255,200,110,${a})`);
+    g.addColorStop(1, 'rgba(255,160,60,0)');
+    dctx.fillStyle = g;
+    dctx.beginPath(); dctx.arc(p.x, p.y, 9, 0, Math.PI * 2); dctx.fill();
+  }
+  /* the flame itself */
+  const flick = 0.85 + 0.15 * Math.sin(t * 11) * Math.sin(t * 23.7);
+  const halo = dctx.createRadialGradient(cx, cy, 0, cx, cy, 34 * flick);
+  halo.addColorStop(0, 'rgba(255,215,130,0.45)');
+  halo.addColorStop(1, 'rgba(255,170,70,0)');
+  dctx.fillStyle = halo;
+  dctx.beginPath(); dctx.arc(cx, cy, 34 * flick, 0, Math.PI * 2); dctx.fill();
+  dctx.save();
+  dctx.translate(cx + Math.sin(t * 9) * 0.8, cy);
+  dctx.scale(1, 1.55);
+  const fg = dctx.createRadialGradient(0, 0, 0, 0, 0, 10 * flick);
+  fg.addColorStop(0, 'rgba(255,255,240,0.95)');
+  fg.addColorStop(0.5, 'rgba(255,195,95,0.85)');
+  fg.addColorStop(1, 'rgba(255,120,40,0)');
+  dctx.fillStyle = fg;
+  dctx.beginPath(); dctx.arc(0, 0, 10 * flick, 0, Math.PI * 2); dctx.fill();
+  dctx.restore();
+  dctx.beginPath(); dctx.arc(cx, cy + 1.5, 2.2, 0, Math.PI * 2);
+  dctx.fillStyle = 'rgba(90,140,255,0.8)'; dctx.fill();   // blue base
+
+  /* moths arrive after 30s of stillness */
+  const still = t - mouse.lastMove;
+  const mA = Math.max(0, Math.min(1, (still - 30) / 6));
+  if (mA > 0) {
+    for (const mo of moths) {
+      mo.a += dt * mo.sp * (1 + Math.sin(t * 3 + mo.ph) * 0.5);
+      const wob = Math.sin(t * 7 + mo.ph) * 8;
+      const mx = cx + Math.cos(mo.a) * (mo.r + wob);
+      const my = cy + Math.sin(mo.a * 1.3) * (mo.r * 0.7 + wob);
+      const wing = Math.abs(Math.sin(t * 18 + mo.ph));
+      dctx.save();
+      dctx.translate(mx, my);
+      dctx.rotate(mo.a + Math.PI / 2);
+      dctx.fillStyle = `rgba(230,220,200,${0.6 * mA})`;
+      for (const ws of [-1, 1]) {
+        dctx.beginPath();
+        dctx.ellipse(ws * 2.6 * wing, 0, 2.6 * wing + 0.4, 4, ws * 0.5, 0, Math.PI * 2);
+        dctx.fill();
+      }
+      dctx.fillStyle = `rgba(120,100,80,${0.7 * mA})`;
+      dctx.beginPath(); dctx.ellipse(0, 0, 1.1, 3.2, 0, 0, Math.PI * 2); dctx.fill();
+      dctx.restore();
+    }
+  }
+}
+
+/* ─────────────────────────────────────────────
+   LIQUID LOGO — rainbow pours into SKLZ, crests,
+   oozes over the top, then drains back out
+   ───────────────────────────────────────────── */
+const wmFill = document.getElementById('wm-fill');
+/* liquid level oscillates between random heights: pick a target, ease there,
+   dwell a beat, pick another. Full and empty visits are guaranteed often. */
+const liq = { level: 0, from: 0, target: 1, t0: 0, dur: 11, dwellUntil: 0 };
+function liquidUpdate() {
+  if (t >= liq.dwellUntil && liq.t0 === 0) {
+    liq.t0 = t;                                      // launch toward current target
+  }
+  if (liq.t0 > 0) {
+    const p = Math.min(1, (t - liq.t0) / liq.dur);
+    const e = p * p * (3 - 2 * p);                   // smoothstep ease
+    liq.level = liq.from + (liq.target - liq.from) * e;
+    if (p >= 1) {                                    // arrived: pick the next height
+      liq.from = liq.target;
+      const roll = Math.random();
+      liq.target = roll < 0.25 ? 1 : roll < 0.5 ? 0 : Math.random();  // favor the extremes
+      if (Math.abs(liq.target - liq.from) < 0.15)    // skip do-nothing moves
+        liq.target = liq.from > 0.5 ? Math.random() * 0.4 : 0.6 + Math.random() * 0.4;
+      const dist = Math.abs(liq.target - liq.from);
+      liq.dur = (CFG.liquidFill * 0.35 + CFG.liquidFill * 0.75 * dist) * (0.8 + Math.random() * 0.4);
+      liq.t0 = 0;
+      liq.dwellUntil = t + 0.6 + Math.random() * (CFG.liquidRest);
+    }
+  }
+
+  /* wavy liquid surface as a clip-path polygon; NEVER above the letter tops */
+  const pts = ['0% 102%'];
+  const topBase = (1 - liq.level) * 103;
+  for (let x = 0; x <= 100; x += 7) {
+    const y = topBase
+      + Math.sin(x * 0.22 + t * 2.6) * 2.4
+      + Math.sin(x * 0.53 - t * 4.2) * 1.5 * (0.5 + bassSm);
+    pts.push(x + '% ' + Math.min(103, Math.max(0, y)).toFixed(1) + '%');
+  }
+  pts.push('100% 102%');
+  wmFill.style.clipPath = 'polygon(' + pts.join(',') + ')';
+  wmFill.style.filter = `hue-rotate(${((t * 36) % 360).toFixed(0)}deg)`;
+}
+
+/* ─────────────────────────────────────────────
+   RESIZE + MAIN LOOP
+   ───────────────────────────────────────────── */
+function qLevel() {
+  if (CFG.perfMode === 1) return 0;                    // forced full
+  if (CFG.perfMode === 2) return Math.max(2, quality); // forced at-least-lite
+  return quality;                                      // auto
+}
+function isLite() { return qLevel() >= 2; }
+function setQuality(q) {
+  q = Math.max(0, Math.min(4, q));
+  if (q === quality) return;
+  quality = q;
+  resize();
+}
+function resize() {
+  W = innerWidth; H = innerHeight;
+  tunScale();
+  const q = qLevel();
+  DPR = Math.min(window.devicePixelRatio || 1, Q_DPR[q]);
+  for (const c of [tunCanvas, heroCanvas, dustCanvas]) {
+    c.width = W * DPR; c.height = H * DPR;
+  }
+  nebCanvas.width = Math.floor(W * DPR * Q_NEB[q]);
+  nebCanvas.height = Math.floor(H * DPR * Q_NEB[q]);
+  gl.viewport(0, 0, nebCanvas.width, nebCanvas.height);
+}
+addEventListener('resize', resize);
+resize();
+
+let t = 0, last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 0.05);
+  last = now;
+  t += dt;
+
+  /* FPS governor: walk DOWN a level after 3s under 32fps, back UP after
+     12s above 55fps. 2s cooldown after each step so measurements settle. */
+  fpsAvg += (1 / Math.max(dt, 1e-3) - fpsAvg) * 0.05;
+  if (CFG.perfMode === 0 && t > 5 && t - lastGovT > 2) {
+    if (fpsAvg < 32 && quality < 4) {
+      if (govLowT < 0) govLowT = t;
+      else if (t - govLowT > 3) { setQuality(quality + 1); lastGovT = t; govLowT = -1; govHighT = -1; }
+    } else govLowT = -1;
+    if (fpsAvg > 55 && quality > 0) {
+      if (govHighT < 0) govHighT = t;
+      else if (t - govHighT > 12) { setQuality(quality - 1); lastGovT = t; govHighT = -1; }
+    } else if (fpsAvg <= 55) govHighT = -1;
+  }
+  updateHud();
+
+  sampleAudio();
+  beatPulse *= Math.exp(-dt * CFG.beatDecay);
+  /* tempo: ease toward BPM-derived multiplier, floored at 1.0 (current speeds) */
+  const tempoTgt = bpm > 0 ? Math.min(CFG.tempoMax, Math.max(1, bpm / CFG.tempoRef)) : 1;
+  tempoMul += (tempoTgt - tempoMul) * Math.min(1, dt * 0.5);
+  tempoT += dt * tempoMul;
+  mouse.str *= Math.exp(-dt * CFG.smokeDecay);   // slow fade: the stir lingers
+  if (!gateGone && gate.classList.contains('gone')) gateGone = true;
+  if (gateGone && CFG.autoEvents && t > nextEventT) spawnEvent();
+  else if (!CFG.autoEvents) nextEventT = t + CFG.eventMinGap;   // no burst when re-enabled
+
+  /* day/night: the nebula's palette slowly wheels through dawn and dusk (off at Q4) */
+  if (qLevel() < 4 && (t | 0) !== frame.lastDayTick) {
+    frame.lastDayTick = t | 0;
+    const dp = (t % (CFG.dayCycleMin * 60)) / (CFG.dayCycleMin * 60) * Math.PI * 2;
+    const hueShift = Math.sin(dp) * 30;
+    const bright = 1 + Math.sin(dp + Math.PI / 2) * 0.13;
+    nebCanvas.style.filter = `hue-rotate(${hueShift.toFixed(1)}deg) brightness(${bright.toFixed(3)})`;
+  }
+
+  /* nebula: full rate at Q0-2, every 2nd frame at Q3, every 4th at Q4 */
+  const q = qLevel();
+  frame.n = (frame.n || 0) + 1;
+  if (q < 3 || (q === 3 && frame.n % 2 === 0) || (q === 4 && frame.n % 4 === 0)) {
+    gl.uniform2f(uRes, nebCanvas.width, nebCanvas.height);
+    gl.uniform1f(uTime, t);
+    gl.uniform1f(uBass, bassSm);
+    gl.uniform2f(uMouse, (mouse.x - 0.5) * (W / H), 0.5 - mouse.y);
+    gl.uniform1f(uMstr, mouse.str * CFG.smokeStir);
+  gl.uniform1f(uScale, CFG.smokeScale);
+  gl.uniform1f(uDrift, CFG.smokeDrift);
+  gl.uniform1f(uStars, CFG.starDensity);
+  gl.uniform1f(uNhue, CFG.nebulaHue);
+  gl.uniform1f(uNsat, CFG.nebulaSat);
+  gl.uniform1f(uNbright, CFG.bgBright);
+  gl.uniform1f(uVig, CFG.vignette);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+
+  drawTunnel(dt);
+  drawHero(dt);
+  drawDust(dt);
+  liquidUpdate();
+
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* ─────────────────────────────────────────────
+   GATE + AUDIO CONTROLS
+   ───────────────────────────────────────────── */
+const gate = document.getElementById('gate');
+const muteBtn = document.getElementById('mute');
+let muted = false;
+
+/* ── live update beacon ──
+   Every deploy writes version.json. Displays poll it and reload themselves,
+   resuming music at the same second so a permanent screen never goes silent
+   and never shows stale art. */
+const RESUME_STORE = 'sklz.resume.v1';
+let updatePending = false;
+function stashResume() {
+  try {
+    localStorage.setItem(RESUME_STORE, JSON.stringify({
+      at: Date.now(), time: music.currentTime, muted, gritoIdx,
+      playing: !music.paused
+    }));
+  } catch (_) {}
+}
+function readResume() {
+  try {
+    const raw = localStorage.getItem(RESUME_STORE);
+    localStorage.removeItem(RESUME_STORE);         // one-shot
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    return (Date.now() - s.at < 120000) ? s : null;  // ignore anything stale
+  } catch (_) { return null; }
+}
+async function checkVersion() {
+  if (updatePending) return;
+  try {
+    const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) return;
+    const v = await r.json();
+    if (v.build && BUILD_ID !== '__BUILD_' + 'ID__' && v.build !== BUILD_ID) {
+      updatePending = true;
+      stashResume();
+      /* let the current bar finish, then take the new build */
+      setTimeout(() => location.replace(location.pathname + '?v=' + v.build), 1500);
+    }
+  } catch (_) {}                                    // offline: try again later
+}
+setInterval(checkVersion, 60000);
+setTimeout(checkVersion, 8000);
+
+let musicStarted = false;
+function startMusic() {
+  initAudio();
+  if (actx.state === 'suspended') actx.resume();
+  music.play().catch(() => {});
+  const t0 = performance.now();
+  (function ramp() {
+    const p = Math.min((performance.now() - t0) / 4000, 1);
+    music.volume = muted ? 0 : p * CFG.musicVolume;
+    if (p < 1) requestAnimationFrame(ramp);
+  })();
+  if (!musicStarted) { musicStarted = true; loadGritos(); }
+}
+gate.addEventListener('click', () => {
+  startMusic();
+  gate.classList.add('gone');
+}, { once: true });
+
+/* came back from an auto-update: skip the gate, pick the track back up.
+   Called at the END of the script: it touches gritoIdx and other bindings
+   declared further down, which would be in the temporal dead zone here. */
+function autoResume() {
+  const s = readResume();
+  if (!s) return;
+  CFG.musicOn = s.muted ? 0 : 1;       // keep CFG the source of truth
+  muted = !!s.muted;
+  gritoIdx = s.gritoIdx | 0;
+  gate.classList.add('gone');
+  gateGone = true;
+  const go = () => {
+    try { music.currentTime = s.time || 0; } catch (_) {}
+    if (s.playing) {
+      startMusic();
+      music.play().catch(() => {                 // autoplay refused: show the gate again
+        gate.classList.remove('gone');
+        gateGone = false;
+      });
+    }
+  };
+  music.readyState >= 1 ? go() : music.addEventListener('loadedmetadata', go, { once: true });
+}
+// Safety net: if autoplay was denied at the gate, the next real
+// interaction anywhere restarts playback (unless the user paused on purpose).
+let userPaused = false;
+addEventListener('pointerdown', () => { if (music.paused && !userPaused && gateGone) startMusic(); });
+
+/* ── SKLZ external control API ──
+   For sensor rigs (Kinect person tracking, gamepads, etc). Everything takes
+   normalized coords: x,y in 0..1 relative to the viewport.
+     SKLZ.setGaze(x, y)     aim all three eyes (hold; call every frame)
+     SKLZ.releaseGaze()     return the eyes to auto/wander
+     SKLZ.look(x, y)        one 2.2s glance (same as a click, no flick)
+     SKLZ.flick(x, y)       throw the skull under that point
+     SKLZ.stir(x, y, s)     churn the smoke there, s = strength 0..1.5
+     SKLZ.effect(name)      'star'|'petals'|'comet'|'meteor'|'nova'|'aurora'|
+                            'ufo'|'alebrije'|'grito'|'rainbow'|'rings'|
+                            'spirals'|'teeth'|'nose'|'random'
+     SKLZ.stare(on)         force / clear the angry stare
+     SKLZ.state()           read: bpm, beatPulse, gritoIdx, counts */
+let extGaze = null;
+window.SKLZ = {
+  setGaze(x, y) { extGaze = { x: x * W, y: y * H }; },
+  releaseGaze() { extGaze = null; },
+  look(x, y) { face.gazeX = x * W; face.gazeY = y * H; face.gazeUntil = t + 2.2; },
+  flick(x, y) { return flickAt(x * W, y * H); },
+  stir(x, y, s) {
+    mouse.x = x; mouse.y = y; mouse.lastMove = t;
+    mouse.str = Math.min(1.5, mouse.str + (s === undefined ? 0.5 : s));
+  },
+  effect(name) {
+    const m = { star: fxShootingStar, petals: fxPetalBurst, comet: fxComet,
+      meteor: fxMeteorShower, nova: fxSupernova, aurora: fxAurora, ufo: fxUfo,
+      alebrije: fxAlebrije, grito: grito,
+      rainbow: () => { rainbowEyeUntil = t + 5; },
+      rings: () => { face.ringSpin += 10; },
+      spirals: () => { face.spiralSpin += 12; },
+      teeth: () => { face.chatterUntil = t + 1.6; },
+      nose: () => { face.noseBurst = t + 1.2; heartBurst(W / 2, H / 2); },
+      random: randomEffect };
+    if (m[name]) m[name]();
+  },
+  stare(on) { stare.until = on ? t + 3600 : t; },
+  config(obj) { return obj ? cfgApply(obj) : { ...CFG }; },   // read or patch
+  saveConfig() { return cfgSave(); },
+  state() { return { bpm, beatPulse, tempoMul, gritoIdx, ufos: ufos.length, lite: isLite(), t }; }
+};
+
+/* ── toggles: CFG holds the truth, applyToggles() makes the world match ──
+   Everything here is saved and restored with the rest of the settings. */
+function applyToggles(opts) {
+  const o = opts || {};
+  document.body.classList.toggle('notext', !CFG.textOn);
+  /* music */
+  muted = !CFG.musicOn;
+  music.volume = muted ? 0 : CFG.musicVolume;
+  muteBtn.innerHTML = muted ? '&#215;' : '&#9835;';
+  muteBtn.title = muted ? 'unmute' : 'mute';
+  /* fps monitor */
+  document.getElementById('hud').classList.toggle('show', !!CFG.hudOn);
+  /* voice: only act on a real change, starting recognition is expensive */
+  if (!o.skipVoice && !!CFG.voiceOn !== voiceOn) toggleVoice();
+  syncToggleUI();
+}
+function syncToggleUI() {
+  document.querySelectorAll('#cfgSliders .sw').forEach(sw => {
+    sw.classList.toggle('on', !!CFG[sw.dataset.key]);
+  });
+}
+
+muteBtn.addEventListener('click', toggleMute);
+function toggleMute() {
+  CFG.musicOn = muted ? 1 : 0;          // flip, then let applyToggles do the work
+  applyToggles({ skipVoice: true });
+}
+function toggleText() {
+  CFG.textOn = CFG.textOn ? 0 : 1;
+  applyToggles({ skipVoice: true });
+}
+
+/* ─────────────────────────────────────────────
+   GRITOS — 13 yells, loaded sequentially once
+   the music starts; G cycles through in order
+   ───────────────────────────────────────────── */
+/* curated list — survivors of Pedram's isolated-scream cull + new candidates */
+const GRITO_FILES = ['01', '04', '06', '07', '10', '12', '14', '15', '16', '19'];
+const gritos = [];
+let gritoIdx = 0;
+/* shuffled bag: play order is random, but every grito plays once before any
+   repeats, and the bag reshuffles when it empties. */
+let gritoBag = [];
+function shuffleBag() {
+  gritoBag = gritos.map((_, i) => i);
+  for (let i = gritoBag.length - 1; i > 0; i--) {      // Fisher-Yates
+    const j = (Math.random() * (i + 1)) | 0;
+    [gritoBag[i], gritoBag[j]] = [gritoBag[j], gritoBag[i]];
+  }
+  /* avoid the seam: a fresh bag must not open with the one that just played */
+  if (gritoBag.length > 1 && gritoBag[0] === gritoLast) {
+    [gritoBag[0], gritoBag[gritoBag.length - 1]] = [gritoBag[gritoBag.length - 1], gritoBag[0]];
+  }
+}
+let gritoLast = -1;
+function loadGritos() {
+  let i = 0;
+  (function next() {
+    if (i >= GRITO_FILES.length) return;
+    const a = new Audio(`gritos/grito-${GRITO_FILES[i]}.mp3`);
+    a.preload = 'auto';
+    gritos.push(a);
+    i++;
+    a.addEventListener('canplaythrough', next, { once: true });
+    a.addEventListener('error', next, { once: true });
+    a.load();
+  })();
+}
+function grito() {
+  if (!gritos.length) return;
+  if (!gritoBag.length) shuffleBag();
+  const pick = gritoBag.shift();
+  gritoLast = pick;
+  gritoIdx++;                                   // still counts total plays
+  const a = gritos[pick];
+  a.currentTime = 0;
+  a.volume = CFG.gritoVolume;
+  a.play().catch(() => {});
+  /* the skull throws the yell: jaw drops for as long as the clip runs */
+  const dur = (isFinite(a.duration) && a.duration > 0) ? a.duration : 3;
+  face.yellStart = t;
+  face.yellUntil = t + Math.min(dur, 8);
+  face.chatterUntil = -1;                       // chatter would fight the yell
+  /* the art celebrates with it */
+  face.ringSpin += 7;
+  rainbowEyeUntil = Math.max(rainbowEyeUntil, t + 2.5);
+  heartBurst(W / 2, H / 2 - H * 0.1);
+}
+
+/* ─────────────────────────────────────────────
+   PANELS — help + live config with copy-JSON
+   ───────────────────────────────────────────── */
+const helpBtn = document.getElementById('help');
+const helpPanel = document.getElementById('helpPanel');
+const cfgPanel = document.getElementById('cfgPanel');
+function togglePanel(p) {
+  const was = p.classList.contains('show');
+  document.querySelectorAll('.panel').forEach(x => {
+    x.classList.remove('show');
+    x.style.transform = '';                 // drop any leftover drag offset
+  });
+  if (!was) p.classList.add('show');
+  /* phones hide the floating controls behind an open sheet */
+  document.body.classList.toggle('sheet-open', !!document.querySelector('.panel.show'));
+}
+helpBtn.addEventListener('click', () => togglePanel(helpPanel));
+
+/* ── mobile sheet chrome ──
+   Below 760px every panel is a full-screen sheet, so it needs a title bar with
+   a real close target and a swipe-down dismiss. The markup is built here rather
+   than in the HTML because all three panels want the identical bar; on desktop
+   the whole thing is display:none and .sheetbody is display:contents, so the
+   rendered panel is byte-for-byte the layout it has always been. */
+(function buildSheets() {
+  document.querySelectorAll('.panel').forEach(panel => {
+    const title = (panel.querySelector('h2') || {}).textContent || '';
+    const body = document.createElement('div');
+    body.className = 'sheetbody';
+    while (panel.firstChild) body.appendChild(panel.firstChild);
+
+    const bar = document.createElement('div');
+    bar.className = 'sheetbar';
+    bar.innerHTML =
+      '<div class="grabber"></div><div class="sheetrow">' +
+      /* divs, not <button>: #cfgPanel already styles every button it contains
+         as a full-width purple bar, and an id selector would win over any class
+         rule here. A div sidesteps that entirely. */
+      (panel.id === 'galPanel' ? '<div class="sheetback" role="button" tabindex="0" aria-label="back to settings">‹</div>' : '') +
+      '<h3 class="sheettitle"></h3>' +
+      '<div class="sheetclose" role="button" tabindex="0" aria-label="close">✕</div></div>';
+    bar.querySelector('.sheettitle').textContent = title;
+    panel.appendChild(bar);
+    panel.appendChild(body);
+
+    /* the gallery is a drill-down from settings, so its ‹ returns there
+       instead of dumping you back to the art */
+    const tap = (el, fn) => {
+      if (!el) return;
+      el.addEventListener('click', fn);
+      el.addEventListener('keydown', e => {          // role=button needs this
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(); }
+      });
+    };
+    tap(bar.querySelector('.sheetback'), () => togglePanel(cfgPanel));
+    tap(bar.querySelector('.sheetclose'), () => togglePanel(panel));
+
+    /* swipe down to dismiss. Only starts from the bar, or from the body when
+       it is already scrolled to the top, so a flick mid-list still scrolls. */
+    let y0 = 0, dy = 0, live = false;
+    const start = e => {
+      if (e.touches.length !== 1) return;
+      const fromBar = bar.contains(e.target);
+      if (!fromBar && body.scrollTop > 0) return;
+      y0 = e.touches[0].clientY; dy = 0; live = true;
+      panel.classList.add('dragging');
+    };
+    const move = e => {
+      if (!live) return;
+      dy = e.touches[0].clientY - y0;
+      if (dy < 0) { dy = 0; return; }
+      if (e.cancelable) e.preventDefault();      // do not rubber-band the page
+      panel.style.transform = 'translate3d(0,' + dy + 'px,0)';
+    };
+    const end = () => {
+      if (!live) return;
+      live = false;
+      panel.classList.remove('dragging');
+      panel.style.transform = '';
+      if (dy > 110) togglePanel(panel);          // past the threshold: let it go
+    };
+    panel.addEventListener('touchstart', start, { passive: true });
+    panel.addEventListener('touchmove', move, { passive: false });
+    panel.addEventListener('touchend', end);
+    panel.addEventListener('touchcancel', end);
+  });
+})();
+
+/* ── the gallery: named boards shared through the Worker + D1 ──
+   Local save (localStorage) is still the private quick-save; this is the
+   public layer. Everything degrades to silence if the API is unreachable. */
+const GALLERY_API = 'https://sklz-presets.smashlabs.workers.dev/api/presets';
+const galPanel = document.getElementById('galPanel');
+const galList = document.getElementById('galList');
+let galSort = 'top';
+
+function galConfigPayload() {
+  const out = {};
+  for (const k in CFG) out[k] = CFG[k];
+  return out;
+}
+async function galPublish(name) {
+  const r = await fetch(GALLERY_API, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, config: galConfigPayload() })
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || 'could not share');
+  return d;
+}
+async function galFetchList(sort) {
+  const r = await fetch(`${GALLERY_API}?sort=${sort}&limit=25`);
+  if (!r.ok) throw new Error('gallery unreachable');
+  return (await r.json()).presets || [];
+}
+async function galLoad(id) {
+  const r = await fetch(`${GALLERY_API}/${id}`);
+  if (!r.ok) throw new Error('gone');
+  const d = await r.json();
+  const n = cfgApply(d.config);            // same validation as any restore
+  syncSliders();
+  return { n, name: d.name };
+}
+function galRender(items) {
+  if (!items.length) { galList.textContent = 'nothing here yet. be the first.'; return; }
+  galList.textContent = '';
+  items.forEach((p, i) => {
+    const row = document.createElement('div'); row.className = 'galitem';
+    const rk = document.createElement('span'); rk.className = 'rank'; rk.textContent = (i + 1);
+    const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = p.name;
+    const ct = document.createElement('span'); ct.className = 'ct';
+    ct.textContent = `${p.loads}▶ ${p.views}◉`;
+    ct.title = `${p.loads} plays, ${p.views} views`;
+    const b = document.createElement('button'); b.textContent = 'try it';
+    b.addEventListener('click', async () => {
+      b.textContent = '...';
+      try {
+        const res = await galLoad(p.id);
+        b.textContent = 'on!';
+        galSay(`playing "${res.name}" (${res.n} settings)`);
+        setTimeout(() => { b.textContent = 'try it'; }, 1500);
+      } catch (_) { b.textContent = 'failed'; }
+    });
+    row.append(rk, nm, ct, b);
+    galList.appendChild(row);
+  });
+}
+let galStatusT = null;
+function galSay(msg) {
+  const el = document.getElementById('cfgStatus');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(galStatusT);
+  galStatusT = setTimeout(() => el.classList.remove('show'), 2600);
+}
+async function galShow(sort) {
+  galSort = sort || galSort;
+  document.querySelectorAll('.galtab').forEach(x => x.classList.toggle('on', x.dataset.sort === galSort));
+  galList.textContent = 'loading...';
+  try { galRender(await galFetchList(galSort)); }
+  catch (_) { galList.textContent = 'gallery is offline right now.'; }
+}
+document.querySelectorAll('.galtab').forEach(tab => {
+  tab.addEventListener('click', () => galShow(tab.dataset.sort));
+});
+document.getElementById('galBrowse').addEventListener('click', () => {
+  togglePanel(galPanel);
+  if (galPanel.classList.contains('show')) galShow(galSort);
+});
+document.getElementById('galPublish').addEventListener('click', async () => {
+  const input = document.getElementById('galName');
+  const name = input.value.trim();
+  if (!name) { galSay('give your board a name first'); input.focus(); return; }
+  const btn = document.getElementById('galPublish');
+  btn.textContent = '...'; btn.disabled = true;
+  try {
+    const d = await galPublish(name);
+    input.value = '';
+    galSay(`shared as "${d.name}" - others can play it now`);
+  } catch (e) {
+    galSay(String(e.message || e));
+  } finally {
+    btn.textContent = 'share'; btn.disabled = false;
+  }
+});
+/* deep link: ?board=<id> loads someone's board straight away and counts a view */
+(async function galDeepLink() {
+  const id = new URLSearchParams(location.search).get('board');
+  if (!id || !/^[a-z0-9]{4,16}$/.test(id)) return;
+  try {
+    const res = await galLoad(id);
+    fetch(`${GALLERY_API}/${id}/view`, { method: 'POST' }).catch(() => {});
+    setTimeout(() => galSay(`playing "${res.name}"`), 1200);
+  } catch (_) {}
+})();
+
+/* ── controls table: key / action / voice word, keys clickable ── */
+const HELP_ROWS = [
+  // [keys], action label, voice word ('' = none), key-event to dispatch
+  [['G'], 'grito!', '"grito"', 'g'],
+  [['Space'], 'play / pause music', '', ' '],
+  [['M'], 'mute music', '', 'm'],
+  [['↑', '↓'], 'music volume', '', 'ArrowUp'],
+  [['E'], 'rainbow third eye', '"rainbow"', 'e'],
+  [['R'], 'spin the eye rings', '', 'r'],
+  [['W'], 'whirl the cheek spirals', '', 'w'],
+  [['T'], 'teeth chatter', '"teeth"', 't'],
+  [['N'], 'nose heart burst', '', 'n'],
+  [['S'], 'shooting star', '"star"', 's'],
+  [['X'], 'meteor shower', '"meteor"', 'x'],
+  [['K'], 'comet', '"comet"', 'k'],
+  [['V'], 'supernova', '"nova"', 'v'],
+  [['A'], 'aurora', '"aurora"', 'a'],
+  [['U'], 'ufo (2+ dogfight!)', '"ufo"', 'u'],
+  [['Enter'], 'surprise me (random event)', '"random"', 'Enter'],
+  [['B'], 'alebrije spirit', '"dragon"', 'b'],
+  [['F'], 'flick a random skull', '"calavera"', 'f'],
+  [['P'], 'petal burst', '"flores"', 'p'],
+  [['Y'], 'mean mug (the stare)', '"mirada"', 'y'],
+  [['I'], 'save a photo', '', 'i'],
+  [['Z'], 'zen mode (hide all text)', '', 'z'],
+  [['L'], 'voice control on / off', '', 'l'],
+  [['D'], 'fps / quality monitor', '', 'd'],
+  [['C'], 'settings + presets', '', 'c'],
+  [['H', '?'], 'this menu', '', 'h'],
+];
+(function buildHelp() {
+  const tb = document.querySelector('#helpTable tbody');
+  for (const [keys, action, voice, evKey] of HELP_ROWS) {
+    const tr = document.createElement('tr');
+    const tdK = document.createElement('td');
+    keys.forEach((kLabel, idx) => {
+      if (idx) tdK.appendChild(document.createTextNode(' '));
+      const kb = document.createElement('kbd');
+      kb.textContent = kLabel;
+      if (evKey) {
+        const dispatchKey = idx === 1 && kLabel === '↓' ? 'ArrowDown' : evKey;
+        kb.addEventListener('click', ev => {
+          ev.stopPropagation();
+          kb.classList.add('pressed');
+          setTimeout(() => kb.classList.remove('pressed'), 140);
+          dispatchEvent(new KeyboardEvent('keydown', { key: dispatchKey, bubbles: true }));
+        });
+      }
+      tdK.appendChild(kb);
+    });
+    const tdA = document.createElement('td'); tdA.textContent = action;
+    const tdV = document.createElement('td'); tdV.textContent = voice;
+    tr.appendChild(tdK); tr.appendChild(tdA); tr.appendChild(tdV);
+    tb.appendChild(tr);
+  }
+})();
+/* photo lives on the I key now; the bar button was retired for the gear */
+document.getElementById('settings').addEventListener('click', () => togglePanel(cfgPanel));
+(function dialsFold() {
+  const btn = document.getElementById('cfgToggleSliders');
+  const box = document.getElementById('cfgSliders');
+  const cnt = document.getElementById('cfgCount');
+  cnt.textContent = '(' + Object.keys(CFG_SCHEMA).length + ')';
+  btn.addEventListener('click', () => {
+    const open = box.classList.toggle('collapsed') === false;
+    btn.firstChild.nodeValue = open ? 'hide the dials ' : 'show the dials ';
+  });
+})();
+
+let syncSliders = () => {};   // real one is assigned inside buildCfg below
+(function buildCfg() {
+  const holder = document.getElementById('cfgSliders');
+  for (const k in CFG_SCHEMA) {
+    const [def, min, max, step, label, kind] = CFG_SCHEMA[k];
+    const lab = document.createElement('label');
+    lab.textContent = label;
+    /* Each dial is wrapped in a .dial row. On desktop that wrapper is
+       `display: contents`, so the three cells still land in the parent's
+       3-column grid exactly as before. On a phone the wrapper becomes its own
+       2-column grid and the slider drops to a full-width second line. */
+    const row = document.createElement('div');
+    row.className = 'dial';
+    holder.appendChild(row);
+    if (kind === 'toggle') {                       // switch, not slider
+      const sw = document.createElement('div');
+      sw.className = 'sw' + (def ? ' on' : '');
+      sw.dataset.key = k;
+      sw.addEventListener('click', () => {
+        CFG[k] = CFG[k] ? 0 : 1;
+        applyToggles();
+      });
+      const spacer = document.createElement('span');
+      row.appendChild(lab); row.appendChild(sw); row.appendChild(spacer);
+      continue;
+    }
+    const r = document.createElement('input');
+    r.type = 'range'; r.min = min; r.max = max; r.step = step; r.value = def;
+    r.dataset.key = k;
+    const v = document.createElement('span'); v.className = 'val'; v.textContent = def;
+    r.addEventListener('input', () => {
+      CFG[k] = parseFloat(r.value);
+      v.textContent = r.value;
+      if (k === 'musicVolume' && !muted) music.volume = CFG.musicVolume;
+      if (k === 'perfMode') resize();
+      if (PALETTE_KEYS.includes(k)) schedulePaletteRebuild();
+    });
+    row.appendChild(lab); row.appendChild(r); row.appendChild(v);
+  }
+  /* push CFG values back into the sliders after a load/reset */
+  syncSliders = function () {
+    holder.querySelectorAll('input[type=range]').forEach(r => {
+      r.value = CFG[r.dataset.key];
+      if (r.nextElementSibling) r.nextElementSibling.textContent = r.value;
+    });
+    applyToggles();                              // switches + their side effects
+    rebuildSprites();                            // colors are baked into sprites
+    resize();                                    // perf/res changes take effect
+  }
+  const statusEl = document.getElementById('cfgStatus');
+  let statusT = null;
+  function say(msg) {
+    statusEl.textContent = msg;
+    statusEl.classList.add('show');
+    clearTimeout(statusT);
+    statusT = setTimeout(() => statusEl.classList.remove('show'), 2200);
+  }
+  if (CFG_RESTORED) { syncSliders(); say(`restored ${CFG_RESTORED} saved settings`); }
+
+  document.getElementById('cfgSave').addEventListener('click', () => {
+    say(cfgSave() ? 'settings saved to this browser' : 'could not save (private mode?)');
+  });
+  document.getElementById('cfgLoad').addEventListener('click', () => {
+    const n = cfgLoad();
+    if (n) { syncSliders(); say(`restored ${n} settings`); }
+    else say('no saved settings yet');
+  });
+  document.getElementById('cfgCopy').addEventListener('click', e => {
+    navigator.clipboard.writeText(JSON.stringify(CFG, null, 2)).then(() => {
+      e.target.textContent = 'copied!';
+      setTimeout(() => e.target.textContent = 'copy settings JSON', 1200);
+    });
+  });
+  document.getElementById('cfgReset').addEventListener('click', () => {
+    for (const k in CFG_SCHEMA) CFG[k] = CFG_SCHEMA[k][0];
+    cfgClear();                                  // forget the saved set too
+    syncSliders();
+    say('back to defaults (saved set cleared)');
+  });
+})();
+
+/* ─────────────────────────────────────────────
+   KEYBOARD
+   ───────────────────────────────────────────── */
+addEventListener('keydown', e => {
+  /* Typing in a field must never fire art shortcuts. Without this, naming a
+     preset "grito" launches a yell, an "s" spawns a star, "z" hides the text. */
+  const el = e.target;
+  if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) {
+    if (e.key === 'Escape') el.blur();
+    return;
+  }
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (!musicStarted && music.paused) startMusic();
+  const k = e.key.toLowerCase();
+  if (k === 'escape') {
+    /* gallery -> config -> help -> closed */
+    const gal = document.getElementById('galPanel');
+    if (gal && gal.classList.contains('show')) {
+      gal.classList.remove('show');
+      cfgPanel.classList.add('show');
+    } else if (cfgPanel.classList.contains('show')) {
+      cfgPanel.classList.remove('show');
+      helpPanel.classList.add('show');
+    } else if (helpPanel.classList.contains('show')) {
+      helpPanel.classList.remove('show');
+    }
+    /* the sheet-open flag drives the mobile control fade; this chain moves
+       panels by hand, so it has to re-derive it */
+    document.body.classList.toggle('sheet-open', !!document.querySelector('.panel.show'));
+    return;
+  }
+  if (k === 'enter') { e.preventDefault(); randomEffect(); return; }
+  if (k === ' ') {
+    e.preventDefault();
+    if (music.paused) { userPaused = false; music.play(); }
+    else { userPaused = true; music.pause(); }
+  }
+  else if (k === 'g') grito();
+  else if (k === 'm') toggleMute();
+  else if (k === 'arrowup')   { e.preventDefault(); CFG.musicVolume = Math.min(1, CFG.musicVolume + 0.05); if (!muted) music.volume = CFG.musicVolume; }
+  else if (k === 'arrowdown') { e.preventDefault(); CFG.musicVolume = Math.max(0, CFG.musicVolume - 0.05); if (!muted) music.volume = CFG.musicVolume; }
+  else if (k === 'e') rainbowEyeUntil = t + 5;
+  else if (k === 'r') face.ringSpin += 10;
+  else if (k === 'w') face.spiralSpin += (Math.random() < 0.5 ? -12 : 12);
+  else if (k === 't') face.chatterUntil = t + 1.6;
+  else if (k === 'n') { face.noseBurst = t + 1.2; heartBurst(W / 2, H / 2); }
+  else if (k === 's') fxShootingStar();
+  else if (k === 'p') fxPetalBurst();
+  else if (k === 'f') fxFlickRandom();
+  else if (k === 'k') fxComet();
+  else if (k === 'x') fxMeteorShower();
+  else if (k === 'v') fxSupernova();
+  else if (k === 'a') fxAurora();
+  else if (k === 'u') fxUfo();
+  else if (k === 'b') fxAlebrije();
+  else if (k === 'y') stare.until = t + 3.2;
+  else if (k === 'z') toggleText();
+  else if (k === 'd') { CFG.hudOn = CFG.hudOn ? 0 : 1; applyToggles({ skipVoice: true }); }
+  else if (k === 'l') { CFG.voiceOn = voiceOn ? 0 : 1; toggleVoice(); syncToggleUI(); }
+  else if (k === 'i') savePhoto();
+  else if (k === 'c') togglePanel(cfgPanel);
+  else if (k === 'h' || k === '?') togglePanel(helpPanel);
+});
+
+applyToggles({ skipVoice: true });   // restored toggles take effect (voice needs a gesture)
+autoResume();                        // last: every binding it touches is initialized by now
+</script>
+</body>
+</html>

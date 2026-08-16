@@ -1,0 +1,52 @@
+name: Element request
+description: Ask for something new in the art (a sky event, a face behavior, a dial, a palette)
+title: "[element] "
+labels: ["enhancement", "needs-artist-approval"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Anyone can file this, including the AI chat on the site. Filing is free.
+
+        **Nothing gets built until Pedram Amini comments and adds the `approved`
+        label.** He is the artist and accepts or declines every recommendation.
+
+        Before filing, skim [ART_DIRECTION.md](../../blob/main/ART_DIRECTION.md).
+        The piece is Día de los Muertos + deep space. Requests that retheme it,
+        change the music genre, or redraw the core art will be closed.
+  - type: textarea
+    id: what
+    attributes:
+      label: What do you want to see?
+      description: Describe it as a viewer, not as code.
+      placeholder: A slow comet that leaves marigold petals in its wake instead of ice.
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What kind of thing is it?
+      options:
+        - New sky event (space)
+        - New behavior on the center skull
+        - New palette
+        - New tunable dial
+        - New interaction (click / key / voice)
+        - Performance or accessibility
+        - Bug
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: fit
+    attributes:
+      label: How does it fit the two themes?
+      description: One line. Día de los Muertos, deep space, or both.
+    validations:
+      required: true
+  - type: input
+    id: cap
+    attributes:
+      label: Suggested population cap
+      description: If it spawns, how many on screen at once is too many? Every element needs a ceiling.
+      placeholder: "3"
