@@ -165,6 +165,10 @@
      (only where a real pointer exists; touch devices keep defaults) */
   @media (pointer: fine) { body { cursor: none; } }
   .ctl, .panel, .panel * , #gate { cursor: pointer; }
+  /* kiosk / screensaver: no pointer exists, so no chrome and no cursor */
+  body.kiosk, body.kiosk * { cursor: none !important; }
+  body.kiosk .ctl, body.kiosk #tools, body.kiosk #chatDock,
+  body.kiosk #voiceMenu, body.kiosk .panel { display: none !important; }
   .panel, .panel * { cursor: auto; }
   .panel input[type=range], .panel button, #gate { cursor: pointer; }
 
@@ -4342,8 +4346,11 @@ async function checkVersion() {
     if (v.build && BUILD_ID !== '__BUILD_' + 'ID__' && v.build !== BUILD_ID) {
       updatePending = true;
       stashResume();
-      /* let the current bar finish, then take the new build */
-      setTimeout(() => location.replace(location.pathname + '?v=' + v.build), 1500);
+      /* let the current bar finish, then take the new build. Keep the query
+         string: dropping it would strand ?kiosk=1 displays at the gate. */
+      const u = new URL(location.href);
+      u.searchParams.set('v', v.build);
+      setTimeout(() => location.replace(u), 1500);
     }
   } catch (_) {}                                    // offline: try again later
 }
@@ -4372,6 +4379,19 @@ function enterGate() {
   return true;
 }
 gate.addEventListener('click', enterGate);
+
+/* ── kiosk / screensaver mode ──
+   ?kiosk=1: the native screensaver shells (screensaver/ in the repo) load
+   this URL. No keyboard or pointer exists there, so walk through the gate
+   automatically. Silent unless &sound=1: the host webview permits autoplay,
+   but a screensaver with a voice is a prank, not a default. */
+(function () {
+  const q = new URLSearchParams(location.search);
+  if (!q.has('kiosk')) return;
+  document.body.classList.add('kiosk');
+  if (q.has('sound')) enterGate();
+  else { gate.classList.add('gone'); gateGone = true; }   // never touch audio
+})();
 
 /* came back from an auto-update: skip the gate, pick the track back up.
    Called at the END of the script: it touches gritoIdx and other bindings

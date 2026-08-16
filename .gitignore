@@ -53,3 +53,8 @@ __pycache__/
 interceptor-screenshot-*
 state/
 drain.log
+
+# screensaver build output and fetched vendor headers
+screensaver/macos/build/
+screensaver/windows/build/
+screensaver/windows/vendor/

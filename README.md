@@ -178,6 +178,34 @@ the art chatters its own teeth or stares at you on its own schedule it stays
 silent, so the audio always means "you did that". Level lives on the
 `gesture sfx volume` dial, and muting the music mutes these too.
 
+### Take It as a Screensaver
+
+Native screensavers for both platforms live in
+[`screensaver/`](screensaver/). Each is a thin webview shell pointed at
+`hermanosamini.com/?kiosk=1`, a mode where the page walks through its own
+enter gate, hides every control, and hides the cursor. Silent by design; the
+art keeps evolving because a screensaver runs the live site, not a copy.
+
+**macOS** (`SKLZ.saver`, signed): download from
+[Releases](https://github.com/pedramamini/HermanosAmini/releases), unzip,
+double-click, and System Settings offers to install it. Or build it yourself:
+
+```bash
+cd screensaver/macos && ./build.sh    # needs Xcode command line tools
+```
+
+**Windows** (`SKLZ.scr`): download from Releases, right-click the `.scr`,
+choose **Install**. Needs the WebView2 runtime, which Windows 11 and updated
+Windows 10 already have. Unsigned, so SmartScreen will ask once. Or
+cross-compile from a Mac:
+
+```bash
+brew install mingw-w64
+cd screensaver/windows && ./build.sh
+```
+
+Any key or a real mouse move exits, as a screensaver should.
+
 ## How It's Built
 
 One `index.html`, ~5,000 lines, zero dependencies, no build step. That is a
