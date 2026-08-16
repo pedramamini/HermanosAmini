@@ -1054,6 +1054,7 @@ const CFG_SCHEMA = {
   sfxVolume:      [0.55,  0,     1,    0.05,  'gesture sfx volume'],
   /* ── color ── */
   palette:        [0,     0,     7,    1,     'palette (0-7)'],
+  bgMode:         [0,     0,     4,    1,     'background (0 smoke 1 galaxy 2 aurora 3 candle 4 void)'],
   hueShift:       [0,   -180,  180,    5,     'ornament hue shift'],
   satMul:         [1.0,   0,     2,    0.05,  'ornament saturation'],
   boneHue:        [0,   -180,  180,    5,     'bone hue'],
@@ -1438,6 +1439,7 @@ uniform float u_nhue;
 uniform float u_nsat;
 uniform float u_nbright;
 uniform float u_vig;
+uniform float u_mode;
 
 float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float noise(vec2 p){
@@ -1491,14 +1493,60 @@ void main(){
   vec3 pink    = vec3(.88, .34, .68);
   vec3 tealC   = vec3(.18, .78, .72);
 
+  /* Five backgrounds share the warped-fbm field (q, r, f) so the cursor stir
+     and the beat keep working in every one; each mode just reads that field
+     differently. 0 smoke, 1 galaxy, 2 aurora veil, 3 candlelight, 4 the void. */
   vec3 col = deep;
-  col = mix(col, violet, clamp(f * f * 2.4, 0., 1.));
-  col = mix(col, pink,   clamp(length(q) * 1.05, 0., 1.) * smoothstep(.2, .8, f) * (uv.y * .5 + .68));
-  col = mix(col, tealC,  clamp(r.y * r.y * 1.5, 0., 1.) * smoothstep(.35, .85, f) * (1. - (uv.y * .5 + .5) * .55) * .9);
+  float starGain = 1.;
 
-  col *= .7 + .95 * f;
+  if (u_mode < .5) {                              /* 0: marbled smoke (original) */
+    col = mix(col, violet, clamp(f * f * 2.4, 0., 1.));
+    col = mix(col, pink,   clamp(length(q) * 1.05, 0., 1.) * smoothstep(.2, .8, f) * (uv.y * .5 + .68));
+    col = mix(col, tealC,  clamp(r.y * r.y * 1.5, 0., 1.) * smoothstep(.35, .85, f) * (1. - (uv.y * .5 + .5) * .55) * .9);
+    col *= .7 + .95 * f;
+
+  } else if (u_mode < 1.5) {                      /* 1: spiral galaxy */
+    float rad = length(uv) + 1e-4;
+    float ang = atan(uv.y, uv.x);
+    /* two arms: brightness follows a log spiral, smeared by the fbm field */
+    float arm = pow(cos(2. * ang - 5.2 * log(rad) + t * 6.) * .5 + .5, 1.6);
+    float disk = exp(-rad * 1.6);
+    float dust = fbm(vec2(rad * 5. - t * 2., ang * 3.) + q);
+    col = deep * .6;
+    col += vec3(.42, .20, .72) * arm * disk * (0.7 + dust) * 1.6;
+    col += vec3(1.0, .62, .28) * exp(-rad * 4.2) * (1.5 + .5 * dust);   /* amber core */
+    col += pink * arm * arm * disk * dust * 1.1;
+    col += tealC * (1. - arm) * disk * .7 * fbm(uv * 4. - t);
+    starGain = 1.6;
+
+  } else if (u_mode < 2.5) {                      /* 2: aurora veil */
+    float curt = fbm(vec2(uv.x * 1.6 + q.x, uv.y * 5. - t * 2.5));
+    float band = smoothstep(.2, .8, sin(uv.x * 2.6 + curt * 4. + t * 3.) * .5 + .5);
+    float hi = uv.y * .5 + .5;
+    col = deep * .8;
+    col += vec3(.12, .95, .55) * band * curt * (0.5 + hi) * 2.1;
+    col += vec3(.72, .22, .95) * band * (1. - curt) * hi * 1.5;
+    col += tealC * curt * curt * (1. - hi) * .6;
+    starGain = 1.3;
+
+  } else if (u_mode < 3.5) {                      /* 3: candlelight (ofrenda) */
+    float ground = clamp(1. - (uv.y * .55 + .42), 0., 1.);    /* warm reaches mid-frame */
+    float rise = fbm(uv * 2.6 + vec2(q.x, -t * 5.));
+    float flicker = .88 + .12 * sin(u_time * 9. + rise * 20.);
+    col = vec3(.07, .02, .015);
+    col += vec3(1.0, .48, .12) * ground * rise * flicker * 2.0;
+    col += vec3(.92, .24, .38) * smoothstep(.35, .9, rise) * ground * .9;
+    col += vec3(.30, .11, .34) * (1. - ground) * f * 1.2;      /* cool night above */
+    starGain = .6;
+
+  } else {                                        /* 4: the void */
+    col = deep * .45;
+    col += violet * f * f * .22;                  /* the faintest breath of dust */
+    starGain = 2.3;
+  }
+
   col *= 1. + u_bass * .4;                        /* breathe with the low end */
-  col += stars(uv + vec2(0., t * .15), u_time) * (1. - smoothstep(.3, .75, f));
+  col += stars(uv + vec2(0., t * .15), u_time) * starGain * (1. - smoothstep(.3, .75, f));
   col *= 1. - u_vig * dot(uv, uv);               /* vignette */
 
   /* palette controls: rotate hue, push saturation, scale brightness */
@@ -1544,6 +1592,7 @@ const uNhue = gl.getUniformLocation(prog, 'u_nhue');
 const uNsat = gl.getUniformLocation(prog, 'u_nsat');
 const uNbright = gl.getUniformLocation(prog, 'u_nbright');
 const uVig = gl.getUniformLocation(prog, 'u_vig');
+const uMode = gl.getUniformLocation(prog, 'u_mode');
 
 /* ─────────────────────────────────────────────
    CALAVERA SPRITE, procedural sugar skull
@@ -2959,6 +3008,30 @@ function drawUfos() {
    place. One named effect is cheaper for the model and better for the art:
    staggered by a few frames so it lands as a crescendo instead of a single
    muddy flash, and routed through the same spawners so every CAP still holds. */
+/* ── restyle: a whole new look in one action ──
+   "Completely change the design" was landing on fxEverything, an effects
+   blowout, because the agent had no single action that means REDESIGN. This is
+   that action: new palette, new hues, new background, coherent rather than
+   uniformly random. The background and palette are rolled together so the
+   result reads as an intentional look, not a slot machine. */
+function fxRestyle() {
+  const pal = (Math.random() * 8) | 0;
+  CFG.palette = pal;
+  CFG.bgMode = (Math.random() * 5) | 0;
+  /* hue shifts stay moderate: full-range random lands on bile green more
+     often than anyone wants */
+  CFG.hueShift  = ((Math.random() * 2 - 1) * 120) | 0;
+  CFG.nebulaHue = ((Math.random() * 2 - 1) * 120) | 0;
+  CFG.boneHue   = ((Math.random() * 2 - 1) * 60)  | 0;
+  CFG.satMul    = +(0.8 + Math.random() * 0.6).toFixed(2);
+  CFG.nebulaSat = +(0.8 + Math.random() * 0.6).toFixed(2);
+  CFG.socketGlow= +(0.6 + Math.random() * 1.4).toFixed(2);
+  applyPalette();
+  schedulePaletteRebuild();
+  syncSlidersSafe();
+  return true;
+}
+
 function fxEverything() {
   const burst = [
     () => grito(), fxComet, fxUfo, fxAurora, fxSupernova, fxMeteorShower,
@@ -3012,6 +3085,7 @@ function savePhoto() {
   gl.uniform1f(uNsat, CFG.nebulaSat);
   gl.uniform1f(uNbright, CFG.bgBright);
   gl.uniform1f(uVig, CFG.vignette);
+  gl.uniform1f(uMode, CFG.bgMode);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   x.filter = nebCanvas.style.filter || 'none';
   x.drawImage(nebCanvas, 0, 0, c.width, c.height);
@@ -3073,6 +3147,7 @@ const VOICE_MAP = [
   [['petal', 'petals', 'flores', 'flowers'],      fxPetalBurst],
   [['alebrije', 'dragon'],                        fxAlebrije],
   [['rainbow', 'arcoiris'],                       () => { rainbowEyeUntil = t + 5; }],
+  [['restyle', 'remix', 'makeover', 'new look'],   fxRestyle],
   [['everything', 'todo', 'fiesta', 'all at once'], fxEverything],
   [['battle', 'war', 'batalla', 'guerra'],        fxGalacticBattle],
   [['swarm', 'flood', 'horde', 'enjambre'],       () => spawnSkull(8)],
@@ -3232,6 +3307,7 @@ const CHAT_FX = {
   swarm: () => spawnSkull(8),
   battle: fxGalacticBattle,
   everything: fxEverything,
+  restyle: fxRestyle,
   rainbow: () => { rainbowEyeUntil = t + 5; },
   teeth:   () => { face.chatterUntil = t + 1.6; },
   stare:   () => { stare.until = t + 3.2; },
@@ -4112,6 +4188,7 @@ function frame(now) {
   gl.uniform1f(uNsat, CFG.nebulaSat);
   gl.uniform1f(uNbright, CFG.bgBright);
   gl.uniform1f(uVig, CFG.vignette);
+  gl.uniform1f(uMode, CFG.bgMode);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 

@@ -99,6 +99,22 @@ They close on each other, open fire, juke incoming lasers, and take two or three
 hits to go down. It runs about half a minute and the last fleet standing cruises
 off. `Shift`+`Q` calls it off early.
 
+### Five Backgrounds
+
+The deep-space layer has five looks, on the `background` dial or by asking the
+chat: **smoke** (the original marbled nebula), **galaxy** (a slow spiral with an
+amber core), **aurora veil** (green and violet curtains), **candlelight** (the
+warm flicker of an ofrenda after dark), and **the void** (near-black, thick
+with stars). All five share the same flow field, so the cursor still stirs them
+and they still breathe with the bass.
+
+### Ask It to Redesign Itself
+
+Tell the chat "change up the design" or say "restyle" out loud and it rolls a
+new coherent look: palette, hues, background, and glow together. Design asks
+change what the piece looks like; effect asks make things happen in it. The
+agent knows the difference.
+
 ### Everything at Once
 
 Ask the chat for "everything" (or say "fiesta") and the piece fires the whole
