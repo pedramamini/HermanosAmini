@@ -128,6 +128,10 @@
     transition: border-color .3s;
   }
   .ctl:hover { border-color: rgba(245,234,223,.7); }
+  /* off state: dim and desaturated, so silence is legible at a glance and not
+     only in a tooltip nobody hovers on a wall display */
+  #mute.off { color: rgba(245,234,223,.42); border-color: rgba(245,234,223,.14); }
+  #mute.off:hover { color: #f5eadf; border-color: rgba(245,234,223,.55); }
   /* the hammer tray is a mobile affordance; desktop shows all four buttons */
   #tools { display: none; }
   #mute { right: 24px; }
@@ -4267,8 +4271,7 @@ function applyToggles(opts) {
   /* music */
   muted = !CFG.musicOn;
   music.volume = muted ? 0 : CFG.musicVolume;
-  muteBtn.innerHTML = muted ? '&#215;' : '&#9835;';
-  muteBtn.title = muted ? 'unmute' : 'mute';
+  syncMuteIcon();
   /* fps monitor */
   document.getElementById('hud').classList.toggle('show', !!CFG.hudOn);
   /* voice: only act on a real change, starting recognition is expensive */
@@ -4281,10 +4284,50 @@ function syncToggleUI() {
   });
 }
 
+/* The icon used to be written in exactly one place, inside applyToggles, and it
+   only ever read `muted`. Five separate paths change whether sound is actually
+   coming out: the mute button, the M key, Space, autoplay being refused at the
+   gate, and autoResume() restoring a paused track. Four of those never touched
+   the icon, so the bar could show a cheerful note over dead silence.
+
+   The fix is not another assignment at each of those sites, which is the same
+   bug waiting to happen the next time someone adds a path. Derive the icon from
+   the real state, and subscribe to the audio element's own play/pause events so
+   ANY path updates it, including ones nobody remembered to wire. */
+function musicAudible() { return !muted && !music.paused; }
+let muteIconState = null;
+function syncMuteIcon() {
+  const on = musicAudible();
+  const key = on ? 'on' : muted ? 'muted' : 'paused';
+  /* idempotent on purpose: startMusic() ramps the volume over 4s, which fires
+     volumechange every frame, and rewriting innerHTML 240 times would be both
+     wasteful and a flicker risk */
+  if (key === muteIconState) return;
+  muteIconState = key;
+  muteBtn.innerHTML = on ? '&#9835;' : '&#215;';
+  muteBtn.title = on ? 'mute' : muted ? 'unmute' : 'play the music';
+  muteBtn.classList.toggle('off', !on);
+}
+music.addEventListener('play', syncMuteIcon);
+music.addEventListener('pause', syncMuteIcon);
+music.addEventListener('volumechange', syncMuteIcon);
+
 muteBtn.addEventListener('click', toggleMute);
 function toggleMute() {
+  /* If the track is paused, "unmute" would light the icon while producing no
+     sound, so the button would read as broken. Whatever silenced it, this
+     button's job is to bring it back. */
+  if (!muted && music.paused) {
+    userPaused = false;
+    music.play().catch(() => {});
+    syncMuteIcon();
+    return;
+  }
   CFG.musicOn = muted ? 1 : 0;          // flip, then let applyToggles do the work
   applyToggles({ skipVoice: true });
+  /* unmuting a track that was also paused should actually make noise */
+  if (!muted && music.paused) { userPaused = false; music.play().catch(() => {}); }
+  syncMuteIcon();
 }
 function toggleText() {
   CFG.textOn = CFG.textOn ? 0 : 1;
@@ -4800,8 +4843,9 @@ addEventListener('keydown', e => {
   if (k === 'enter') { e.preventDefault(); randomEffect(); return; }
   if (k === ' ') {
     e.preventDefault();
-    if (music.paused) { userPaused = false; music.play(); }
+    if (music.paused) { userPaused = false; music.play().catch(() => {}); }
     else { userPaused = true; music.pause(); }
+    syncMuteIcon();          // belt and braces: the media events also fire
   }
   else if (k === 'g') grito();
   else if (k === 'm') toggleMute();
