@@ -102,6 +102,11 @@
     color: rgba(245,234,223,.65); font-size: clamp(11px, 1.2vw, 15px);
     letter-spacing: .45em; text-indent: .45em; text-transform: uppercase;
   }
+  /* quieter than the call to action above it: an affordance, not a headline */
+  #gate p.gatehint {
+    margin-top: 10px; font-size: clamp(9px, .8vw, 11px);
+    letter-spacing: .3em; text-indent: .3em; color: rgba(245,234,223,.34);
+  }
   #gate .ring {
     width: 74px; height: 74px; border-radius: 50%;
     border: 1px solid rgba(245,234,223,.35);
@@ -901,6 +906,7 @@
   <h1>SKLZ</h1>
   <div class="ring"></div>
   <p>enter the other side</p>
+  <p class="gatehint">click or press any key</p>
   <p class="tagline">una obra psicod&eacute;lica de los hermanos amini</p>
 </div>
 
@@ -3644,10 +3650,15 @@ function startMusic() {
   })();
   if (!musicStarted) { musicStarted = true; loadGritos(); }
 }
-gate.addEventListener('click', () => {
+/* One way in, whether it was a click or a keypress. Idempotent: the keydown
+   path and the click path can both fire on the same interaction. */
+function enterGate() {
+  if (gate.classList.contains('gone')) return false;
   startMusic();
   gate.classList.add('gone');
-}, { once: true });
+  return true;
+}
+gate.addEventListener('click', enterGate);
 
 /* came back from an auto-update: skip the gate, pick the track back up.
    Called at the END of the script: it touches gritoIdx and other bindings
@@ -4171,6 +4182,20 @@ addEventListener('keydown', e => {
     return;
   }
   if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+  /* While the gate is up, the only thing a key can do is open it. Previously
+     this started the music but left the gate on screen and let the key fall
+     through, so pressing Enter fired a random event and Space paused the track
+     you had just started, all behind a curtain that never lifted.
+     Tab is exempt so keyboard focus navigation still works. */
+  if (!gate.classList.contains('gone')) {
+    if (e.key === 'Tab' || e.key === 'Shift' || e.key === 'Control' ||
+        e.key === 'Alt' || e.key === 'Meta') return;
+    e.preventDefault();
+    enterGate();
+    return;
+  }
+
   if (!musicStarted && music.paused) startMusic();
   const k = e.key.toLowerCase();
   if (k === 'escape') {
