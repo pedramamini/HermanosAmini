@@ -8,16 +8,16 @@
 <meta name="description" content="Una obra psicod&eacute;lica de los Hermanos Amini. An infinite Dia de los Muertos altar: endless skull tunnel, a living third eye, nebula smoke, three hours of Latin downtempo.">
 <meta property="og:title" content="SKLZ &middot; Ritmos de los Muertos">
 <meta property="og:description" content="Una obra psicod&eacute;lica de los Hermanos Amini. An infinite Dia de los Muertos altar: endless skull tunnel, a living third eye, nebula smoke, three hours of Latin downtempo.">
-<meta property="og:image" content="https://pedramamini.com/dropbox/sklz/og.jpg">
+<meta property="og:image" content="https://hermanosamini.com/og.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:url" content="https://pedramamini.com/dropbox/sklz/">
+<meta property="og:url" content="https://hermanosamini.com/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="SKLZ">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="SKLZ &middot; Ritmos de los Muertos">
 <meta name="twitter:description" content="Una obra psicod&eacute;lica de los Hermanos Amini.">
-<meta name="twitter:image" content="https://pedramamini.com/dropbox/sklz/og.jpg">
+<meta name="twitter:image" content="https://hermanosamini.com/og.jpg">
 <meta name="theme-color" content="#160724">
 <meta name="author" content="The Amini Brothers">
 <meta name="artist" content="Una obra psicod&eacute;lica de los Hermanos Amini">
@@ -986,12 +986,66 @@
 'use strict';
 /* ═══════════════════════════════════════════════════════════════════
    SKLZ · Ritmos de los Muertos
-   Four stacked layers, back to front:
-     1. #nebula, WebGL domain-warped fbm clouds + starfield (half-res)
-     2. #tunnel, infinite exponential zoom of pre-rendered calaveras
-     3. #hero, large center skull, god rays, glowing sockets, third eye
-     4. #dust, parallax ember/petal particles
-   Audio drives bass energy into every layer.
+   una obra psicodélica de los Hermanos Amini · hermanosamini.com
+
+   ONE FILE ON PURPOSE. No build, no framework, no dependencies. Open it
+   from file:// and it runs (silently, unless you supply the audio).
+
+   THE LAYER STACK, back to front, each its own <canvas>:
+     1. #nebula  WebGL domain-warped fbm smoke + starfield, half-res.
+                 Five looks behind u_mode: smoke / galaxy / aurora /
+                 candlelight / void. All read the same flow field, so the
+                 cursor stir and bass breathing work in every one.
+     2. #tunnel  infinite exponential zoom of pre-baked calavera sprites.
+                 Also hosts anything spawned "behind" the hero: the spark
+                 loop retargets `dctx` per object (depth is a property of
+                 the OBJECT, not the drawing code).
+     3. #hero    the living face: tracked eyes, counter-rotating rings,
+                 heart nostril, chattering teeth, god rays, third eye.
+     4. #dust    foreground particles + every effect spawned "in front".
+
+   A READER'S MAP, in file order (grep the ALL-CAPS titles):
+     AUDIO            <audio> + analyser; flux-based beat detection on its
+                      own 60Hz timer (never the render loop: the page can
+                      idle at 15fps on a 5K display); BPM -> tempoMul.
+     LAYER 1 NEBULA   the shader, u_mode looks, palette uniforms.
+     CALAVERA SPRITE  procedural sugar-skull painter + baked VARIANTS.
+     LIVING FACE      gaze, rings, spirals, gesture hit-testing (faceHit).
+     LAYER 2 TUNNEL   golden-spiral skull field + swarm + flick physics.
+     LAYER 3 HERO     god rays, sockets, third eye, mouth/grito.
+     LAYER 4 DUST     spark loop (per-object depth), motes, cursor candle.
+     RANDOM EVENTS    every spawnable effect. Each declares a cap in CAPS;
+                      hitting a cap is a silent no-op, never a queue.
+     UFOs             three kinds, dogfights; art baked as 8-frame
+                      flipbooks (per-path Canvas2D was 35ms/frame at 48
+                      ships; one drawImage each is 1.7ms).
+     GESTURE SFX      synthesized Web Audio percussion (never sampled,
+                      never shipped); fires ONLY from user gestures.
+     VOICE + CHAT     keyword commands and an agentic chat (Workers AI).
+                      The model only PROPOSES {say, actions[]}; the page
+                      validates every action against CFG_SCHEMA. That is
+                      the enforcement boundary.
+     LIQUID LOGO      the rainbow SKLZ fill/drain.
+     RESIZE + LOOP    frame order tunnel -> hero -> dust (the depth trick
+                      depends on this order; see LAYER 2 note).
+     GATE + AUDIO     enter gate (any key), mute (icon derives from real
+                      audio state, driven by the element's own events).
+     GRITOS           13 yells, sequential preload, shuffled bag.
+     PANELS           help (alphabetized at render time), config (55+
+                      dials from CFG_SCHEMA), gallery, request box.
+     KEYBOARD         one handler; typing in inputs never fires art keys.
+     SENSOR BRIDGE    auto-connects ws://localhost:8181 so a Kinect (or
+                      any tracker) drives the art with zero page setup.
+     window.SKLZ      the public control API for rigs and consoles.
+
+   INVARIANTS THAT PROTECT YOU (each learned the hard way):
+     - CFG_SCHEMA is the single source of truth for every tunable. The
+       Worker's LIMITS must stay in lockstep or saved presets silently
+       lose keys.
+     - Every spawnable declares a population cap in CAPS. No exceptions.
+     - autoResume() stays the LAST statement in this script (temporal
+       dead zone otherwise, and it only bites on a live auto-update).
+     - Audio is never committed to the repo. See ART_DIRECTION.md.
    ═══════════════════════════════════════════════════════════════════ */
 
 /* ── performance: a 5-level quality ladder + FPS governor ──
@@ -4713,6 +4767,7 @@ const HELP_ROWS = [
   [['Y'], 'mean mug (the stare)', '"mirada"', 'y'],
   [['I'], 'save a photo', '', 'i'],
   [['Z'], 'zen mode (hide all text)', '', 'z'],
+  [['O'], 'surprise me with a new look', '"restyle"', 'o'],
   [['Q'], 'galactic battle (3 fleets)', '"battle"', 'q'],
   [['J'], 'spawn more skulls (hold to flood)', '"skulls"', 'j'],
   [['\u21e7J'], 'clear the skull flood', '', ''],
@@ -4998,6 +5053,7 @@ addEventListener('keydown', e => {
   else if (k === 'z') toggleText();
   else if (k === 'd') { CFG.hudOn = CFG.hudOn ? 0 : 1; applyToggles({ skipVoice: true }); }
   else if (k === 'l') { CFG.voiceOn = voiceOn ? 0 : 1; toggleVoice(); syncToggleUI(); }
+  else if (k === 'o') document.getElementById('cfgRestyle').click();  // same as the dice
   else if (k === 'i') savePhoto();
   else if (k === 'c') togglePanel(cfgPanel);
   else if (k === 'h' || k === '?') togglePanel(helpPanel);

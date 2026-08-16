@@ -69,14 +69,23 @@ It runs silently without audio, see [Audio](#audio) below.
 
 | Key | | | Key | |
 |---|---|---|---|---|
-| `?` | all controls | | `C` | settings + presets |
-| `G` | grito | | `Z` | zen mode (hide text) |
-| `U` | UFO (2+ dogfight) | | `Y` | mean mug |
-| `B` | alebrije spirit | | `I` | save a photo |
-| `L` | keyword voice | | `D` | fps / quality monitor |
-| `Enter` | surprise me | | `Esc` | back out of panels |
-| `J` | flood with skulls | | `Shift`+`J` | clear the flood |
-| `Q` | galactic battle | | `Shift`+`Q` | clear the sky |
+| `A` | aurora | | `P` | petal burst |
+| `B` | alebrije spirit | | `Q` | galactic battle |
+| `C` | settings + presets | | `R` | spin the eye rings |
+| `D` | fps / quality monitor | | `S` | shooting star |
+| `E` | rainbow third eye | | `T` | teeth chatter |
+| `F` | flick a random skull | | `U` | UFO (2+ dogfight) |
+| `G` | grito | | `V` | supernova |
+| `I` | save a photo | | `W` | whirl the cheek spirals |
+| `J` | flood with skulls | | `X` | meteor shower |
+| `K` | comet | | `Y` | mean mug |
+| `L` | keyword voice | | `Z` | zen mode (hide text) |
+| `M` | mute | | `Enter` | surprise me |
+| `N` | nose heart burst | | `Space` | play / pause |
+| `O` | roll a whole new look | | `Esc` | close the open panel |
+| `Shift`+`J` | clear the flood | | `Shift`+`Q` | clear the sky |
+
+The full list lives on `?` in the piece itself, alphabetized.
 
 Click the art: the eyes follow you, face parts react, skulls flick away.
 Click the microphone to pick how you talk to it:
@@ -146,9 +155,34 @@ the art chatters its own teeth or stares at you on its own schedule it stays
 silent, so the audio always means "you did that". Level lives on the
 `gesture sfx volume` dial, and muting the music mutes these too.
 
-Under the hood: WebGL nebula, four stacked canvases, beat detection driving a
-BPM-locked tempo, and a five-tier quality ladder that sheds detail until the
-piece runs on a phone or an old TV browser.
+## How It's Built
+
+One `index.html`, ~5,000 lines, zero dependencies, no build step. That is a
+deliberate constraint, not a dare. A reader's map of the source lives in the
+header comment at the top of the `<script>`; the short version:
+
+- **Four stacked canvases**: a WebGL nebula (domain-warped fbm, five looks
+  behind one uniform), the infinite skull tunnel, the living face, and a
+  foreground particle layer. Spawned effects pick a random depth: the spark
+  loop retargets its drawing context per object, which is how one boolean put
+  everything either in front of or behind the hero skull without touching ~250
+  draw calls.
+- **Beat detection on flux**, the rate bass rises, not level vs a running mean
+  (level-based dies on compressed masters). It samples on its own 60Hz timer
+  because the render loop can idle at 15fps on a 5K display.
+- **Sprites and flipbooks over per-frame paths**: skulls are baked variants,
+  saucers are 8-frame flipbooks. The difference is 35ms vs 1.7ms per frame at
+  full battle scale.
+- **A 5-tier quality ladder** with an FPS governor that walks down under 32fps
+  and back up with headroom, so the same file runs on a 5K studio display and
+  an old TV browser.
+- **The agentic chat runs on Workers AI** with no key in the client. The model
+  only proposes `{say, actions[]}`; the page validates every action against
+  its own schema. A jailbroken reply cannot reach past knobs that exist.
+- **Every spawnable has a population cap.** Six trigger sources firing at once
+  saturates; it never melts down.
+- **All percussion is synthesized** in Web Audio at runtime. The repo ships
+  zero bytes of audio and never will.
 
 ## Audio
 
@@ -162,7 +196,7 @@ at the paths in `index.html`.
 
 Read [ART_DIRECTION.md](ART_DIRECTION.md) first. It's short and it's the whole
 deal. Then open an issue describing what you want to see, as a viewer, not as
-code. If it fits the piece and Pedram approves it, it gets built.
+code. If it fits the piece and one of the brothers approves it, it gets built.
 
 ## Releases
 
