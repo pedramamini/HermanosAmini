@@ -4524,6 +4524,8 @@ const HELP_ROWS = [
   [['Z'], 'zen mode (hide all text)', '', 'z'],
   [['Q'], 'galactic battle (3 fleets)', '"battle"', 'q'],
   [['J'], 'spawn more skulls (hold to flood)', '"skulls"', 'j'],
+  [['\u21e7J'], 'clear the skull flood', '', ''],
+  [['\u21e7Q'], 'clear the sky', '', ''],
   [['L'], 'keyword voice on / off', '', 'l'],
   [['🎤'], 'pick keyword or agentic chat', '', ''],
   [['D'], 'fps / quality monitor', '', 'd'],
@@ -4532,7 +4534,25 @@ const HELP_ROWS = [
 ];
 (function buildHelp() {
   const tb = document.querySelector('#helpTable tbody');
-  for (const [keys, action, voice, evKey] of HELP_ROWS) {
+  /* Alphabetical by key, so the table is a lookup rather than a tour. Sorting
+     here instead of hand-ordering the literal means a row appended to
+     HELP_ROWS lands in the right place on its own.
+     Plain letters first A-Z; a shifted variant sorts next to its own letter
+     (J then Shift-J); everything that is not a letter goes to the bottom in a
+     stated order, since "where does Space go" has no alphabetical answer. */
+  const TAIL = ['Enter', 'Space', '\u2191', '?', '\u{1F3A4}'];
+  const sortKey = ([keys]) => {
+    const k = keys[0];
+    const bare = k.replace('\u21e7', '');
+    if (/^[A-Za-z]$/.test(bare)) {
+      /* 'J' -> 'J0', 'Shift-J' -> 'J1': same letter, shifted one second */
+      return '0' + bare.toUpperCase() + (k.includes('\u21e7') ? '1' : '0');
+    }
+    const i = TAIL.indexOf(k);
+    return '1' + String(i < 0 ? TAIL.length : i).padStart(2, '0');
+  };
+  const rows = [...HELP_ROWS].sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
+  for (const [keys, action, voice, evKey] of rows) {
     const tr = document.createElement('tr');
     const tdK = document.createElement('td');
     keys.forEach((kLabel, idx) => {
