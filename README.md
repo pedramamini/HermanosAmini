@@ -95,7 +95,7 @@ It runs silently without audio, see [Audio](#audio) below.
 | `←` `→` | skull size | | `↑` `↓` | music volume |
 | `Shift`+`J` | clear the flood | | `Shift`+`Q` | clear the sky |
 | `!` | fiesta: new look + everything + grito | | | |
-| `Shift`+`I` | record a clip (20s max, silent) | | | |
+| `Shift`+`I` | record a clip (20s max, with sound) | | | |
 
 The full list lives on `?` in the piece itself, alphabetized.
 
@@ -212,8 +212,9 @@ appear in the recording. Both are composited by hand from the four canvas
 layers, with the wordmark, signature, and QR drawn in, so a capture looks like
 the piece rather than like a screenshot of a browser.
 
-Clips are silent on purpose. The mix is J. Pool's and the gritos are sourced
-clips: the art travels, the soundtrack does not.
+Clips carry the sound: the music, the gritos, and the gesture percussion, all
+tapped from the same master bus you are listening to. Mute the piece and the
+clip records silent, so the file always matches what you heard.
 
 ### Take It as a Screensaver
 
