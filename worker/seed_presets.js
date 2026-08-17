@@ -41,13 +41,15 @@ const PRESETS = [
          eventMinGap: 5, eventMaxGap: 14 },
   },
   {
-    name: 'Deep Space Cathedral',
-    // Vast and still: giant skull, near-empty tunnel, cold bone, rare events.
-    o: { palette: 2, bgMode: 4, skullSize: 1.7, skullOnTop: 1,
-         skullBreathe: 1, breatheRate: 3, tunnelCount: 14, tunnelSpeed: 0.008,
-         starDensity: 2.5, dustCount: 0.3, boneHue: -170, boneSat: 0.5,
-         socketGlow: 2.0, auraSize: 2.2, vignette: 0.9, tempoMax: 1.2,
-         eventMinGap: 20, eventMaxGap: 60, wanderPace: 0.5, ringSpeed: 0.05 },
+    name: 'Hielo Eterno',
+    // The one long corridor: full tunnel at a crawl, small skull far down it,
+    // cold bone under an aurora. Nothing else here is a deep hallway.
+    o: { palette: 2, bgMode: 2, skullSize: 0.95, tunnelCount: 56,
+         tunnelSpeed: 0.016, tunnelBreath: 0.14, boneHue: -150, boneSat: 1.3,
+         nebulaSat: 1.4, bgBright: 1.15, starDensity: 2.2, dustCount: 1.4,
+         ringSpeed: 0.42, spiralSpeed: 0.3, petalCount: 18, rayLength: 1.8,
+         socketGlow: 1.9, auraSize: 1.4, vignette: 0.5, gazeRange: 1.6,
+         eventMinGap: 9, eventMaxGap: 22 },
   },
   {
     name: 'Ember Ritual',
@@ -130,6 +132,14 @@ const PRESETS = [
  * win over anything an entry above sets. */
 const PINNED = { voiceOn: 0, musicOn: 1, hudOn: 0, perfMode: 0 };
 
+/* Measured on the live page: the calavera's chin crosses the top of the SKLZ
+ * wordmark at skullSize ~1.35 (chin y=1022px vs wordmark top y=1032px at
+ * 1.30, and 1052 vs 1032 at 1.40). Past that the art collides with the type,
+ * so those presets ship in zen mode. Automatic rather than per-entry: raise
+ * a skull past the line later and it hides the text without anyone
+ * remembering this rule. */
+const ZEN_ABOVE_SKULL_SIZE = 1.35;
+
 let bad = 0;
 const rows = PRESETS.map(p => {
   const cfg = {};
@@ -142,6 +152,7 @@ const rows = PRESETS.map(p => {
     cfg[k] = v;
   }
   Object.assign(cfg, PINNED);
+  if (cfg.skullSize >= ZEN_ABOVE_SKULL_SIZE) cfg.textOn = 0;   // no type under the chin
   return { name: p.name, cfg };
 });
 if (bad) { console.error(`\n${bad} problem(s); nothing emitted.`); process.exit(1); }
