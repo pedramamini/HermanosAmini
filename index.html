@@ -185,6 +185,7 @@
   .panel h2 {
     font-family: 'Anton', Impact, sans-serif; font-size: 16px;
     letter-spacing: .18em; margin-bottom: 12px; color: #ffb347;
+    padding-right: 66px;              /* clear of the back / close buttons */
   }
   .panel table { border-collapse: separate; border-spacing: 0 4px; width: 100%; }
   .panel th {
@@ -406,10 +407,36 @@
   #cfgStatus.show { opacity: 1; transform: translate(-50%, 0); }
 
   /* ── sheet chrome ──
-     Injected into every panel by JS, but invisible on desktop: `display:contents`
-     on the body wrapper makes the desktop panel lay out exactly as it did before
-     the wrapper existed. Only the mobile query below gives it a shape. */
-  .sheetbar { display: none; }
+     Injected into every panel by JS. On phones (query near the bottom) it is a
+     full title bar; on desktop it keeps only the two buttons, pinned top-right
+     like window chrome. Same markup, same handlers, so back and close behave
+     identically on both. `display:contents` on the body wrapper keeps the rest
+     of the desktop panel laid out exactly as it was before the wrapper existed. */
+  .sheetbar {
+    position: sticky; top: -4px; z-index: 4;
+    display: flex; justify-content: flex-end; gap: 8px;
+    /* pull out of the panel's padding so the buttons hug the corner, and let
+       clicks fall through the empty stretch of the row to the panel below */
+    /* negative bottom margin pulls the panel's own h2 up onto this line, so
+       the chrome costs no vertical space; the h2 reserves room on its right */
+    margin: -4px -14px -26px 0; pointer-events: none;
+  }
+  .sheetbar .grabber, .sheetbar .sheettitle { display: none; }
+  .sheetrow { display: contents; }
+  .sheetclose, .sheetback {
+    pointer-events: auto;
+    width: 26px; height: 26px; border-radius: 50%;
+    display: grid; place-items: center; padding: 0;
+    background: rgba(10,5,22,.55); border: 1px solid rgba(245,234,223,.22);
+    color: rgba(245,234,223,.75); font-size: 13px; line-height: 1;
+    cursor: pointer; backdrop-filter: blur(6px);
+    transition: transform .16s cubic-bezier(.34,1.56,.64,1), background .16s, color .16s;
+  }
+  .sheetback { font-size: 17px; }
+  .sheetclose:hover, .sheetback:hover {
+    background: rgba(145,70,255,.5); color: #fff; border-color: rgba(245,234,223,.5);
+  }
+  .sheetclose:active, .sheetback:active { transform: scale(.88); }
   .sheetbody { display: contents; }
 
   /* ═══════════════════════════════════════════════════════════════
@@ -452,7 +479,9 @@
 
     /* top bar: grabber, title, and a thumb-sized close */
     .sheetbar {
+      /* undo the desktop chrome: on a phone this is a full title bar again */
       display: block; flex: 0 0 auto;
+      position: static; margin: 0; pointer-events: auto;
       padding: 8px 14px 10px;
       padding-top: calc(8px + env(safe-area-inset-top));
       background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,0));
@@ -460,23 +489,27 @@
       touch-action: none;   /* the bar is the drag handle, never a scroller */
       user-select: none; -webkit-user-select: none;
     }
-    .grabber {
+    .sheetbar .grabber {
+      display: block;
       width: 42px; height: 4px; border-radius: 3px; margin: 0 auto 12px;
       background: rgba(245,234,223,.3);
     }
     .sheetrow { display: flex; align-items: center; gap: 10px; }
-    .sheettitle {
+    .sheetbar .sheettitle {
+      display: block;
       flex: 1; min-width: 0; margin: 0;
       font-family: 'Anton', Impact, sans-serif; font-size: 17px;
       letter-spacing: .16em; color: #ffb347; text-transform: uppercase;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .sheetclose, .sheetback {
+      /* thumb-sized again, not the 26px desktop chrome */
       flex: 0 0 auto; width: 42px; height: 42px; border-radius: 50%;
       display: grid; place-items: center; padding: 0;
       background: rgba(245,234,223,.09);
       border: 1px solid rgba(245,234,223,.22);
       color: #f5eadf; font-size: 17px; line-height: 1; cursor: pointer;
+      backdrop-filter: none;
       transition: transform .16s cubic-bezier(.34,1.56,.64,1), background .16s;
     }
     .sheetclose:active, .sheetback:active {
