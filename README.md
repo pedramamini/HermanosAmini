@@ -95,6 +95,7 @@ It runs silently without audio, see [Audio](#audio) below.
 | `←` `→` | skull size | | `↑` `↓` | music volume |
 | `Shift`+`J` | clear the flood | | `Shift`+`Q` | clear the sky |
 | `!` | fiesta: new look + everything + grito | | | |
+| `Shift`+`O` | demo mode: a new look every 60s | | | |
 | `Shift`+`I` | record a clip (20s max, with sound) | | | |
 
 The full list lives on `?` in the piece itself, alphabetized.
@@ -202,6 +203,15 @@ Sounds fire on your gestures only, whether you click or use the keyboard. When
 the art chatters its own teeth or stares at you on its own schedule it stays
 silent, so the audio always means "you did that". Level lives on the
 `gesture sfx volume` dial, and muting the music mutes these too.
+
+### Demo Mode
+
+`Shift`+`O` rolls a whole new look every sixty seconds, the same roll the dice
+button gives you, so a piece left running on a wall or a projector never settles
+on one palette. A small amber tell sits in the top left while it is on; press
+`Shift`+`O` again to stop. It is deliberately not remembered between visits: a
+page that started reskinning itself on load would read as a bug rather than a
+setting.
 
 ### Take a Photo or a Clip
 

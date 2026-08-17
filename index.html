@@ -882,6 +882,25 @@
     padding: 6px 14px 6px 10px; backdrop-filter: blur(6px);
   }
   #recdot.on { display: flex; }
+  /* demo-mode tell: without it, a piece that reskins itself every minute
+     reads as a bug rather than a setting. Top-left, out of the way, and it
+     steps below the fps monitor when that is open. Zen mode hides it. */
+  #demodot {
+    top: 18px; left: 18px; z-index: 22; display: none;
+    align-items: center; gap: 8px;
+    font-family: 'SF Mono', 'Menlo', monospace; font-size: 10px;
+    letter-spacing: .18em; text-transform: uppercase;
+    color: rgba(255,179,71,.85); background: rgba(10,5,22,.5);
+    border: 1px solid rgba(255,179,71,.3); border-radius: 999px;
+    padding: 5px 12px 5px 9px; backdrop-filter: blur(6px);
+  }
+  body.demo #demodot { display: flex; }
+  body.demo.notext #demodot { display: none; }
+  body:has(#hud.show) #demodot { top: 78px; }
+  #demodot::before {
+    content: ''; width: 7px; height: 7px; border-radius: 50%;
+    background: #ffb347; animation: recpulse 2.4s ease-in-out infinite;
+  }
   /* ── battle victory toast ──
      Top-right, slides in, drains a timer bar, slides out. pointer-events:none
      because it is an announcement, not a dialog: a wall display must never end
@@ -992,6 +1011,7 @@
 <div id="tag" class="ui">una obra psicod&eacute;lica de los hermanos amini</div>
 <div id="hud" class="ui"></div>
 <div id="recdot" class="ui">rec</div>
+<div id="demodot" class="ui">demo</div>
 
 <!-- battle victory toast. Deliberately not a modal: it must never block the
      art or need dismissing on a wall display, so a timer bar drains and it
@@ -5265,6 +5285,7 @@ const HELP_ROWS = [
   [['\u21e7I'], 'record a clip with sound (20s max)', '', '\u21e7i'],
   [['Z'], 'zen mode (hide all text)', '', 'z'],
   [['O'], 'surprise me with a new look', '"restyle"', 'o'],
+  [['\u21e7O'], 'demo mode: a new look every 60s', '', '\u21e7o'],
   [['!'], 'fiesta: new look + everything + grito', '', '!'],
   [['Q'], 'galactic battle (3 fleets)', '"battle"', 'q'],
   [['J'], 'spawn more skulls (hold to flood)', '"skulls"', 'j'],
@@ -5353,6 +5374,31 @@ function cfgStatusSay(msg) {
   clearTimeout(cfgStatusT);
   cfgStatusT = setTimeout(() => el.classList.remove('show'), 2600);
 }
+
+/* ── demo mode ──
+   A gallery/wall setting: roll a whole new look on a fixed cadence so the
+   piece never sits on one palette while nobody is touching it. Deliberately
+   the same action as the dice, not a second randomizer, so what you see on a
+   timer is exactly what O gives you by hand.
+
+   Not persisted, and pinned off in curated presets: a page that started
+   remixing itself on load because of a setting from last week would read as
+   a bug. A wall display turns it on once with the key. */
+const DEMO_EVERY_MS = 60000;
+let demoTimer = null;
+function demoTick() {
+  document.getElementById('cfgRestyle').click();   // one source of truth
+}
+function setDemo(on) {
+  clearInterval(demoTimer);
+  demoTimer = null;
+  document.body.classList.toggle('demo', !!on);
+  if (!on) { cfgStatusSay('demo mode off'); return; }
+  demoTick();                                   // start with a fresh look
+  demoTimer = setInterval(demoTick, DEMO_EVERY_MS);
+  cfgStatusSay(`demo mode on: a new look every ${DEMO_EVERY_MS / 1000}s`);
+}
+function toggleDemo() { setDemo(!demoTimer); }
 
 document.getElementById('cfgRestyle').addEventListener('click', () => {
   fxRestyle();
@@ -5582,7 +5628,10 @@ addEventListener('keydown', e => {
     else { CFG.voiceOn = voiceOn ? 0 : 1; toggleVoice(); syncToggleUI(); }
   }
   else if (k === '.') { if (!e.repeat) pttStart(); }
-  else if (k === 'o') document.getElementById('cfgRestyle').click();  // same as the dice
+  else if (k === 'o') {
+    if (e.shiftKey) toggleDemo();               // same roll, on a timer
+    else document.getElementById('cfgRestyle').click();   // same as the dice
+  }
   else if (k === '!') {
     /* fiesta: the dice and the fireworks in one hit. fxEverything already
        opens with the grito, so the yell lands with the new look. */
