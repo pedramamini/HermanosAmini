@@ -40,8 +40,8 @@ Most generative art is something you look at. This is something you **argue
 with**.
 
 1. **Look at it.** Skulls, nebula, sky events, a face that notices you.
-2. **Play with it.** 50+ live dials, 8 palettes, voice control, a gallery of
-   boards other people built. Break it however you want; nothing you do is
+2. **Play with it.** 59 live dials, 8 palettes, 5 backgrounds, voice control,
+   and a gallery of boards other people built. Break it however you want; nothing you do is
    permanent.
 3. **Ask it for something it doesn't have.** Tell it you want a comet that
    sheds marigold petals, or a skull that hums along. That request becomes a
@@ -97,6 +97,7 @@ It runs silently without audio, see [Audio](#audio) below.
 | `!` | fiesta: new look + everything + grito | | | |
 | `Shift`+`O` | demo mode: a new look every 60s | | | |
 | `Shift`+`I` | record a clip (20s max, with sound) | | | |
+| `H` or `?` | this list, in the piece | | | |
 
 The full list lives on `?` in the piece itself, alphabetized.
 

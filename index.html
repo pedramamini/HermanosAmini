@@ -3476,7 +3476,12 @@ function fxAlebrije() {
 
 /* ── photo mode: composite all layers + brand, download PNG ── */
 const qrImg = new Image();
-qrImg.src = 'qr.png';
+/* Version the QR request. The image is fetched by its own URL, so a returning
+   visitor with qr.png in cache keeps whatever it pointed at forever: the code
+   silently sent people to the retired dropbox path long after the file on the
+   server was correct. BUILD_ID changes every deploy, which is exactly the
+   right cache key. */
+qrImg.src = 'qr.png?v=' + BUILD_ID;
 /* One shader pass into nebCanvas with the current dials. Three callers need
    it: the frame loop, the photo grab, and the recorder, and the recorder is
    why this had to stop being copy-pasted. There is no preserveDrawingBuffer,
