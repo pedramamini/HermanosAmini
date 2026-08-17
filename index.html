@@ -1433,16 +1433,26 @@ addEventListener('pointermove', e => {
   mouse.x = nx; mouse.y = ny; mouse.lastMove = t;
 });
 
+/* ── the master bus ──
+   Everything audible funnels through one gain node instead of connecting to
+   actx.destination directly. That is what lets a recording tap the whole mix
+   with a single connect: music, gritos and gesture percussion all arrive here,
+   so a new sound cannot silently miss the recorder by forgetting to register
+   itself somewhere. */
+let masterBus = null;
+
 function initAudio() {
   if (actx) return;
   actx = new (window.AudioContext || window.webkitAudioContext)();
+  masterBus = actx.createGain();
+  masterBus.connect(actx.destination);
   const src = actx.createMediaElementSource(music);
   analyser = actx.createAnalyser();
   analyser.fftSize = 512;
   analyser.smoothingTimeConstant = 0.7;
   freq = new Uint8Array(analyser.frequencyBinCount);
   src.connect(analyser);
-  analyser.connect(actx.destination);
+  analyser.connect(masterBus);
   /* decoupled from requestAnimationFrame on purpose: see aNow() above */
   audioT0 = aNow();
   lastBeatT = -9;
@@ -1467,7 +1477,7 @@ function sfxReady() {
   if (actx.state === 'suspended') actx.resume();
   if (!sfxBus) {
     sfxBus = actx.createGain();
-    sfxBus.connect(actx.destination);
+    sfxBus.connect(masterBus);
   }
   sfxBus.gain.value = CFG.sfxVolume;
   return actx;
@@ -3516,21 +3526,47 @@ function composeMarks(x, w, h) {
 }
 
 /* ── video clips ──
-   MediaRecorder over a downscaled composite canvas. Deliberately SILENT:
-   the mix is J. Pool's and the gritos are sourced clips, so muxing the audio
-   graph in would turn every clip into redistribution. The art travels; the
-   soundtrack does not. */
+   MediaRecorder over a downscaled composite canvas, muxed with the live audio
+   graph so a clip carries the music, the gritos and the gesture percussion.
+   Invariant 4 still holds: no audio is COMMITTED to this repo, and nothing
+   here downloads or vendors a file. This is the viewer's own capture of a page
+   already playing in front of them, which is why muting the piece records a
+   silent clip: the file should match what you heard. */
 const CLIP_MAX_SEC = 20;              // hard stop; nobody shares a 3 minute loop
 const CLIP_LONG_EDGE = 1280;          // 5K per frame would cost more than it shows
 let rec = null, recCanvas = null, recCtx = null, recChunks = [], recStart = 0;
 const recDot = document.getElementById('recdot');
 
-function clipMime() {
+function clipMime(withAudio) {
   /* mp4 first: it drops into iMessage, Twitter, and Slack without a convert
-     step. webm only where mp4 recording is missing. */
-  const want = ['video/mp4;codecs=avc1.42E01E', 'video/mp4',
-                'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+     step. webm only where mp4 recording is missing. The audio variants come
+     first when there is a soundtrack to carry, because asking for an
+     audio-bearing codec string and handing it a video-only stream is fine,
+     but the reverse silently drops the audio track. */
+  const want = withAudio
+    ? ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4',
+       'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']
+    : ['video/mp4;codecs=avc1.42E01E', 'video/mp4',
+       'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
   return want.find(m => MediaRecorder.isTypeSupported(m)) || '';
+}
+
+/* The recording tap. masterBus already carries the whole mix, so one connect
+   captures music, gritos and gesture percussion together. Muting the piece
+   should mute the clip too, so a muted session records silent rather than
+   recording a soundtrack the viewer cannot hear. */
+let recAudio = null;
+function openAudioTap() {
+  if (!actx || !masterBus || muted) return null;
+  if (actx.state === 'suspended') actx.resume();
+  recAudio = actx.createMediaStreamDestination();
+  masterBus.connect(recAudio);
+  return recAudio.stream.getAudioTracks()[0] || null;
+}
+function closeAudioTap() {
+  if (!recAudio) return;
+  try { masterBus.disconnect(recAudio); } catch (_) {}
+  recAudio = null;
 }
 
 function recTick() {
@@ -3542,8 +3578,9 @@ function recTick() {
 }
 
 function startClip() {
-  const mime = clipMime();
-  if (!mime) { cfgStatusSay('this browser cannot record video'); return; }
+  const track = openAudioTap();
+  const mime = clipMime(!!track);
+  if (!mime) { closeAudioTap(); cfgStatusSay('this browser cannot record video'); return; }
   const scale = Math.min(1, CLIP_LONG_EDGE / Math.max(W, H));
   recCanvas = document.createElement('canvas');
   /* even dimensions: H.264 encoders reject odd width or height */
@@ -3552,7 +3589,10 @@ function startClip() {
   recCtx = recCanvas.getContext('2d');
   recChunks = [];
   recStart = t;
-  rec = new MediaRecorder(recCanvas.captureStream(30), { mimeType: mime, videoBitsPerSecond: 6e6 });
+  const stream = recCanvas.captureStream(30);
+  if (track) stream.addTrack(track);
+  rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 6e6,
+                                    audioBitsPerSecond: 128000 });
   rec.ondataavailable = e => { if (e.data.size) recChunks.push(e.data); };
   rec.onstop = () => {
     const blob = new Blob(recChunks, { type: mime });
@@ -3562,13 +3602,15 @@ function startClip() {
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 30000);
     rec = null; recChunks = [];
+    closeAudioTap();
     recDot.classList.remove('on');
     cfgStatusSay(`clip saved (${(blob.size / 1048576).toFixed(1)} MB)`);
   };
   recTick();                            // first frame before the encoder starts
   rec.start();
   recDot.classList.add('on');
-  cfgStatusSay(`recording, ${CLIP_MAX_SEC}s max. press ⇧I to stop`);
+  cfgStatusSay(`recording ${track ? 'with sound' : 'silently'}, ` +
+               `${CLIP_MAX_SEC}s max. press ⇧I to stop`);
 }
 
 function stopClip() { if (rec && rec.state === 'recording') rec.stop(); }
@@ -4952,6 +4994,20 @@ function loadGritos() {
     a.load();
   })();
 }
+/* Gritos are their own <audio> elements, so by default they bypass the graph
+   entirely and a recording would miss them. createMediaElementSource can be
+   called ONCE per element and permanently reroutes it, so this is lazy, keyed
+   on the element, and only ever runs when there is a context to route into:
+   tapping an element with no live graph would mute the yell outright. */
+const gritoTapped = new WeakSet();
+function tapGrito(el) {
+  if (!actx || !masterBus || gritoTapped.has(el)) return;
+  try {
+    actx.createMediaElementSource(el).connect(masterBus);
+    gritoTapped.add(el);
+  } catch (_) { gritoTapped.add(el); }         // already tapped elsewhere: leave it
+}
+
 function grito() {
   if (!gritos.length) return;
   if (!gritoBag.length) shuffleBag();
@@ -4959,6 +5015,7 @@ function grito() {
   gritoLast = pick;
   gritoIdx++;                                   // still counts total plays
   const a = gritos[pick];
+  tapGrito(a);                                  // route it through the master bus
   a.currentTime = 0;
   a.volume = CFG.gritoVolume;
   a.play().catch(() => {});
