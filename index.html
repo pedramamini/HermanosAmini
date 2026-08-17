@@ -837,6 +837,23 @@
     backdrop-filter: blur(6px);
   }
   #hud.show { display: block; }
+  /* recording tally, top-right. Deliberately NOT drawn into the composite
+     canvas: it tells you a clip is running, it does not belong in the clip. */
+  #recdot {
+    top: 18px; right: 18px; z-index: 22; display: none;
+    align-items: center; gap: 8px;
+    font-family: 'SF Mono', 'Menlo', monospace; font-size: 11px;
+    letter-spacing: .18em; text-transform: uppercase;
+    color: #ff2f60; background: rgba(10,5,22,.55);
+    border: 1px solid rgba(255,47,96,.35); border-radius: 999px;
+    padding: 6px 14px 6px 10px; backdrop-filter: blur(6px);
+  }
+  #recdot.on { display: flex; }
+  #recdot::before {
+    content: ''; width: 9px; height: 9px; border-radius: 50%;
+    background: #ff2f60; animation: recpulse 1.1s ease-in-out infinite;
+  }
+  @keyframes recpulse { 0%, 100% { opacity: 1 } 50% { opacity: .25 } }
   #credit {
     bottom: 28px; left: 24px; font-size: 10px; font-weight: 300;
     letter-spacing: .2em; text-transform: uppercase;
@@ -860,6 +877,7 @@
 <div id="wordmark" class="ui"><span id="wm-stack">SKLZ<span id="wm-fill" aria-hidden="true">SKLZ</span></span><small>ritmos de los muertos</small></div>
 <div id="tag" class="ui">una obra psicod&eacute;lica de los hermanos amini</div>
 <div id="hud" class="ui"></div>
+<div id="recdot" class="ui">rec</div>
 <div id="credit" class="ui">music &middot; j. pool: latin &amp; world downtempo</div>
 <div id="tools" class="ui" title="tools">&#128296;</div>
 <div id="settings" class="ui ctl" title="settings &amp; presets">&#9881;</div>
@@ -3195,14 +3213,12 @@ function fxAlebrije() {
 /* ── photo mode: composite all layers + brand, download PNG ── */
 const qrImg = new Image();
 qrImg.src = 'qr.png';
-function savePhoto() {
-  const c = document.createElement('canvas');
-  c.width = W * DPR; c.height = H * DPR;
-  const x = c.getContext('2d');
-  x.fillStyle = '#06030f'; x.fillRect(0, 0, c.width, c.height);
-  /* the WebGL buffer is cleared after every composite (no
-     preserveDrawingBuffer), so re-render the nebula NOW and copy it in the
-     same tick, with the live CSS filter (day/night hue + brightness) */
+/* One shader pass into nebCanvas with the current dials. Three callers need
+   it: the frame loop, the photo grab, and the recorder, and the recorder is
+   why this had to stop being copy-pasted. There is no preserveDrawingBuffer,
+   so the buffer is only readable inside the tick that painted it. */
+let nebulaFresh = false;
+function paintNebula() {
   gl.uniform2f(uRes, nebCanvas.width, nebCanvas.height);
   gl.uniform1f(uTime, t);
   gl.uniform1f(uBass, bassSm);
@@ -3217,41 +3233,123 @@ function savePhoto() {
   gl.uniform1f(uVig, CFG.vignette);
   gl.uniform1f(uMode, CFG.bgMode);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
+}
+
+/* Flatten the four live layers into one 2D context. Shared by the photo and
+   every recorded frame, so a clip is framed exactly like a still. Caller has
+   already guaranteed the nebula buffer is fresh this tick. */
+function composeLayers(x, w, h) {
+  x.fillStyle = '#06030f';
+  x.fillRect(0, 0, w, h);
   x.filter = nebCanvas.style.filter || 'none';
-  x.drawImage(nebCanvas, 0, 0, c.width, c.height);
+  x.drawImage(nebCanvas, 0, 0, w, h);
   x.filter = 'none';
-  x.drawImage(tunCanvas, 0, 0);
-  x.drawImage(heroCanvas, 0, 0);
-  x.drawImage(dustCanvas, 0, 0);
+  x.drawImage(tunCanvas, 0, 0, w, h);
+  x.drawImage(heroCanvas, 0, 0, w, h);
+  x.drawImage(dustCanvas, 0, 0, w, h);
   /* gentle global lift to match perceived screen brightness */
   x.save();
   x.globalCompositeOperation = 'overlay';
   x.fillStyle = 'rgba(255,255,255,0.06)';
-  x.fillRect(0, 0, c.width, c.height);
+  x.fillRect(0, 0, w, h);
   x.restore();
-  /* wordmark + tag, since they live in DOM */
+}
+
+/* Wordmark, tagline, signature, QR: they live in the DOM, so anything we
+   export has to draw them by hand. Sizes are fractions of height, which is
+   why a downscaled clip carries the same layout as a full-res still. */
+function composeMarks(x, w, h) {
   x.textAlign = 'center';
   x.fillStyle = 'rgba(245,234,223,0.95)';
-  x.font = `${0.13 * H * DPR}px Anton, Impact, sans-serif`;
-  x.fillText('SKLZ', c.width / 2, c.height * 0.90);
-  x.font = `300 ${0.011 * H * DPR}px 'Space Grotesk', sans-serif`;
+  x.font = `${0.13 * h}px Anton, Impact, sans-serif`;
+  x.fillText('SKLZ', w / 2, h * 0.90);
+  x.font = `300 ${0.011 * h}px 'Space Grotesk', sans-serif`;
   x.fillStyle = 'rgba(245,234,223,0.55)';
-  x.fillText('U N A   O B R A   P S I C O D É L I C A   D E   L O S   H E R M A N O S   A M I N I', c.width / 2, c.height * 0.965);
-  /* the signature, bottom-left */
+  x.fillText('U N A   O B R A   P S I C O D É L I C A   D E   L O S   H E R M A N O S   A M I N I', w / 2, h * 0.965);
   x.textAlign = 'left';
-  x.font = `italic ${0.032 * H * DPR}px 'Snell Roundhand', 'Savoye LET', cursive`;
+  x.font = `italic ${0.032 * h}px 'Snell Roundhand', 'Savoye LET', cursive`;
   x.fillStyle = 'rgba(245,234,223,0.8)';
-  x.fillText('Hermanos Amini', 0.025 * c.width, c.height * 0.955);
-  /* subtle QR back to the page, bottom-right (white-on-black, screened) */
+  x.fillText('Hermanos Amini', 0.025 * w, h * 0.955);
   if (qrImg.complete && qrImg.naturalWidth) {
-    const qs = Math.round(0.085 * Math.min(c.width, c.height));
+    const qs = Math.round(0.085 * Math.min(w, h));
     x.save();
     x.globalCompositeOperation = 'screen';
     x.globalAlpha = 0.5;
     x.imageSmoothingEnabled = false;
-    x.drawImage(qrImg, c.width - qs - 0.018 * c.width, c.height - qs - 0.018 * c.width, qs, qs);
+    x.drawImage(qrImg, w - qs - 0.018 * w, h - qs - 0.018 * w, qs, qs);
     x.restore();
   }
+}
+
+/* ── video clips ──
+   MediaRecorder over a downscaled composite canvas. Deliberately SILENT:
+   the mix is J. Pool's and the gritos are sourced clips, so muxing the audio
+   graph in would turn every clip into redistribution. The art travels; the
+   soundtrack does not. */
+const CLIP_MAX_SEC = 20;              // hard stop; nobody shares a 3 minute loop
+const CLIP_LONG_EDGE = 1280;          // 5K per frame would cost more than it shows
+let rec = null, recCanvas = null, recCtx = null, recChunks = [], recStart = 0;
+const recDot = document.getElementById('recdot');
+
+function clipMime() {
+  /* mp4 first: it drops into iMessage, Twitter, and Slack without a convert
+     step. webm only where mp4 recording is missing. */
+  const want = ['video/mp4;codecs=avc1.42E01E', 'video/mp4',
+                'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+  return want.find(m => MediaRecorder.isTypeSupported(m)) || '';
+}
+
+function recTick() {
+  if (!rec || rec.state !== 'recording') return;
+  if (!nebulaFresh) paintNebula();     // Q3/Q4 skip frames; a clip cannot
+  composeLayers(recCtx, recCanvas.width, recCanvas.height);
+  composeMarks(recCtx, recCanvas.width, recCanvas.height);
+  if ((t - recStart) >= CLIP_MAX_SEC) stopClip();
+}
+
+function startClip() {
+  const mime = clipMime();
+  if (!mime) { cfgStatusSay('this browser cannot record video'); return; }
+  const scale = Math.min(1, CLIP_LONG_EDGE / Math.max(W, H));
+  recCanvas = document.createElement('canvas');
+  /* even dimensions: H.264 encoders reject odd width or height */
+  recCanvas.width = Math.round(W * scale / 2) * 2;
+  recCanvas.height = Math.round(H * scale / 2) * 2;
+  recCtx = recCanvas.getContext('2d');
+  recChunks = [];
+  recStart = t;
+  rec = new MediaRecorder(recCanvas.captureStream(30), { mimeType: mime, videoBitsPerSecond: 6e6 });
+  rec.ondataavailable = e => { if (e.data.size) recChunks.push(e.data); };
+  rec.onstop = () => {
+    const blob = new Blob(recChunks, { type: mime });
+    const a = document.createElement('a');
+    a.download = 'sklz-' + Date.now() + (mime.startsWith('video/mp4') ? '.mp4' : '.webm');
+    a.href = URL.createObjectURL(blob);
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 30000);
+    rec = null; recChunks = [];
+    recDot.classList.remove('on');
+    cfgStatusSay(`clip saved (${(blob.size / 1048576).toFixed(1)} MB)`);
+  };
+  recTick();                            // first frame before the encoder starts
+  rec.start();
+  recDot.classList.add('on');
+  cfgStatusSay(`recording, ${CLIP_MAX_SEC}s max. press ⇧I to stop`);
+}
+
+function stopClip() { if (rec && rec.state === 'recording') rec.stop(); }
+function toggleClip() { rec ? stopClip() : startClip(); }
+
+function savePhoto() {
+  const c = document.createElement('canvas');
+  c.width = W * DPR; c.height = H * DPR;
+  const x = c.getContext('2d');
+  /* the WebGL buffer is cleared after every composite (no
+     preserveDrawingBuffer), so re-render the nebula NOW and copy it in the
+     same tick, with the live CSS filter (day/night hue + brightness) */
+  paintNebula();
+  composeLayers(x, c.width, c.height);
+  composeMarks(x, c.width, c.height);
   const a = document.createElement('a');
   a.download = 'sklz-' + Date.now() + '.png';
   a.href = c.toDataURL('image/png');
@@ -4341,26 +4439,13 @@ function frame(now) {
   /* nebula: full rate at Q0-2, every 2nd frame at Q3, every 4th at Q4 */
   const q = qLevel();
   frame.n = (frame.n || 0) + 1;
-  if (q < 3 || (q === 3 && frame.n % 2 === 0) || (q === 4 && frame.n % 4 === 0)) {
-    gl.uniform2f(uRes, nebCanvas.width, nebCanvas.height);
-    gl.uniform1f(uTime, t);
-    gl.uniform1f(uBass, bassSm);
-    gl.uniform2f(uMouse, (mouse.x - 0.5) * (W / H), 0.5 - mouse.y);
-    gl.uniform1f(uMstr, mouse.str * CFG.smokeStir);
-  gl.uniform1f(uScale, CFG.smokeScale);
-  gl.uniform1f(uDrift, CFG.smokeDrift);
-  gl.uniform1f(uStars, CFG.starDensity);
-  gl.uniform1f(uNhue, CFG.nebulaHue);
-  gl.uniform1f(uNsat, CFG.nebulaSat);
-  gl.uniform1f(uNbright, CFG.bgBright);
-  gl.uniform1f(uVig, CFG.vignette);
-  gl.uniform1f(uMode, CFG.bgMode);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-  }
+  nebulaFresh = q < 3 || (q === 3 && frame.n % 2 === 0) || (q === 4 && frame.n % 4 === 0);
+  if (nebulaFresh) paintNebula();
 
   drawTunnel(dt);
   drawHero(dt);
   drawDust(dt);
+  recTick();                 // last: the clip must see the finished frame
   liquidUpdate();
 
   requestAnimationFrame(frame);
@@ -4881,6 +4966,7 @@ const HELP_ROWS = [
   [['P'], 'petal burst', '"flores"', 'p'],
   [['Y'], 'mean mug (the stare)', '"mirada"', 'y'],
   [['I'], 'save a photo', '', 'i'],
+  [['⇧I'], 'record a clip (20s max)', '', ''],
   [['Z'], 'zen mode (hide all text)', '', 'z'],
   [['O'], 'surprise me with a new look', '"restyle"', 'o'],
   [['!'], 'fiesta: new look + everything + grito', '', '!'],
@@ -5192,7 +5278,7 @@ addEventListener('keydown', e => {
     fxEverything();
     cfgStatusSay('¡fiesta!');
   }
-  else if (k === 'i') savePhoto();
+  else if (k === 'i') { if (e.shiftKey) toggleClip(); else savePhoto(); }
   else if (k === 'c') togglePanel(cfgPanel);
   else if (k === 'h' || k === '?') togglePanel(helpPanel);
 });

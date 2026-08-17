@@ -95,6 +95,7 @@ It runs silently without audio, see [Audio](#audio) below.
 | `←` `→` | skull size | | `↑` `↓` | music volume |
 | `Shift`+`J` | clear the flood | | `Shift`+`Q` | clear the sky |
 | `!` | fiesta: new look + everything + grito | | | |
+| `Shift`+`I` | record a clip (20s max, silent) | | | |
 
 The full list lives on `?` in the piece itself, alphabetized.
 
@@ -191,6 +192,18 @@ Sounds fire on your gestures only, whether you click or use the keyboard. When
 the art chatters its own teeth or stares at you on its own schedule it stays
 silent, so the audio always means "you did that". Level lives on the
 `gesture sfx volume` dial, and muting the music mutes these too.
+
+### Take a Photo or a Clip
+
+`I` saves a full-resolution PNG of the exact frame you are looking at. `Shift`+`I`
+starts recording and saves an MP4 when you press it again or when it hits the
+20 second cap; a red tally in the corner shows it is running, and does not
+appear in the recording. Both are composited by hand from the four canvas
+layers, with the wordmark, signature, and QR drawn in, so a capture looks like
+the piece rather than like a screenshot of a browser.
+
+Clips are silent on purpose. The mix is J. Pool's and the gritos are sourced
+clips: the art travels, the soundtrack does not.
 
 ### Take It as a Screensaver
 
