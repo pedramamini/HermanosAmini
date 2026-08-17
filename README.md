@@ -128,8 +128,11 @@ one behind it cannot shoot through it, so they have to fight around the head.
 The fleets are named for what sits on an ofrenda: **Los Copales** (green, the
 incense whose smoke guides the dead home), **Las Catrinas** (rose, the elegant
 skeleton), and **Los Cempasúchiles** (gold, the marigold that lights the path).
-It runs about half a minute, and when one fleet is left standing the sky
-announces them by name and the survivors throw marigold petals. `Shift`+`Q`
+It runs about half a minute, and when one fleet is left standing the survivors
+throw marigold petals and a toast slides in from the top right: the victor's
+name in their own colour, a running scoreboard of every fleet's wins, and a
+timer bar that drains before the toast slides back out. The tally is kept in
+the browser, so the standings build across every battle you run. `Shift`+`Q`
 calls it off early, with no winner declared.
 
 ### Five Backgrounds

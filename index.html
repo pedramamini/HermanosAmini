@@ -882,46 +882,86 @@
     padding: 6px 14px 6px 10px; backdrop-filter: blur(6px);
   }
   #recdot.on { display: flex; }
-  /* ── battle victory card ──
-     Centred but pointer-events:none: it is an announcement, not a dialog. It
-     fades itself out so a wall display never ends up stuck behind a modal
-     nobody is there to dismiss. --win is set per fleet from UFO_KINDS.glow. */
+  /* ── battle victory toast ──
+     Top-right, slides in, drains a timer bar, slides out. pointer-events:none
+     because it is an announcement, not a dialog: a wall display must never end
+     up stuck behind something nobody is there to dismiss. --win is set per
+     fleet from UFO_KINDS.glow so the toast wears the victor's colours. */
   #winner {
     --win: #ffb347;
-    top: 50%; left: 50%; transform: translate(-50%, -50%);
-    z-index: 24; display: none; text-align: center; pointer-events: none;
-    padding: 26px 44px 22px; border-radius: 18px;
-    background: radial-gradient(120% 120% at 50% 0%,
-                rgba(10,5,22,.82), rgba(10,5,22,.62));
-    border: 1px solid color-mix(in srgb, var(--win) 55%, transparent);
-    box-shadow: 0 0 60px color-mix(in srgb, var(--win) 28%, transparent),
-                0 24px 70px rgba(0,0,0,.6);
-    backdrop-filter: blur(8px);
+    top: 18px; right: 18px; z-index: 24; display: none;
+    width: 268px; overflow: hidden; pointer-events: none;
+    padding: 14px 16px 0; border-radius: 14px;
+    background: linear-gradient(180deg, rgba(14,6,28,.92), rgba(10,5,22,.88));
+    border: 1px solid color-mix(in srgb, var(--win) 45%, transparent);
+    box-shadow: 0 0 42px color-mix(in srgb, var(--win) 22%, transparent),
+                0 18px 50px rgba(0,0,0,.55);
+    backdrop-filter: blur(9px);
     font-family: 'Space Grotesk', sans-serif;
   }
-  #winner.show { display: block; animation: winIn .5s cubic-bezier(.16,1,.3,1), winOut .8s ease-in 4.4s forwards; }
-  @keyframes winIn  { from { opacity: 0; transform: translate(-50%, -46%) scale(.94); } }
-  @keyframes winOut { to   { opacity: 0; transform: translate(-50%, -54%) scale(.98); } }
-  .winflag { font-size: 34px; line-height: 1; margin-bottom: 8px;
-             filter: drop-shadow(0 0 16px var(--win)); }
+  /* the recording tally lives in the same corner; step down past it */
+  body:has(#recdot.on) #winner { top: 66px; }
+  #winner.show { display: block; animation: winIn .42s cubic-bezier(.16,1,.3,1); }
+  #winner.out   { animation: winOut .5s ease-in forwards; }
+  @keyframes winIn  { from { opacity: 0; transform: translateX(24px); } }
+  @keyframes winOut { to   { opacity: 0; transform: translateX(24px); } }
+
+  .winhead { display: flex; align-items: center; gap: 12px; }
+  .winflag { font-size: 26px; line-height: 1; flex: 0 0 auto;
+             filter: drop-shadow(0 0 12px var(--win)); }
+  .wintext { min-width: 0; }
   .wineyebrow {
-    font-size: 10px; letter-spacing: .3em; text-transform: uppercase;
-    color: rgba(245,234,223,.5); margin-bottom: 8px;
+    font-size: 8px; letter-spacing: .22em; text-transform: uppercase;
+    color: rgba(245,234,223,.45);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .winname {
-    font-family: 'Anton', Impact, sans-serif; font-size: 34px;
-    letter-spacing: .12em; color: var(--win);
-    text-shadow: 0 0 26px color-mix(in srgb, var(--win) 65%, transparent);
+    font-family: 'Anton', Impact, sans-serif; font-size: 19px;
+    letter-spacing: .06em; color: var(--win); margin: 2px 0 1px;
+    text-shadow: 0 0 20px color-mix(in srgb, var(--win) 60%, transparent);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .winsub {
-    margin-top: 6px; font-size: 11px; font-weight: 300;
-    letter-spacing: .24em; text-transform: uppercase;
-    color: rgba(245,234,223,.6);
+    font-size: 9px; font-weight: 300; letter-spacing: .2em;
+    text-transform: uppercase; color: rgba(245,234,223,.5);
   }
+
+  /* standings: every fleet every time, so a zero reads as "still winless"
+     rather than as a fleet that does not exist */
+  .winboard {
+    display: flex; gap: 6px; margin: 12px 0 10px;
+    border-top: 1px solid rgba(245,234,223,.1); padding-top: 10px;
+  }
+  .wbteam {
+    flex: 1; text-align: center; border-radius: 8px; padding: 5px 2px 4px;
+    background: rgba(245,234,223,.05);
+  }
+  .wbteam.win { background: color-mix(in srgb, var(--win) 18%, transparent); }
+  .wbdot { font-size: 12px; line-height: 1; }
+  .wbn {
+    font-family: 'Anton', Impact, sans-serif; font-size: 15px;
+    color: rgba(245,234,223,.85); line-height: 1.25;
+  }
+  .wbteam.win .wbn { color: var(--win); }
+  .wbl {
+    font-size: 7px; letter-spacing: .16em; text-transform: uppercase;
+    color: rgba(245,234,223,.4);
+  }
+
+  /* the drain: width goes to zero over the toast's life, then it leaves */
+  .wintimer { height: 3px; margin: 0 -16px; background: rgba(245,234,223,.08); }
+  .wintimer i {
+    display: block; height: 100%; width: 100%;
+    background: linear-gradient(90deg, var(--win), color-mix(in srgb, var(--win) 40%, transparent));
+    transform-origin: left center;
+  }
+  #winner.show .wintimer i { animation: winDrain var(--winms, 6000ms) linear forwards; }
+  @keyframes winDrain { to { transform: scaleX(0); } }
+
   body.notext #winner { display: none !important; }   /* zen mode means zen */
   @media (max-width: 760px) {
-    #winner { padding: 20px 26px 16px; }
-    .winname { font-size: 24px; }
+    #winner { width: auto; left: 12px; right: 12px; top: 12px; }
+    body:has(#recdot.on) #winner { top: 60px; }
   }
   #recdot::before {
     content: ''; width: 9px; height: 9px; border-radius: 50%;
@@ -953,13 +993,20 @@
 <div id="hud" class="ui"></div>
 <div id="recdot" class="ui">rec</div>
 
-<!-- battle victory. Deliberately not a modal: it must never block the art
-     or need dismissing on a wall display, so it fades itself out. -->
+<!-- battle victory toast. Deliberately not a modal: it must never block the
+     art or need dismissing on a wall display, so a timer bar drains and it
+     slides itself back out. -->
 <div id="winner" class="ui">
-  <div class="winflag"></div>
-  <div class="wineyebrow">the sky is quiet again</div>
-  <div class="winname"></div>
-  <div class="winsub">hold the heavens</div>
+  <div class="winhead">
+    <div class="winflag"></div>
+    <div class="wintext">
+      <div class="wineyebrow">the sky is quiet again</div>
+      <div class="winname"></div>
+      <div class="winsub">hold the heavens</div>
+    </div>
+  </div>
+  <div class="winboard" id="winBoard"></div>
+  <div class="wintimer"><i></i></div>
 </div>
 <div id="credit" class="ui">music &middot; j. pool: latin &amp; world downtempo</div>
 <div id="tools" class="ui" title="tools">&#128296;</div>
@@ -2938,12 +2985,16 @@ function fxAurora() {
    the elegant skeleton (rose), Cempasuchil is the marigold whose petals mark
    the path (gold). The names exist so the battle can crown a winner by name
    instead of by hex code. */
+/* Real characters, not HTML entities: these strings are written with
+   textContent and sliced for the scoreboard, and an entity would both print
+   literally and shear in half at a slice boundary. `short` is authored rather
+   than computed for exactly that reason. */
 const UFO_KINDS = [
-  { name: 'LOS COPALES', flag: '&#127807;',                                                   // copal resin, green smoke
+  { name: 'LOS COPALES', short: 'COPALES', flag: '\u{1F33F}',      // copal resin, green smoke
     body: '#c8dceb', dome: 'rgba(150,255,200,', glow: '140,255,180', laser: '80,255,140' },
-  { name: 'LAS CATRINAS', flag: '&#128128;',                                                  // the elegant dead
+  { name: 'LAS CATRINAS', short: 'CATRINAS', flag: '\u{1F480}',    // the elegant dead
     body: '#e8b8c8', dome: 'rgba(255,120,140,', glow: '255,110,140', laser: '255,60,90' },
-  { name: 'LOS CEMPAS&Uacute;CHILES', flag: '&#127804;',                                      // the marigold itself
+  { name: 'LOS CEMPASÚCHILES', short: 'CEMPAS.', flag: '\u{1F33C}', // the marigold itself
     body: '#e8d9a8', dome: 'rgba(255,220,120,', glow: '255,200,90',  laser: '255,190,60' },
 ];
 /* Saucer art is identical for every ship of a kind, but it was being rebuilt
@@ -3094,19 +3145,57 @@ function fxGalacticBattle() {
    `U` press would crown a champion nobody fought for. */
 let battleLive = false;
 const winBanner = document.getElementById('winner');
+const winBoard = document.getElementById('winBoard');
+const WIN_MS = 6000;                       // toast life, matches the drain bar
+
+/* ── the standings ──
+   Kept in localStorage so the tally survives a refresh and a wall display's
+   auto-update. Indexed by fleet, and read defensively: a stored array from a
+   build with a different fleet count must never desync the board. */
+const WINS_STORE = 'sklz.wins.v1';
+function readWins() {
+  const zero = UFO_KINDS.map(() => 0);
+  try {
+    const raw = JSON.parse(localStorage.getItem(WINS_STORE));
+    if (!Array.isArray(raw)) return zero;
+    return zero.map((_, i) => (Number.isFinite(raw[i]) && raw[i] >= 0 ? raw[i] | 0 : 0));
+  } catch (_) { return zero; }
+}
+let wins = readWins();
+function saveWins() {
+  try { localStorage.setItem(WINS_STORE, JSON.stringify(wins)); } catch (_) {}
+}
+/* Every fleet is always on the board, including the winless ones: a 0 has to
+   read as "still winless", not as a fleet that does not exist. */
+function renderBoard(champ) {
+  winBoard.innerHTML = UFO_KINDS.map((K, i) =>
+    `<div class="wbteam${i === champ ? ' win' : ''}">` +
+      `<div class="wbdot">${K.flag}</div>` +
+      `<div class="wbn">${wins[i]}</div>` +
+      `<div class="wbl">${K.short}</div>` +
+    `</div>`).join('');
+}
 
 function declareWinner(kind) {
   battleLive = false;
+  wins[kind]++;
+  saveWins();
   const K = UFO_KINDS[kind];
-  winBanner.querySelector('.winflag').innerHTML = K.flag;
-  winBanner.querySelector('.winname').innerHTML = K.name;
-  /* the card wears the fleet's own colors, so the win reads before the words do */
+  winBanner.querySelector('.winflag').textContent = K.flag;
+  winBanner.querySelector('.winname').textContent = K.name;
+  winBanner.querySelector('.winsub').textContent =
+    wins[kind] === 1 ? 'first victory' : `${wins[kind]} victories`;
+  /* the toast wears the fleet's own colors, so the win reads before the words do */
   winBanner.style.setProperty('--win', `rgb(${K.glow})`);
-  winBanner.classList.remove('show');
-  void winBanner.offsetWidth;                 // restart the animation on a re-win
+  winBanner.style.setProperty('--winms', WIN_MS + 'ms');
+  renderBoard(kind);
+  /* restart cleanly if a second battle resolves while the first toast is up */
+  winBanner.classList.remove('show', 'out');
+  void winBanner.offsetWidth;
   winBanner.classList.add('show');
-  clearTimeout(declareWinner.t);
-  declareWinner.t = setTimeout(() => winBanner.classList.remove('show'), 5200);
+  clearTimeout(declareWinner.t); clearTimeout(declareWinner.t2);
+  declareWinner.t = setTimeout(() => winBanner.classList.add('out'), WIN_MS);
+  declareWinner.t2 = setTimeout(() => winBanner.classList.remove('show', 'out'), WIN_MS + 520);
 
   /* fireworks in the victor's colour, from the survivors themselves */
   const cheer = ufos.filter(u => u.kind === kind).slice(0, 6);
