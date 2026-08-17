@@ -4836,6 +4836,7 @@ const HELP_ROWS = [
   [['I'], 'save a photo', '', 'i'],
   [['Z'], 'zen mode (hide all text)', '', 'z'],
   [['O'], 'surprise me with a new look', '"restyle"', 'o'],
+  [['!'], 'fiesta: new look + everything + grito', '', '!'],
   [['Q'], 'galactic battle (3 fleets)', '"battle"', 'q'],
   [['J'], 'spawn more skulls (hold to flood)', '"skulls"', 'j'],
   [['\u21e7J'], 'clear the skull flood', '', ''],
@@ -5137,6 +5138,13 @@ addEventListener('keydown', e => {
   }
   else if (k === '.') { if (!e.repeat) pttStart(); }
   else if (k === 'o') document.getElementById('cfgRestyle').click();  // same as the dice
+  else if (k === '!') {
+    /* fiesta: the dice and the fireworks in one hit. fxEverything already
+       opens with the grito, so the yell lands with the new look. */
+    fxRestyle();
+    fxEverything();
+    cfgStatusSay('¡fiesta!');
+  }
   else if (k === 'i') savePhoto();
   else if (k === 'c') togglePanel(cfgPanel);
   else if (k === 'h' || k === '?') togglePanel(helpPanel);

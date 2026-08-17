@@ -94,6 +94,7 @@ It runs silently without audio, see [Audio](#audio) below.
 | `Shift`+`L` | agentic chat on/off | | hold `.` | push-to-talk |
 | `←` `→` | skull size | | `↑` `↓` | music volume |
 | `Shift`+`J` | clear the flood | | `Shift`+`Q` | clear the sky |
+| `!` | fiesta: new look + everything + grito | | | |
 
 The full list lives on `?` in the piece itself, alphabetized.
 
