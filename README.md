@@ -97,6 +97,11 @@ It runs silently without audio, see [Audio](#audio) below.
 
 The full list lives on `?` in the piece itself, alphabetized.
 
+Two toggles in the settings drawer change the skull itself: **skull always on
+top** keeps every spirit, spark, and saucer behind the hero calavera, and
+**skull breathing** makes it swell and shrink at whatever pace you set on the
+breathing dial.
+
 Click the art: the eyes follow you, face parts react, skulls flick away.
 Click the microphone to pick how you talk to it:
 
