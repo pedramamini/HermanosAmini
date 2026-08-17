@@ -5175,6 +5175,11 @@ document.getElementById('galPublish').addEventListener('click', async () => {
   } catch (_) {}
 })();
 
+/* Keys whose whole job is to capture the frame. Clicking these from the help
+   panel dismisses it first: you should be looking at the art you are shooting,
+   not at the menu you shot it from. */
+const CAPTURE_KEYS = new Set(['i']);
+
 /* ── controls table: key / action / voice word, keys clickable ── */
 const HELP_ROWS = [
   // [keys], action label, voice word ('' = none), key-event to dispatch
@@ -5200,16 +5205,16 @@ const HELP_ROWS = [
   [['P'], 'petal burst', '"flores"', 'p'],
   [['Y'], 'mean mug (the stare)', '"mirada"', 'y'],
   [['I'], 'save a photo', '', 'i'],
-  [['⇧I'], 'record a clip (20s max)', '', ''],
+  [['\u21e7I'], 'record a clip (20s max)', '', '\u21e7i'],
   [['Z'], 'zen mode (hide all text)', '', 'z'],
   [['O'], 'surprise me with a new look', '"restyle"', 'o'],
   [['!'], 'fiesta: new look + everything + grito', '', '!'],
   [['Q'], 'galactic battle (3 fleets)', '"battle"', 'q'],
   [['J'], 'spawn more skulls (hold to flood)', '"skulls"', 'j'],
-  [['\u21e7J'], 'clear the skull flood', '', ''],
-  [['\u21e7Q'], 'clear the sky', '', ''],
+  [['\u21e7J'], 'clear the skull flood', '', '\u21e7j'],
+  [['\u21e7Q'], 'clear the sky', '', '\u21e7q'],
   [['L'], 'keyword voice on / off', '', 'l'],
-  [['\u21e7L'], 'agentic chat on / off', '', ''],
+  [['\u21e7L'], 'agentic chat on / off', '', '\u21e7l'],
   [['.'], 'hold to talk, release to send', '', ''],
   [['🎤'], 'pick keyword or agentic chat', '', ''],
   [['D'], 'fps / quality monitor', '', 'd'],
@@ -5244,13 +5249,29 @@ const HELP_ROWS = [
       const kb = document.createElement('kbd');
       kb.textContent = kLabel;
       if (evKey) {
+        /* a leading shift glyph means the row needs shiftKey on the event;
+           without it every shift binding here was a dead button */
+        const shifted = evKey.startsWith('\u21e7');
+        const bareKey = shifted ? evKey.slice(1) : evKey;
         const dispatchKey = idx === 1 && kLabel === '↓' ? 'ArrowDown'
-                         : idx === 1 && kLabel === '\u2192' ? 'ArrowRight' : evKey;
+                         : idx === 1 && kLabel === '\u2192' ? 'ArrowRight' : bareKey;
         kb.addEventListener('click', ev => {
           ev.stopPropagation();
           kb.classList.add('pressed');
           setTimeout(() => kb.classList.remove('pressed'), 140);
-          dispatchEvent(new KeyboardEvent('keydown', { key: dispatchKey, bubbles: true }));
+          const fire = () => dispatchEvent(new KeyboardEvent('keydown',
+            { key: dispatchKey, shiftKey: shifted, bubbles: true }));
+          /* The file itself is clean either way (captures composite the four
+             canvases, not the DOM), but leaving a 500px menu over the art
+             means you cannot see what you are framing, and a clip records
+             while you stare at a table of hotkeys. Close it, then wait out
+             the panel's fade before firing. */
+          if (CAPTURE_KEYS.has(dispatchKey.toLowerCase())) {
+            togglePanel(helpPanel);
+            setTimeout(fire, 260);
+          } else {
+            fire();
+          }
         });
       }
       tdK.appendChild(kb);
