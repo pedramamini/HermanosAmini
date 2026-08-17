@@ -88,7 +88,7 @@ It runs silently without audio, see [Audio](#audio) below.
 | `J` | flood with skulls | | `X` | meteor shower |
 | `K` | comet | | `Y` | mean mug |
 | `L` | keyword voice | | `Z` | zen mode (hide text) |
-| `M` | mute | | `Enter` | surprise me |
+| `M` | mute all sound | | `Enter` | surprise me |
 | `N` | nose heart burst | | `Space` | play / pause |
 | `O` | roll a whole new look | | `Esc` | close the open panel |
 | `Shift`+`L` | agentic chat on/off | | hold `.` | push-to-talk |
@@ -203,7 +203,8 @@ The piece ships no percussion files and vendors no audio.
 Sounds fire on your gestures only, whether you click or use the keyboard. When
 the art chatters its own teeth or stares at you on its own schedule it stays
 silent, so the audio always means "you did that". Level lives on the
-`gesture sfx volume` dial, and muting the music mutes these too.
+`gesture sfx volume` dial, and the mute button silences them along with
+the music and the gritos.
 
 ### Demo Mode
 

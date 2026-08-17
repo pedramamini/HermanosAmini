@@ -1033,7 +1033,7 @@
 <div id="settings" class="ui ctl" title="settings &amp; presets">&#9881;</div>
 <div id="mic" class="ui ctl" title="voice control">&#127908;</div>
 <div id="help" class="ui ctl" title="controls">?</div>
-<div id="mute" class="ui ctl" title="mute">&#9835;</div>
+<div id="mute" class="ui ctl" title="mute all sound">&#9835;</div>
 
 <div id="voiceMenu" class="ui">
   <div class="vmhead">voice</div>
@@ -1314,7 +1314,7 @@ const CFG_SCHEMA = {
    [default, 0, 1, 1, label, 'toggle'] renders a switch instead of a slider. */
 const CFG_TOGGLES = {
   textOn:      [1, 0, 1, 1, 'show text', 'toggle'],
-  musicOn:     [1, 0, 1, 1, 'music on', 'toggle'],
+  musicOn:     [1, 0, 1, 1, 'sound on (music, gritos, sfx)', 'toggle'],
   autoEvents:  [1, 0, 1, 1, 'random events', 'toggle'],
   voiceOn:     [0, 0, 1, 1, 'voice control', 'toggle'],
   beatSync:    [1, 0, 1, 1, 'sync to the beat', 'toggle'],
@@ -1461,11 +1461,22 @@ addEventListener('pointermove', e => {
    itself somewhere. */
 let masterBus = null;
 
+/* Mute is a property of the BUS, not of the music element. Cutting the bus
+   silences music, gritos and gesture percussion in one assignment, and any
+   sound added later is silenced by construction rather than by remembering to
+   check a flag. Before this, muting only dropped music.volume, so pressing M
+   and then G yelled at full volume. */
+function applyMuteGain() {
+  if (!masterBus) return;
+  masterBus.gain.value = muted ? 0 : 1;
+}
+
 function initAudio() {
   if (actx) return;
   actx = new (window.AudioContext || window.webkitAudioContext)();
   masterBus = actx.createGain();
   masterBus.connect(actx.destination);
+  applyMuteGain();                 // may be starting up already muted
   const src = actx.createMediaElementSource(music);
   analyser = actx.createAnalyser();
   analyser.fftSize = 512;
@@ -4915,9 +4926,11 @@ window.SKLZ = {
 function applyToggles(opts) {
   const o = opts || {};
   document.body.classList.toggle('notext', !CFG.textOn);
-  /* music */
+  /* sound: the flag is still called `muted` and still lives on CFG.musicOn,
+     but it now means ALL audio, not just the track */
   muted = !CFG.musicOn;
   music.volume = muted ? 0 : CFG.musicVolume;
+  applyMuteGain();
   syncMuteIcon();
   /* fps monitor */
   document.getElementById('hud').classList.toggle('show', !!CFG.hudOn);
@@ -4954,7 +4967,7 @@ function syncMuteIcon() {
   /* the glyph is always the note; silence is the note with a line through
      it, which is the symbol everyone already knows from every mute button */
   muteBtn.innerHTML = '&#9835;';
-  muteBtn.title = on ? 'mute' : muted ? 'unmute' : 'play the music';
+  muteBtn.title = on ? 'mute all sound' : muted ? 'unmute' : 'play the music';
   muteBtn.classList.toggle('off', !on);
 }
 music.addEventListener('play', syncMuteIcon);
@@ -5042,7 +5055,10 @@ function grito() {
   const a = gritos[pick];
   tapGrito(a);                                  // route it through the master bus
   a.currentTime = 0;
-  a.volume = CFG.gritoVolume;
+  /* the bus already handles this, but tapGrito can fail (one
+     createMediaElementSource per element, ever) and an untapped element plays
+     straight to the speakers, around the bus */
+  a.volume = muted ? 0 : CFG.gritoVolume;
   a.play().catch(() => {});
   /* the skull throws the yell: jaw drops for as long as the clip runs */
   const dur = (isFinite(a.duration) && a.duration > 0) ? a.duration : 3;
@@ -5267,7 +5283,7 @@ const HELP_ROWS = [
   // [keys], action label, voice word ('' = none), key-event to dispatch
   [['G'], 'grito!', '"grito"', 'g'],
   [['Space'], 'play / pause music', '', ' '],
-  [['M'], 'mute music', '', 'm'],
+  [['M'], 'mute all sound', '', 'm'],
   [['↑', '↓'], 'music volume', '', 'ArrowUp'],
   [['←', '→'], 'skull size', '', 'ArrowLeft'],
   [['E'], 'rainbow third eye', '"rainbow"', 'e'],
