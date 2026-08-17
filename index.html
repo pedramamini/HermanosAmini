@@ -1980,6 +1980,28 @@ function toSkullUnits(cx, cy) {
   const k = heroS * (4 / 3);
   return [(cx - W / 2) / k, (cy - (H / 2 - H * 0.02 + heroBob)) / k - 24];
 }
+/* Screen point in "skull silhouette" space, where the unit circle IS the
+   calavera. skullOutlinePath spans x -390..390 and y -440..560, so an
+   ellipse through that box is the head: close enough for line of sight and
+   far cheaper than a real path hit-test every frame. */
+function toSkullNorm(cx, cy) {
+  const [sx, sy] = toSkullUnits(cx, cy);
+  return [sx / 390, (sy - 60) / 500];
+}
+/* Does the segment A->B pass through the skull? Distance from the origin to
+   the closest point on the segment, in the normalized space above. Used for
+   saucer line of sight: the head is opaque, so a ship in front of it and a
+   ship behind it cannot shoot through it. */
+function skullBlocks(ax, ay, bx, by) {
+  const [px, py] = toSkullNorm(ax, ay);
+  const [qx, qy] = toSkullNorm(bx, by);
+  const dx = qx - px, dy = qy - py;
+  const len2 = dx * dx + dy * dy;
+  let s = len2 ? -(px * dx + py * dy) / len2 : 0;
+  s = Math.max(0, Math.min(1, s));
+  const cx2 = px + dx * s, cy2 = py + dy * s;
+  return cx2 * cx2 + cy2 * cy2 < 1;
+}
 function heartBurst(cx, cy) {
   if (!canSpawn('heart', 10)) return;
   for (let k = 0; k < 10; k++) {
@@ -2963,6 +2985,11 @@ function ufoExplode(u) {
                   life: 0, max: 0.9 + Math.random() * 0.6, hue: Math.random() });
   }
 }
+/* Which side of the calavera a saucer is drawn on. skullOnTop forces every
+   artifact behind the head, so with it on the whole fleet shares one layer
+   and nobody is occluded from anybody. */
+const ufoLayer = u => (u.behind || CFG.skullOnTop) ? 1 : 0;
+
 function updateUfos(dt) {
   /* dwell only while a rivalry exists; a sky of allies just cruises off */
   const dwell = ufos.length > 1 && ufos.some(a => ufos.some(b => b.kind !== a.kind));
@@ -2989,15 +3016,21 @@ function updateUfos(dt) {
       }
       const sp = Math.hypot(u.vx, u.vy), cap = t < u.jukeT ? 300 : 130;
       if (sp > cap) { u.vx *= cap / sp; u.vy *= cap / sp; }
-      /* spot a rival: close enough + cooldown up -> open fire */
+      /* spot a rival: close enough + line of sight + cooldown up -> open fire */
       for (const v of ufos) {
         if (v === u || v.kind === u.kind) continue;      // same kind = allies
+        /* The calavera is solid. Two saucers on the same side of it can see
+           each other anywhere, but one in front and one behind can only
+           trade fire around the head, never through it. Same-layer pairs
+           skip the test entirely: nothing is between them. */
+        if (ufoLayer(u) !== ufoLayer(v) && skullBlocks(u.x, u.y, v.x, v.y)) continue;
         const d = Math.hypot(v.x - u.x, v.y - u.y);
         if (d < 520 && t > u.fireT) {
           const dl = d || 1;
           if (lasers.length < CAPS.laser) {
             lasers.push({ x: u.x, y: u.y + 4, dx: (v.x - u.x) / dl, dy: (v.y - u.y) / dl,
-                          speed: 700, kind: u.kind, behind: u.behind, target: v, life: 0 });
+                          speed: 700, kind: u.kind, behind: u.behind, target: v,
+                          layer: ufoLayer(u), life: 0 });
           }
           u.fireT = t + 0.5 + Math.random() * 0.9;
         }
@@ -3016,6 +3049,20 @@ function updateUfos(dt) {
     L.life += dt;
     L.x += L.dx * L.speed * dt; L.y += L.dy * L.speed * dt;
     const tgt = L.target;
+    /* Fired with a clear lane, but the mark ducked to the far side of the
+       head: the bolt splashes on bone instead of chasing through it. */
+    if (tgt && L.layer !== undefined && L.layer !== ufoLayer(tgt) &&
+        skullBlocks(L.x, L.y, L.x, L.y)) {
+      for (let k2 = 0; k2 < 3; k2++) {
+        const a2 = Math.random() * Math.PI * 2, sp2 = 30 + Math.random() * 90;
+        if (!canSpawn('ember')) break;
+        sparks.push({ kind: 'ember', behind: L.behind, x: L.x, y: L.y,
+                      vx: Math.cos(a2) * sp2, vy: Math.sin(a2) * sp2,
+                      life: 0, max: 0.3 + Math.random() * 0.3, hue: Math.random() });
+      }
+      lasers.splice(i, 1);
+      continue;
+    }
     if (ufos.includes(tgt) && Math.hypot(tgt.x - L.x, tgt.y - L.y) < 24) {
       tgt.hp--;
       lasers.splice(i, 1);
