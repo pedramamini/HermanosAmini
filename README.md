@@ -236,8 +236,8 @@ Native screensavers for both platforms live in
 enter gate, hides every control, and hides the cursor. Silent by design; the
 art keeps evolving because a screensaver runs the live site, not a copy.
 
-**macOS** (`SKLZ.saver`, signed and notarized): download from
-[Releases](https://github.com/pedramamini/HermanosAmini/releases), unzip,
+**macOS** (`SKLZ.saver`, signed and notarized): download from the
+[latest release](https://github.com/pedramamini/HermanosAmini/releases/latest), unzip,
 double-click, and System Settings offers to install it. No Gatekeeper warning:
 it carries a stapled Apple notarization ticket. Or build it yourself:
 
@@ -245,7 +245,8 @@ it carries a stapled Apple notarization ticket. Or build it yourself:
 cd screensaver/macos && ./build.sh    # needs Xcode command line tools
 ```
 
-**Windows** (`SKLZ.scr`): download from Releases, right-click the `.scr`,
+**Windows** (`SKLZ.scr`): download from the
+[latest release](https://github.com/pedramamini/HermanosAmini/releases/latest), right-click the `.scr`,
 choose **Install**. Needs the WebView2 runtime, which Windows 11 and updated
 Windows 10 already have. Unsigned, so SmartScreen will ask once. Or
 cross-compile from a Mac:
