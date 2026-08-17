@@ -236,9 +236,10 @@ Native screensavers for both platforms live in
 enter gate, hides every control, and hides the cursor. Silent by design; the
 art keeps evolving because a screensaver runs the live site, not a copy.
 
-**macOS** (`SKLZ.saver`, signed): download from
+**macOS** (`SKLZ.saver`, signed and notarized): download from
 [Releases](https://github.com/pedramamini/HermanosAmini/releases), unzip,
-double-click, and System Settings offers to install it. Or build it yourself:
+double-click, and System Settings offers to install it. No Gatekeeper warning:
+it carries a stapled Apple notarization ticket. Or build it yourself:
 
 ```bash
 cd screensaver/macos && ./build.sh    # needs Xcode command line tools
