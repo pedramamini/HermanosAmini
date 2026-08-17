@@ -122,8 +122,15 @@ and it is told to refuse if you ask.
 
 `Q` scrambles three fleets, sixteen saucers each, one to a corner of the sky.
 They close on each other, open fire, juke incoming lasers, and take two or three
-hits to go down. It runs about half a minute and the last fleet standing cruises
-off. `Shift`+`Q` calls it off early.
+hits to go down. The calavera is solid cover: a saucer in front of the skull and
+one behind it cannot shoot through it, so they have to fight around the head.
+
+The fleets are named for what sits on an ofrenda: **Los Copales** (green, the
+incense whose smoke guides the dead home), **Las Catrinas** (rose, the elegant
+skeleton), and **Los Cempasúchiles** (gold, the marigold that lights the path).
+It runs about half a minute, and when one fleet is left standing the sky
+announces them by name and the survivors throw marigold petals. `Shift`+`Q`
+calls it off early, with no winner declared.
 
 ### Five Backgrounds
 
