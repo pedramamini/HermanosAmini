@@ -59,3 +59,4 @@ screensaver/macos/build/
 screensaver/windows/build/
 screensaver/windows/vendor/
 bridge/.venv/
+bridge.log
