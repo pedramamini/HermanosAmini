@@ -101,6 +101,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR cmd, int) {
   HHOOK kb = SetWindowsHookExA(WH_KEYBOARD_LL, kb_hook, GetModuleHandle(nullptr), 0);
   HHOOK ms = SetWindowsHookExA(WH_MOUSE_LL, ms_hook, GetModuleHandle(nullptr), 0);
 
+  /* Same belt-and-braces as the macOS shell: the URL asks for kiosk mode and
+     so does this script, which runs before the page's own code. A lost query
+     string would otherwise strand the screensaver on the enter gate. */
+  webview_init(g_w, "window.SKLZ_KIOSK = 1;");
   webview_navigate(g_w, kUrl);
   webview_run(g_w);
 

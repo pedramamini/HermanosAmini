@@ -169,6 +169,17 @@
   body.kiosk, body.kiosk * { cursor: none !important; }
   body.kiosk .ctl, body.kiosk #tools, body.kiosk #chatDock,
   body.kiosk #voiceMenu, body.kiosk .panel { display: none !important; }
+  /* The gate is removed from the layout entirely, not just faded. Hiding it by
+     class alone was not enough: autoResume() puts the gate BACK if autoplay is
+     refused, and a screensaver has no one to click it. CSS wins over any class
+     any code path adds or removes later. */
+  body.kiosk #gate { display: none !important; }
+  /* Zen by removal, not by fade. The .notext rule animates opacity over 600ms,
+     which on a screensaver means the wordmark and credits visibly fade away
+     every time it starts. Take them out of the layout so they never appear. */
+  body.kiosk #eyebrow, body.kiosk #wordmark, body.kiosk #tag,
+  body.kiosk #credit, body.kiosk #hud, body.kiosk #ghstar,
+  body.kiosk #demodot, body.kiosk #recdot { display: none !important; }
   .panel, .panel * { cursor: auto; }
   .panel input[type=range], .panel button, #gate { cursor: pointer; }
 
@@ -4844,9 +4855,16 @@ gate.addEventListener('click', enterGate);
    but a screensaver with a voice is a prank, not a default. */
 (function () {
   const q = new URLSearchParams(location.search);
-  if (!q.has('kiosk')) return;
+  /* window.SKLZ_KIOSK is set by the native shells with an injected script that
+     runs before this page's own code. Belt and braces: if anything ever eats
+     the query string (a redirect, a rewritten update-reload), the shell still
+     gets the mode it asked for. */
+  if (!q.has('kiosk') && !window.SKLZ_KIOSK) return;
   document.body.classList.add('kiosk');
-  if (q.has('sound')) enterGate();
+  /* a screensaver is zen by definition: no wordmark, no tagline, no credit */
+  CFG.textOn = 0;
+  document.body.classList.add('notext');
+  if (q.has('sound') || window.SKLZ_KIOSK_SOUND) enterGate();
   else { gate.classList.add('gone'); gateGone = true; }   // never touch audio
 })();
 

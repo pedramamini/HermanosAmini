@@ -30,6 +30,16 @@ static const NSTimeInterval kRetry = 30.0;
   // for anyone who edits kSaverURL and rebuilds.
   cfg.mediaTypesRequiringUserActionForPlayback = WKAudiovisualMediaTypeNone;
 
+  /* Ask for kiosk mode twice: once in the URL, once with a flag injected
+     before any of the page's own script runs. The query alone is one redirect
+     or one rewritten reload away from being lost, and losing it strands a
+     screensaver on the enter-gate with nobody to click it. */
+  WKUserScript *kiosk =
+      [[WKUserScript alloc] initWithSource:@"window.SKLZ_KIOSK = 1;"
+                             injectionTime:WKUserScriptInjectionTimeAtDocumentStart
+                          forMainFrameOnly:YES];
+  [cfg.userContentController addUserScript:kiosk];
+
   _web = [[WKWebView alloc] initWithFrame:self.bounds configuration:cfg];
   _web.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
   _web.navigationDelegate = self;
