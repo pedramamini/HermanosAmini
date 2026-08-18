@@ -1139,7 +1139,7 @@
     <thead><tr><th></th><th>action</th><th>&#127908; say</th></tr></thead>
     <tbody></tbody>
   </table>
-  <p style="margin-top:10px;color:rgba(245,234,223,.4)">click a key to try it &middot; eyes follow clicks &middot; face parts react &middot; skulls flick</p>
+  <p style="margin-top:10px;color:rgba(245,234,223,.4)">click a key to try it &middot; eyes follow clicks &middot; face parts react &middot; skulls flick &middot; pick a bloom off the crown</p>
 </div>
 
 <div id="cfgPanel" class="panel">
@@ -1411,7 +1411,7 @@ const CFG_TOGGLES = {
   beatSync:    [1, 0, 1, 1, 'sync to the beat', 'toggle'],
   skullOnTop:  [0, 0, 1, 1, 'skull always on top', 'toggle'],
   skullBreathe:[0, 0, 1, 1, 'skull breathing', 'toggle'],
-  flowerCrown: [1, 0, 1, 1, 'flower crown', 'toggle'],
+  flowerCrown: [0, 0, 1, 1, 'flower crown', 'toggle'],
   hudOn:       [0, 0, 1, 1, 'fps monitor', 'toggle'],
 };
 Object.assign(CFG_SCHEMA, CFG_TOGGLES);
@@ -2428,6 +2428,49 @@ function crownAt(f, lift) {
   return [x + nx * o, y + ny * o];
 }
 
+/* ── plucking ──
+   Every ornament the crown draws registers its SCREEN position here, keyed by
+   a stable id, so the click handler can hit-test without re-deriving the
+   transform stack. Rebuilt each frame rather than cached: the skull bobs,
+   breathes, spins and rescales, so any stored position is stale by the next
+   tick. This is the same bargain `skullPos` makes for the tunnel.
+
+   The transform is read from the canvas rather than recomputed, which means
+   the hit test cannot drift out of sync with the draw. Reconstructing it by
+   hand is exactly the bug I would have shipped, because the crown sits under
+   four nested transforms and a DPR scale. */
+const crownPos = [];
+/* id -> when it regrows. A plucked ornament is not deleted, it is scheduled:
+   the request was for one to grow back in its place, so the SLOT persists and
+   only its scale animates. That also keeps the layout stable, instead of the
+   crown reflowing every time someone picks a flower. */
+const crownOut = new Map();
+const CROWN_REGROW = 2.6;                       // seconds of bare metal
+const CROWN_GROW   = 1.9;                       // seconds to swell back
+
+function crownMark(id, lx, ly, r) {
+  const m = hctx.getTransform();
+  crownPos.push({
+    id,
+    x: (m.a * lx + m.c * ly + m.e) / DPR,
+    y: (m.b * lx + m.d * ly + m.f) / DPR,
+    r: r * Math.hypot(m.a, m.b) / DPR,
+  });
+}
+
+/* 0 while plucked, easing to 1 as it grows back. The overshoot is the whole
+   character of the thing: a bloom that swells past full size and settles
+   reads as ALIVE, where a linear fade-in reads as a texture popping in. */
+function crownScale(id) {
+  const g = crownOut.get(id);
+  if (g === undefined) return 1;
+  const age = t - g;
+  if (age < 0) return 0;
+  if (age > CROWN_GROW) { crownOut.delete(id); return 1; }
+  const u = age / CROWN_GROW;
+  return 1 - Math.pow(1 - u, 2.4) + Math.sin(u * Math.PI) * 0.16;
+}
+
 /* Height of the pointed silhouette above the band top, at position f.
    Cells alternate tall spire / short post, which is the shape every real
    crown has and the thing a plain zig-zag misses. */
@@ -2587,7 +2630,16 @@ function drawRoyalCrown() {
     const f = (j + 0.5) / JN;
     const [jx, jy] = crownAt(f, CR_BAND * 0.60);
     const jr = 30 * (0.66 + 0.34 * Math.sin(Math.PI * f));
-    crownJewel(jx, jy, jr, GEMS[j % GEMS.length], q < 4);
+    crownMark('j' + j, jx, jy, jr * 1.5);
+    const k = crownScale('j' + j);
+    if (k <= 0.01) {
+      /* an empty setting, not a hole: the bezel stays so the crown does not
+         look damaged while the stone is away */
+      hctx.beginPath(); hctx.arc(jx, jy, jr * 1.10, 0, Math.PI * 2);
+      hctx.fillStyle = PAL.gold3; hctx.fill();
+      continue;
+    }
+    crownJewel(jx, jy, jr * k, GEMS[j % GEMS.length], q < 4);
   }
 
   /* ball finials: the thing that most says "crown" at a glance */
@@ -2634,7 +2686,11 @@ function drawFlowerCrown() {
     const [x, y] = crownAt(f, CR_BAND * (0.34 + 0.34 * (i % 2)));
     /* radius from the SPACING, so a higher bloom count packs tighter instead
        of leaving gaps between stamps */
-    const r = (CR_SPAN * 1.30 / n) * jit * (0.80 + 0.30 * Math.sin(Math.PI * f)) * (1 + sway);
+    const r0 = (CR_SPAN * 1.30 / n) * jit * (0.80 + 0.30 * Math.sin(Math.PI * f)) * (1 + sway);
+    crownMark('b' + i, x, y, r0);
+    const k = crownScale('b' + i);
+    if (k <= 0.01) continue;                     // the rope shows through
+    const r = r0 * k;
     const spin = t * 0.1 * (i % 2 ? 1 : -1) + i * 1.7;
     const c1 = i % 3 === 0 ? PAL.gold : i % 3 === 1 ? PAL.magenta : PAL.violet;
     const c2 = i % 3 === 0 ? PAL.magenta : i % 3 === 1 ? PAL.gold : PAL.teal;
@@ -2670,8 +2726,42 @@ function drawFlowerCrown() {
 }
 
 function drawCrown() {
-  if (!CFG.flowerCrown) return;
+  crownPos.length = 0;                           // stale positions are worse
+  if (!CFG.flowerCrown) { crownOut.clear(); return; }
   if (CFG.crownStyle >= 0.5) drawRoyalCrown(); else drawFlowerCrown();
+}
+
+/* Pluck whatever is under the pointer. Returns true if it ate the click, so
+   the caller can stop before flicking a skull behind the crown. */
+function crownPluck(cx, cy) {
+  if (!CFG.flowerCrown) return false;
+  let best = null, bestD = Infinity;
+  for (const p of crownPos) {
+    if (crownOut.has(p.id)) continue;            // already off; do not double-pop
+    const dx = cx - p.x, dy = cy - p.y;
+    const d2 = dx * dx + dy * dy;
+    if (d2 < p.r * p.r && d2 < bestD) { best = p; bestD = d2; }
+  }
+  if (!best) return false;
+
+  const royal = CFG.crownStyle >= 0.5;
+  crownOut.set(best.id, t + CROWN_REGROW);
+  if (canSpawn('crownbit')) {
+    /* Falls in FRONT of the skull. `behind` is a spawn roll for most sparks,
+       but a piece the viewer just knocked off the crown has to stay visible
+       or the interaction has no payoff. */
+    sparks.push({
+      kind: 'crownbit', behind: false, x: best.x, y: best.y,
+      vx: (Math.random() - 0.5) * 90,
+      vy: -108 - Math.random() * 54,             // pops UP first, so you see it detach
+      life: 0, max: 6.5, hue: Math.random(),
+      rot: 0, vr: (Math.random() < 0.5 ? -1 : 1) * (0.7 + Math.random() * 1.1),
+      r: best.r * (royal ? 0.62 : 0.86), royal,
+      idx: parseInt(best.id.slice(1), 10) || 0,
+    });
+  }
+  SFX.bell();
+  return true;
 }
 
 function drawEyeAssembly(side) {
@@ -3024,6 +3114,9 @@ addEventListener('pointerdown', e => {
   if (!gateGone) return;
   if (e.target.closest && e.target.closest('.panel, .ctl')) return;  // UI clicks stay UI clicks
   face.gazeX = e.clientX; face.gazeY = e.clientY; face.gazeUntil = t + 2.2;  // eyes snap to the click
+  /* Crown first. It overlaps the top of the cranium, so testing the face
+     before it would let the third eye swallow clicks aimed at a bloom. */
+  if (crownPluck(e.clientX, e.clientY)) return;
   if (faceHit(e.clientX, e.clientY)) return;    // face parts eat the click
   if (flickAt(e.clientX, e.clientY)) SFX.knock();
 });
@@ -3478,6 +3571,10 @@ const CAPS = {
   petal:    260,
   ember:    300,
   heart:    120,
+  /* plucked crown pieces. Low on purpose: they live 5.4s and only a
+     deliberate click makes one, so a high cap would only ever be hit by
+     someone hammering the crown, which should thin out rather than lag. */
+  crownbit: 24,
   boom:     12,
   /* not a spark: the swarm has its own array, but the cap belongs with the
      others so there is one place to look. 140 is generous enough that a held
@@ -5076,6 +5173,66 @@ function drawDust(dt) {
       gg.addColorStop(1, 'rgba(255,255,255,0)');
       dctx.fillStyle = gg;
       dctx.beginPath(); dctx.arc(sp.x, sp.y, 14, 0, Math.PI * 2); dctx.fill();
+    } else if (sp.kind === 'crownbit') {
+      /* A piece knocked off the crown. It does NOT fall like a rock: the
+         request was that it "slowly floats down", so gravity is gentle and a
+         sideways sway makes it drift like a real petal shedding. The jewel
+         version falls faster and swings less, because it is a stone. */
+      const heavy = sp.royal;
+      /* Terminal velocity, not free fall: the ask was that it "slowly floats
+         down". But my first numbers were so slow the piece never left the
+         crown it fell off, which reads as a rendering glitch rather than as
+         an event. A petal has to clear the frame inside its lifetime or the
+         interaction has no follow-through. */
+      sp.vy += (heavy ? 460 : 190) * dt;
+      sp.vy = Math.min(sp.vy, heavy ? 780 : 290);
+      sp.x += Math.sin(t * (heavy ? 2.2 : 2.6) + sp.hue * 7) * (heavy ? 22 : 96) * dt;
+      sp.rot += sp.vr * dt * (heavy ? 1.4 : 1);
+      /* fade only over the last third, so it stays solid for most of the fall
+         instead of dissolving the moment it leaves the crown */
+      const cf = Math.min(1, (sp.max - sp.life) / (sp.max * 0.34));
+      const cr = sp.r;
+      dctx.save();
+      /* The spark layer runs in 'lighter' because everything else on it is a
+         glow. This is not a glow, it is a solid object, and additive blending
+         summed its overlapping petals straight to pure white: the piece fell
+         off the crown as a featureless blob. Verified by sampling the canvas,
+         not by looking, because at thumbnail size white-on-dark still reads
+         as "a flower is falling". */
+      dctx.globalCompositeOperation = 'source-over';
+      dctx.translate(sp.x, sp.y);
+      dctx.rotate(sp.rot);
+      dctx.globalAlpha = cf;
+      if (heavy) {
+        const GEMS = [PAL.magenta, PAL.teal, PAL.gold, PAL.violet];
+        dctx.beginPath(); dctx.arc(0, 0, cr * 1.24, 0, Math.PI * 2);
+        dctx.fillStyle = PAL.gold3; dctx.fill();
+        dctx.beginPath(); dctx.arc(0, 0, cr, 0, Math.PI * 2);
+        dctx.fillStyle = GEMS[sp.idx % GEMS.length]; dctx.fill();
+        const gg = dctx.createRadialGradient(-cr * 0.34, -cr * 0.4, cr * 0.05, 0, 0, cr);
+        gg.addColorStop(0, 'rgba(255,255,255,.92)');
+        gg.addColorStop(0.3, 'rgba(255,255,255,.16)');
+        gg.addColorStop(1, 'rgba(0,0,0,.34)');
+        dctx.fillStyle = gg;
+        dctx.beginPath(); dctx.arc(0, 0, cr, 0, Math.PI * 2); dctx.fill();
+      } else {
+        const c1 = sp.idx % 3 === 0 ? PAL.gold : sp.idx % 3 === 1 ? PAL.magenta : PAL.violet;
+        const c2 = sp.idx % 3 === 0 ? PAL.magenta : sp.idx % 3 === 1 ? PAL.gold : PAL.teal;
+        for (let p = 0; p < 8; p++) {
+          dctx.save();
+          dctx.rotate((p / 8) * Math.PI * 2);
+          dctx.beginPath();
+          dctx.ellipse(0, -cr * 0.62, cr * 0.30, cr * 0.62, 0, 0, Math.PI * 2);
+          dctx.fillStyle = p % 2 ? c1 : c2;
+          dctx.fill();
+          dctx.restore();
+        }
+        dctx.beginPath(); dctx.arc(0, 0, cr * 0.17, 0, Math.PI * 2);
+        dctx.fillStyle = PAL.bone1; dctx.fill();
+      }
+      dctx.globalAlpha = 1;
+      dctx.restore();
+
     } else if (sp.kind === 'heart') {         // pink hearts from the nose
       sp.vy += 60 * dt;
       const szh = 6 + 4 * (1 - fade);
