@@ -1015,6 +1015,14 @@
   }
   body.demo #demodot { display: flex; }
   body.demo.notext #demodot { display: none; }
+  /* the /demo path's opening tell: beats the zen hide for a few seconds, then
+     fades out and stays gone. Specificity has to clear body.demo.notext. */
+  body.demo.notext #demodot.flash,
+  body #demodot.flash { display: flex; animation: demofade 7s ease-out forwards; }
+  @keyframes demofade {
+    0%, 72% { opacity: 1; }
+    100%    { opacity: 0; }
+  }
   body:has(#hud.show) #demodot { top: 78px; }
   #demodot::before {
     content: ''; width: 7px; height: 7px; border-radius: 50%;
@@ -6508,6 +6516,63 @@ function setDemo(on) {
   cfgStatusSay(`demo mode on: everything rerolls every ${DEMO_EVERY_MS / 60000} min`);
 }
 function toggleDemo() { setDemo(!demoTimer); }
+
+/* ── the /demo path ──
+   hermanosamini.com/demo walks through the gate and starts demo mode on
+   load: no click, no Enter, straight into a self-rerolling zen board. It is
+   the URL you point a wall display, a projector or a lobby screen at.
+
+   Why a path and not just ?demo=1: a path is what somebody can actually type
+   from memory into a TV browser with a remote. `?demo=1` still works and is
+   what local testing uses, since a static file server does no rewriting.
+
+   This satisfies invariant 8 ("must not persist") for free. Demo mode stays a
+   plain variable, nothing is written to storage, and the ONLY way in is a URL
+   you deliberately typed. Navigating to / afterwards is a normal page. That
+   was the actual danger the invariant is about: a page that starts reskinning
+   itself because of a stale saved setting is indistinguishable from a bug.
+
+   Not kiosk mode. Kiosk hides all chrome and force-mutes because a native
+   screensaver has no keyboard; here the panels, hotkeys and sound all still
+   work, so a person can walk up and take over. */
+(function demoPath() {
+  const q = new URLSearchParams(location.search);
+  const path = location.pathname.replace(/\/+$/, '');   // /demo/ and /demo alike
+  if (!q.has('demo') && !/\/demo$/i.test(path)) return;
+  if (document.body.classList.contains('kiosk')) return;  // kiosk already owns the boot
+
+  /* Through the gate. The music will very likely be REFUSED here: no browser
+     starts audio without a gesture, and there has not been one. That is fine
+     and deliberate, because the art is entirely rAF driven and runs silently
+     (the same reason the screensaver works). The existing pointerdown safety
+     net starts the track on the first touch or click anyone gives it, so a
+     display that nobody touches is silent and a display someone walks up to
+     is not. Faking a gesture is not possible and pretending otherwise would
+     just move the failure somewhere harder to see. */
+  enterGate();
+
+  /* After the current frame, so CFG restore and syncSliders have run: rolling
+     the dials first and then having a restore overwrite them would show one
+     board and claim another. */
+  setTimeout(() => {
+    setDemo(true);
+    demoFlash();
+  }, 0);
+})();
+
+/* The on-screen tell, for a path with no gate press behind it.
+
+   #demodot is hidden by `body.demo.notext` because demo mode forces zen, so
+   in practice demo mode has NO permanent tell. That is right for a wall
+   display and wrong for the first few seconds, when a passerby needs to know
+   the art is deliberately rerolling itself rather than glitching. So: show it
+   briefly, then let zen take over for good. */
+function demoFlash() {
+  const el = document.getElementById('demodot');
+  if (!el) return;
+  el.classList.add('flash');
+  setTimeout(() => el.classList.remove('flash'), 7000);
+}
 
 document.getElementById('cfgRestyle').addEventListener('click', () => {
   fxRestyle();

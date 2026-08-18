@@ -1,0 +1,30 @@
+# hermanosamini.com, served by Apache from the shared dropbox DocumentRoot.
+#
+# This file is TRACKED and deployed by deploy.sh. It lived only on the server
+# until 2026-08-18, which meant the canonical-host redirect existed nowhere in
+# the repo and would have been lost silently by any host rebuild.
+
+RewriteEngine On
+
+# 1. Canonical host. This directory is served by BOTH vhosts (they share a
+#    DocumentRoot), so the redirect MUST be conditional on hostname or
+#    hermanosamini.com would redirect to itself forever.
+RewriteCond %{HTTP_HOST} !^(www\.)?hermanosamini\.com$ [NC]
+RewriteRule ^(.*)$ https://hermanosamini.com/$1 [R=301,L]
+
+# 2. /demo -> the art, in demo mode, no gate. See the "demo path" block in
+#    index.html.
+#
+#    The trailing-slash redirect is NOT cosmetic and must not be removed.
+#    index.html loads version.json, the two audio files, gritos/*.mp3 and
+#    qr.png by RELATIVE name. Under "/demo/" the browser resolves those
+#    against /demo/ and every one of them 404s: no music, no gritos, no QR in
+#    saved photos, and -- the expensive one -- checkVersion() can never see a
+#    new build, so a wall display left on /demo/ would sit on a stale build
+#    forever with nothing on screen to say so.
+#
+#    With no trailing slash the "directory" of /demo is /, so every relative
+#    URL resolves exactly as it does at the root. So: send /demo/ to /demo,
+#    then serve the real file without changing the address bar.
+RewriteRule ^demo/$ /demo [R=301,L]
+RewriteRule ^demo$ index.html [L]
