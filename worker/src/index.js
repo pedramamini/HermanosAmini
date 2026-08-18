@@ -325,7 +325,7 @@ export default {
           '',
           `Knobs you may set, with their allowed ranges: ${knobs}`,
           'Effects you may fire: grito, comet, ufo, aurora, supernova, meteor, star,',
-          'petals, alebrije, rainbow, flick, teeth, stare, swarm, battle, everything,',
+          'petals, alebrije, blackhole, rainbow, flick, teeth, stare, swarm, battle, everything,',
           'restyle, random.',
           '',
           'DESIGN CHANGES vs EVENTS, the distinction that matters most:',
