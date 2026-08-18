@@ -1361,6 +1361,8 @@ const CFG_SCHEMA = {
   auraSize:       [1.0,   0,     2.5,  0.1,   'skull aura'],
   petalCount:     [12,    4,     20,   1,     'eye petals'],
   crownBlooms:    [7,     3,     14,   1,     'flower crown blooms'],
+  crownStyle:     [1,     0,     1,    1,     'crown: 0 flores 1 corona'],
+  crownPeaks:     [4,     3,     7,    1,     'crown points'],
 };
 /* ── categories ──
    Every dial belongs to exactly one, for the filter dropdown. Kept as a
@@ -1379,7 +1381,7 @@ const CFG_CATEGORY = {
          'ringBeatKick', 'nosePulse', 'teethClack', 'pupilBeat', 'tempoRef',
          'beatSync'],
   skull: ['skullSize', 'socketGlow', 'auraSize', 'petalCount', 'rayLength',
-          'rayCount', 'flickForce', 'skullOnTop', 'skullBreathe', 'floodRate',
+          'rayCount', 'flickForce', 'skullOnTop', 'skullBreathe', 'floodRate', 'crownStyle', 'crownPeaks',
           'flowerCrown', 'crownBlooms'],
   sky: ['tunnelCount', 'starDensity', 'dustCount', 'smokeScale', 'smokeStir',
         'smokeDecay', 'eventMinGap', 'eventMaxGap', 'autoEvents'],
@@ -1494,6 +1496,13 @@ function applyPalette() {
   PAL.gold    = shiftHex(p.a[2], dh, sm);
   PAL.violet  = shiftHex(p.a[3], dh, sm);
   /* bone runs on its own hue so skulls can stay ivory in a wild palette */
+  /* the crown is metal, so it needs light/mid/dark of the palette's gold
+     rather than one flat fill. Derived from the palette so a noir board gets
+     a silver crown and an ice board gets a pewter one, for free. */
+  const [gh, gsat] = hex2hsl(p.a[2]);
+  PAL.gold1 = hsl(gh + dh, gsat * sm, 0.87);
+  PAL.gold2 = hsl(gh + dh, gsat * sm, 0.58);
+  PAL.gold3 = hsl(gh + dh, gsat * sm, 0.30);
   const bh = p.bone + CFG.boneHue, bs = CFG.boneSat;
   PAL.bone1 = hsl(bh, 0.62 * bs, 0.90);
   PAL.bone2 = hsl(bh, 0.60 * bs, 0.67);
@@ -2338,101 +2347,331 @@ function faceHit(cx, cy) {
   return false;
 }
 
-/* ── flower crown (viewer request #9) ──
-   Cempasuchil across the crown of the head: the marigold is the flower of the
-   ofrenda and a flower crown is what La Catrina wears, so this sits inside
-   both themes rather than being an ornament bolted on.
+/* ── the crown ──
+   Two styles share one piece of geometry, and that geometry is the whole
+   lesson. A crown is a BAND THAT WRAPS A HEAD. My first two attempts drew
+   ornaments along the skull's own dome curve, which bows UPWARD, and the
+   result read as clip art pasted on a forehead because nothing about it
+   said "this object goes around something".
 
-   The blooms follow the REAL silhouette. My first attempt placed them on an
-   ellipse, which looked obvious and was wrong: the skull's top is far flatter
-   than an ellipse, so every bloom landed inside the outline and read as paint
-   on the forehead, crowding the third eye. These sample the same bezier
-   `skullOutlinePath` uses and push outward along the normal, so the crown
-   rests ON the head and cannot drift if the silhouette is ever retuned. */
+   The band here is the front half of a horizontal circle resting on the
+   cranium, so in projection it is an ellipse arc that bows DOWNWARD at the
+   centre: we are looking UP at a crown that sits above eye level. That one
+   sign flip is the difference between a sticker and a hat.
+
+   It is deliberately a little wider than the bone at that height. A crown
+   perches on a skull, it does not shrink-wrap it, and the overhang at the
+   temples is what sells the perch. */
 const CROWN_P0 = [-390, 0], CROWN_P1 = [-390, -270],
       CROWN_P2 = [-215, -440], CROWN_P3 = [0, -440];
-function crownPoint(f) {
-  /* f 0..1 sweeps left temple to right temple. The left half samples the
-     outline's own top-left bezier; the right half mirrors it. */
-  const side = f < 0.5 ? -1 : 1;
-  const u = f < 0.5 ? f * 2 : (1 - f) * 2;        // 0 at the temple, 1 at centre
-  const t = 0.42 + u * 0.58;                       // skip the steep lower flank
-  const m = 1 - t;
-  const bx = m*m*m*CROWN_P0[0] + 3*m*m*t*CROWN_P1[0] + 3*m*t*t*CROWN_P2[0] + t*t*t*CROWN_P3[0];
-  const by = m*m*m*CROWN_P0[1] + 3*m*m*t*CROWN_P1[1] + 3*m*t*t*CROWN_P2[1] + t*t*t*CROWN_P3[1];
-  /* push out along the normal from a point inside the cranium, so blooms
-     straddle the bone edge instead of sitting on the forehead */
-  const cx = 0, cy = -120;
-  const dx = bx - cx, dy = by - cy;
-  const d = Math.hypot(dx, dy) || 1;
-  const OUT = 26;
-  return [side * (bx + dx / d * OUT), by + dy / d * OUT];
+
+/* Invert the outline bezier: which half-width does the bone have at height y?
+   Only used to place the band relative to the real silhouette, so a future
+   retune of the skull drags the crown along instead of stranding it. */
+function headHalfWidth(y) {
+  let lo = 0, hi = 1;
+  for (let k = 0; k < 20; k++) {
+    const t = (lo + hi) / 2, m = 1 - t;
+    const by = m*m*m*CROWN_P0[1] + 3*m*m*t*CROWN_P1[1] + 3*m*t*t*CROWN_P2[1] + t*t*t*CROWN_P3[1];
+    if (by > y) lo = t; else hi = t;          // by falls as t rises
+  }
+  const t = (lo + hi) / 2, m = 1 - t;
+  return -(m*m*m*CROWN_P0[0] + 3*m*m*t*CROWN_P1[0] + 3*m*t*t*CROWN_P2[0] + t*t*t*CROWN_P3[0]);
 }
 
-function drawFlowerCrown() {
-  const n = Math.round(CFG.crownBlooms);
-  if (!CFG.flowerCrown || n < 1) return;
+/* Invert the outline the other way: how high is the bone at half-width x?
+   This is what the band rides on. */
+function headTopY(x) {
+  let lo = 0, hi = 1;
+  for (let k = 0; k < 20; k++) {
+    const t = (lo + hi) / 2, m = 1 - t;
+    const bx = -(m*m*m*CROWN_P0[0] + 3*m*m*t*CROWN_P1[0] + 3*m*t*t*CROWN_P2[0] + t*t*t*CROWN_P3[0]);
+    if (bx > x) lo = t; else hi = t;          // bx falls from 390 to 0 as t rises
+  }
+  const t = (lo + hi) / 2, m = 1 - t;
+  return m*m*m*CROWN_P0[1] + 3*m*m*t*CROWN_P1[1] + 3*m*t*t*CROWN_P2[1] + t*t*t*CROWN_P3[1];
+}
+
+/* Band geometry, in skull units.
+
+   The rim follows the skull's OWN dome, flattened a little, rather than a
+   free-floating ellipse. I tried the ellipse first because that is what a
+   hoop round a head projects to, and it was wrong here for a specific
+   reason: this cranium is an egg, so it narrows fast as it rises. Any hoop
+   wide enough to look like a crown has its ends hanging in empty space above
+   the temples. Riding the bone keeps every part of the band touching
+   something, and the flattening (CR_FLAT) is what stops it reading as a
+   stripe painted on the curve: a metal hoop bends less than bone does.
+
+   Everything else is built by pushing out along the dome normal, so the band
+   keeps its thickness all the way round instead of pinching at the sides. */
+const CR_SPAN = 322;      // half-width where the rim meets the bone
+const CR_FLAT = 0.31;     // rigidity: 0 hugs the dome exactly, 1 is a flat line
+const CR_SEAT = 14;       // overhang past the bone edge
+const CR_BAND = 106;      // band height, measured along the normal
+/* Bias the band's rise toward vertical. The pure dome normal points sharply
+   outward at the temples, which gave the band a lateral flare that read as
+   bat wings rather than metal. */
+const CR_UP = 0.55;
+const CR_EDGE_Y = headTopY(CR_SPAN);
+
+function crownAt(f, lift) {
+  const x = (f * 2 - 1) * CR_SPAN;
+  const dy = headTopY(Math.abs(x));
+  const y = dy + (CR_EDGE_Y - dy) * CR_FLAT;
+  const vx = x, vy = y + 40;                  // normal from inside the cranium
+  const d = Math.hypot(vx, vy) || 1;
+  let nx = (vx / d) * (1 - CR_UP), ny = (vy / d) * (1 - CR_UP) - CR_UP;
+  const dn = Math.hypot(nx, ny) || 1;
+  nx /= dn; ny /= dn;
+  const o = CR_SEAT + (lift || 0);
+  return [x + nx * o, y + ny * o];
+}
+
+/* Height of the pointed silhouette above the band top, at position f.
+   Cells alternate tall spire / short post, which is the shape every real
+   crown has and the thing a plain zig-zag misses. */
+function crownProfile(f, cells, ph) {
+  const c = Math.min(f, 0.99999) * cells;
+  const i = Math.floor(c), u = c - i;
+  /* measured from the CENTRE, not from the left end: with an odd cell count
+     the middle of the crown has to be a tall spire, and indexing from zero
+     put a short post there half the time */
+  const tall = Math.abs(i - (cells - 1) / 2) % 2 < 0.5;
+  /* outer points shorten: further round the hoop, so more foreshortened */
+  const h = ph * (tall ? 1 : 0.42) * (0.58 + 0.42 * Math.sin(Math.PI * f));
+  /* exponent BELOW 1 puts a cusp at the apex and hollows the flanks. Above 1
+     gives a rounded bump, which is precisely what a crown is not. The small
+     floor is what lets the beaded outline dip into a swag between spires
+     instead of running along a wall. */
+  return 4 + h * (1 - Math.pow(Math.abs(2 * u - 1), 0.50));
+}
+
+function crownPath(pts) {
+  hctx.beginPath();
+  hctx.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < pts.length; i++) hctx.lineTo(pts[i][0], pts[i][1]);
+}
+
+function crownBeads(pts, r, col, every) {
+  hctx.fillStyle = col;
+  for (let i = 0; i < pts.length; i += every) {
+    hctx.beginPath();
+    hctx.arc(pts[i][0], pts[i][1], r, 0, Math.PI * 2);
+    hctx.fill();
+  }
+}
+
+function crownJewel(x, y, r, col, facets) {
+  for (let i = 0; i < 18; i++) {                 // beaded bezel
+    const a = (i / 18) * Math.PI * 2;
+    hctx.beginPath();
+    hctx.arc(x + Math.cos(a) * r * 1.34, y + Math.sin(a) * r * 1.34, r * 0.19, 0, Math.PI * 2);
+    hctx.fillStyle = PAL.gold1; hctx.fill();
+  }
+  hctx.beginPath(); hctx.arc(x, y, r * 1.20, 0, Math.PI * 2);
+  hctx.fillStyle = PAL.gold3; hctx.fill();
+  hctx.beginPath(); hctx.arc(x, y, r, 0, Math.PI * 2);
+  hctx.fillStyle = col; hctx.fill();
+  if (facets) {                                  // a cut stone, not a dot
+    hctx.save();
+    hctx.beginPath(); hctx.arc(x, y, r, 0, Math.PI * 2); hctx.clip();
+    hctx.strokeStyle = 'rgba(0,0,0,.20)'; hctx.lineWidth = Math.max(1, r * 0.10);
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2 + 0.4;
+      hctx.beginPath(); hctx.moveTo(x, y);
+      hctx.lineTo(x + Math.cos(a) * r * 1.2, y + Math.sin(a) * r * 1.2);
+      hctx.stroke();
+    }
+    hctx.beginPath(); hctx.arc(x, y, r * 0.48, 0, Math.PI * 2); hctx.stroke();
+    hctx.restore();
+  }
+  const g = hctx.createRadialGradient(x - r * 0.34, y - r * 0.40, r * 0.05, x, y, r * 1.02);
+  g.addColorStop(0, 'rgba(255,255,255,.92)');
+  g.addColorStop(0.28, 'rgba(255,255,255,.18)');
+  g.addColorStop(0.70, 'rgba(255,255,255,0)');
+  g.addColorStop(1, 'rgba(0,0,0,.40)');
+  hctx.fillStyle = g;
+  hctx.beginPath(); hctx.arc(x, y, r, 0, Math.PI * 2); hctx.fill();
+}
+
+/* ── style 1: la corona real ── */
+function drawRoyalCrown() {
   const q = qLevel();
-  /* the quality ladder sheds petals per bloom, not blooms: a phone still gets
-     the crown the viewer asked for, just a simpler one */
+  const cells = Math.max(3, Math.round(CFG.crownPeaks) * 2 - 1);
+  const ph = 196 * (1 + beatPulse * 0.06);
+  const N = q >= 3 ? 96 : 200;
+
+  const bot = [], mid = [], top = [];
+  for (let i = 0; i <= N; i++) {
+    const f = i / N;
+    bot.push(crownAt(f, 0));
+    mid.push(crownAt(f, CR_BAND));
+    top.push(crownAt(f, CR_BAND + crownProfile(f, cells, ph)));
+  }
+
+  /* Seat it. A soft shadow on the bone under the rim: flat fills on flat
+     bone have nothing to separate them, and this is what stops the crown
+     hovering the way the flowers did. */
+  hctx.save();
+  hctx.globalAlpha = 0.42; hctx.fillStyle = PAL.dark;
+  crownPath(bot);
+  for (let i = N; i >= 0; i--) hctx.lineTo(bot[i][0] * 0.985, bot[i][1] + 30);
+  hctx.closePath(); hctx.fill();
+  hctx.restore();
+
+  /* body: band and points as ONE silhouette, so the metal is continuous */
+  let yTop = 1e9, yBot = -1e9;
+  for (const p of top) if (p[1] < yTop) yTop = p[1];
+  for (const p of bot) if (p[1] > yBot) yBot = p[1];
+  const g = hctx.createLinearGradient(0, yTop, 0, yBot);
+  g.addColorStop(0.00, PAL.gold1);
+  g.addColorStop(0.20, PAL.gold2);
+  g.addColorStop(0.38, PAL.gold1);              // specular sweep across the metal
+  g.addColorStop(0.58, PAL.gold2);
+  g.addColorStop(1.00, PAL.gold3);
+  crownPath(bot);
+  for (let i = N; i >= 0; i--) hctx.lineTo(top[i][0], top[i][1]);
+  hctx.closePath();
+  hctx.fillStyle = g; hctx.fill();
+  hctx.strokeStyle = PAL.gold3; hctx.lineWidth = 5; hctx.stroke();
+
+  /* Lattice, and only in the LOWER strip of the band. Running it edge to
+     edge turned the whole hoop into mesh; a real crown has a worked base and
+     a smooth jewelled zone above it, and the contrast is what makes the
+     jewels read as set into metal. */
+  if (q < 3) {
+    const seam = [];
+    for (let i = 0; i <= N; i++) seam.push(crownAt(i / N, CR_BAND * 0.44));
+    hctx.save();
+    crownPath(bot);
+    for (let i = N; i >= 0; i--) hctx.lineTo(seam[i][0], seam[i][1]);
+    hctx.closePath(); hctx.clip();
+    hctx.strokeStyle = 'rgba(0,0,0,.20)'; hctx.lineWidth = 3;
+    for (let i = 0; i <= N; i += 2) {
+      hctx.beginPath();
+      hctx.moveTo(bot[i][0], bot[i][1]); hctx.lineTo(seam[i][0], seam[i][1]);
+      hctx.stroke();
+    }
+    for (let k = 1; k < 3; k++) {
+      hctx.beginPath();
+      for (let i = 0; i <= N; i++) {
+        const x = bot[i][0] + (seam[i][0] - bot[i][0]) * (k / 3);
+        const y = bot[i][1] + (seam[i][1] - bot[i][1]) * (k / 3);
+        if (i) hctx.lineTo(x, y); else hctx.moveTo(x, y);
+      }
+      hctx.stroke();
+    }
+    hctx.restore();
+    crownPath(seam);
+    hctx.strokeStyle = PAL.gold3; hctx.lineWidth = 4; hctx.stroke();
+  }
+
+  /* beaded trim: the bottom rim, the band seam, and the whole point outline.
+     The outline beading is the single most crown-like detail there is. */
+  const every = q >= 3 ? 4 : 3;
+  crownBeads(bot, 8, PAL.gold1, every);
+  crownBeads(mid, 7, PAL.gold1, every);
+  crownBeads(top, 8, PAL.gold1, every);
+  const inner = [];
+  for (let i = 0; i <= N; i++) {
+    const f = i / N;
+    inner.push(crownAt(f, CR_BAND + crownProfile(f, cells, ph) * 0.70 - 20));
+  }
+  crownBeads(inner, 5, PAL.gold3, every + 1);
+
+  /* jewels ride the upper band */
+  const JN = Math.max(3, Math.round(CFG.crownPeaks) + 1);
+  const GEMS = [PAL.magenta, PAL.teal, PAL.gold, PAL.violet];
+  for (let j = 0; j < JN; j++) {
+    const f = (j + 0.5) / JN;
+    const [jx, jy] = crownAt(f, CR_BAND * 0.60);
+    const jr = 30 * (0.66 + 0.34 * Math.sin(Math.PI * f));
+    crownJewel(jx, jy, jr, GEMS[j % GEMS.length], q < 4);
+  }
+
+  /* ball finials: the thing that most says "crown" at a glance */
+  for (let i = 0; i < cells; i++) {
+    const f = (i + 0.5) / cells;
+    const tall = Math.abs(i - (cells - 1) / 2) % 2 < 0.5;
+    const [px, py] = crownAt(f, CR_BAND + crownProfile(f, cells, ph) + (tall ? 15 : 18));
+    const br = tall ? 18 : 23;
+    hctx.beginPath(); hctx.arc(px, py, br, 0, Math.PI * 2);
+    hctx.fillStyle = PAL.gold2; hctx.fill();
+    hctx.strokeStyle = PAL.gold3; hctx.lineWidth = 3.5; hctx.stroke();
+    hctx.beginPath();
+    hctx.arc(px - br * 0.30, py - br * 0.32, br * 0.38, 0, Math.PI * 2);
+    hctx.fillStyle = PAL.gold1; hctx.fill();
+  }
+}
+
+/* ── style 0: corona de flores ──
+   Same band, so the marigolds wrap the cranium instead of arcing over it,
+   and they OVERLAP. A garland is gathered; evenly spaced flowers that never
+   touch are exactly what made the first version read as a sticker sheet. */
+function drawFlowerCrown() {
+  const n = Math.max(3, Math.round(CFG.crownBlooms));
+  const q = qLevel();
   const PET = q >= 4 ? 5 : q >= 3 ? 6 : 8;
-  const sway = Math.sin(t * 0.35) * 0.04 + beatPulse * 0.03;
+  const sway = Math.sin(t * 0.35) * 0.04 + beatPulse * 0.04;
+
+  /* foliage first: the dark rope the blooms are tied to. Without a substrate
+     the flowers have nothing to be gathered ON, which is half the problem. */
+  const RN = q >= 3 ? 26 : 48;
+  hctx.globalAlpha = 0.55; hctx.fillStyle = PAL.dark;
+  for (let i = 0; i <= RN; i++) {
+    const f = i / RN;
+    const [x, y] = crownAt(f, CR_BAND * 0.34);
+    hctx.beginPath();
+    hctx.ellipse(x, y, 34, 19, Math.sin(f * 9) * 0.8, 0, Math.PI * 2);
+    hctx.fill();
+  }
+  hctx.globalAlpha = 1;
+
   for (let i = 0; i < n; i++) {
-    const f = n === 1 ? 0.5 : i / (n - 1);
-    const [x, y] = crownPoint(f);
-    /* biggest at the centre, tapering to the temples, like a real garland.
-       The per-index jitter matters: identical blooms read as a stamped
-       pattern, and the whole point is that this looks gathered by hand. */
-    const edge = 0.35 + 0.65 * Math.sin(f * Math.PI);
-    const jit = 0.86 + 0.28 * ((i * 2654435761 % 97) / 97);
-    const r = (36 + 32 * edge) * jit * (1 + sway);
+    const f = (i + 0.5) / n;
+    const jit = 0.84 + 0.32 * ((i * 2654435761 % 97) / 97);
+    const [x, y] = crownAt(f, CR_BAND * (0.34 + 0.34 * (i % 2)));
+    /* radius from the SPACING, so a higher bloom count packs tighter instead
+       of leaving gaps between stamps */
+    const r = (CR_SPAN * 1.30 / n) * jit * (0.80 + 0.30 * Math.sin(Math.PI * f)) * (1 + sway);
     const spin = t * 0.1 * (i % 2 ? 1 : -1) + i * 1.7;
     const c1 = i % 3 === 0 ? PAL.gold : i % 3 === 1 ? PAL.magenta : PAL.violet;
     const c2 = i % 3 === 0 ? PAL.magenta : i % 3 === 1 ? PAL.gold : PAL.teal;
     hctx.save();
     hctx.translate(x, y);
-    /* Seat the bloom. Without this they float above the bone like stickers:
-       flat fills on a flat skull have nothing to separate them. */
     hctx.beginPath();
-    hctx.arc(0, r * 0.10, r * 1.02, 0, Math.PI * 2);
-    hctx.fillStyle = PAL.dark;
-    hctx.globalAlpha = 0.32;
-    hctx.fill();
+    hctx.arc(0, r * 0.12, r * 1.06, 0, Math.PI * 2);
+    hctx.fillStyle = PAL.dark; hctx.globalAlpha = 0.34; hctx.fill();
     hctx.globalAlpha = 1;
     for (let p = 0; p < PET; p++) {
       hctx.save();
       hctx.rotate((p / PET) * Math.PI * 2 + spin);
       hctx.beginPath();
-      /* narrow and long, not round: a round petal is a daisy, and the
-         cempasuchil this is meant to be has tight, elongated florets */
       hctx.ellipse(0, -r * 0.62, r * 0.30, r * 0.62, 0, 0, Math.PI * 2);
       hctx.fillStyle = p % 2 ? c1 : c2;
-      hctx.globalAlpha = 0.96;
-      hctx.fill();
+      hctx.globalAlpha = 0.96; hctx.fill();
       hctx.restore();
     }
-    /* Second ring ON TOP of the first, rotated half a petal. Drawn under the
-       outer ring it was invisible at this scale, which made every bloom a
-       flat cartoon flower; over the top it reads as marigold layering. */
     if (q < 3) {
       for (let p = 0; p < PET; p++) {
         hctx.save();
         hctx.rotate((p / PET) * Math.PI * 2 - spin * 0.6 + Math.PI / PET);
         hctx.beginPath();
         hctx.ellipse(0, -r * 0.36, r * 0.20, r * 0.38, 0, 0, Math.PI * 2);
-        hctx.fillStyle = c1;
-        hctx.globalAlpha = 0.85;
-        hctx.fill();
+        hctx.fillStyle = c1; hctx.globalAlpha = 0.85; hctx.fill();
         hctx.restore();
       }
     }
-    hctx.beginPath();
-    hctx.arc(0, 0, r * 0.17, 0, Math.PI * 2);
-    hctx.fillStyle = PAL.bone1;
-    hctx.globalAlpha = 1;
-    hctx.fill();
+    hctx.beginPath(); hctx.arc(0, 0, r * 0.17, 0, Math.PI * 2);
+    hctx.fillStyle = PAL.bone1; hctx.globalAlpha = 1; hctx.fill();
     hctx.restore();
   }
+}
+
+function drawCrown() {
+  if (!CFG.flowerCrown) return;
+  if (CFG.crownStyle >= 0.5) drawRoyalCrown(); else drawFlowerCrown();
 }
 
 function drawEyeAssembly(side) {
@@ -3049,7 +3288,7 @@ function drawHero(dt) {
   hctx.scale(sY, sY);
   hctx.translate(0, 32);
   hctx.scale(4 / 3, 4 / 3);
-  drawFlowerCrown();
+  drawCrown();
   hctx.restore();
 
   /* socket glow, skull-space socket centers: (±178,-60), third eye (0,-300)
