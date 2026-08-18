@@ -26,7 +26,7 @@ const LIMITS = {
   ringSpeed: [0, 1, 'eye ring speed'], ringBeatKick: [0, 6, 'ring beat kick'], spiralSpeed: [0, 1, 'cheek spiral speed'], raySpeed: [0, 0.4, 'sunbeam speed'],
   nosePulse: [0, 1, 'nose beat thump'], teethClack: [0, 0.5, 'teeth beat clack'], pupilBeat: [0, 0.6, 'pupil beat snap'],
   smokeStir: [0, 4, 'smoke cursor stir'], smokeDecay: [0.05, 3, 'smoke stir fade rate'], skullSize: [0.5, 1.8, 'hero skull size'], breatheRate: [2, 40, 'breathing pace (per min)'],
-  rayLength: [0.3, 2.5, 'starburst length'], rayCount: [6, 28, 'starburst rays'], smokeScale: [0.4, 3, 'smoke marble size'],
+  rayLength: [0.3, 2.5, 'starburst length'], rayCount: [6, 28, 'starburst rays'], smokeScale: [0.4, 3, 'smoke marble size'], floodRate: [0, 40, 'skull flood rate (/min)'],
   smokeDrift: [0.1, 4, 'smoke drift speed'], tunnelCount: [12, 56, 'tunnel skull count'], starDensity: [0.2, 2.5, 'star density'],
   dustCount: [0.2, 2, 'dust particles'], gazeRange: [0.3, 2, 'pupil travel range'], wanderPace: [0.3, 3, 'eye wander pace'],
   tempoRef: [60, 140, 'tempo ref BPM'], dayCycleMin: [2, 30, 'day/night cycle minutes'], perfMode: [0, 2, 'perf mode'], tempoMax: [1, 3, 'tempo speed cap'],

@@ -1330,12 +1330,13 @@ const CFG_SCHEMA = {
   tunnelCount:    [56,    12,    56,   4,     'tunnel skull count'],
   starDensity:    [1.0,   0.2,   2.5,  0.1,   'star density'],
   dustCount:      [1.0,   0.2,   2,    0.1,   'dust particles'],
+  floodRate:      [0,     0,     40,   1,     'skull flood rate (/min)'],
   gazeRange:      [1.0,   0.3,   2,    0.1,   'pupil travel range'],
   wanderPace:     [1.0,   0.3,   3,    0.1,   'eye wander pace'],
-  tempoRef:       [96,    60,    140,  2,     'tempo ref BPM'],
+  tempoRef:       [96,    60,    140,  1,     'tempo ref BPM'],
   dayCycleMin:    [10,    2,     30,   1,     'day/night cycle (min)'],
   perfMode:       [0,     0,     2,    1,     'perf: 0 auto 1 full 2 lite'],
-  tempoMax:       [1.8,   1,     3,    0.1,   'tempo speed cap'],
+  tempoMax:       [1.8,   1,     3,    0.02,  'tempo speed cap'],
   eventMinGap:    [7,     1,     30,   1,     'event gap min (s)'],
   eventMaxGap:    [20,    2,     60,   1,     'event gap max (s)'],
   liquidFill:     [11,    2,     30,   1,     'logo travel time (s)'],
@@ -1378,7 +1379,7 @@ const CFG_CATEGORY = {
          'ringBeatKick', 'nosePulse', 'teethClack', 'pupilBeat', 'tempoRef',
          'beatSync'],
   skull: ['skullSize', 'socketGlow', 'auraSize', 'petalCount', 'rayLength',
-          'rayCount', 'flickForce', 'skullOnTop', 'skullBreathe',
+          'rayCount', 'flickForce', 'skullOnTop', 'skullBreathe', 'floodRate',
           'flowerCrown', 'crownBlooms'],
   sky: ['tunnelCount', 'starDensity', 'dustCount', 'smokeScale', 'smokeStir',
         'smokeDecay', 'eventMinGap', 'eventMaxGap', 'autoEvents'],
@@ -2562,7 +2563,12 @@ const skullSpin = Array.from({ length: N_SKULLS }, (_, i) => {
    key and an unbounded array. */
 const swarm = [];
 
-function spawnSkull(n) {
+/* `ttl` (seconds) is what separates a keyed flood from a rated one. A flood
+   you asked for by hand should pile up and stay: that is the whole gag, and
+   shift-J clears it. A flood arriving on a timer must NOT, or a viewer who
+   nudged the rate dial once comes back to a scene buried under 140 skulls
+   with no memory of why. Rated skulls drift through and leave. */
+function spawnSkull(n, ttl) {
   let made = 0;
   for (let k = 0; k < (n || 1); k++) {
     if (swarm.length >= CAPS.swarm) break;
@@ -2594,6 +2600,7 @@ function spawnSkull(n) {
       vr: (Math.random() < 0.5 ? -1 : 1) * (0.15 + Math.random() * 0.75),
       v: Math.floor(Math.random() * Math.max(1, VARIANTS.length)),
       born: t,
+      until: ttl ? t + ttl : 0,
     });
     made++;
   }
@@ -2601,6 +2608,12 @@ function spawnSkull(n) {
 }
 
 function stepSwarm(dt) {
+  if (!swarm.length) return;
+  /* retire the rated arrivals. Backwards so the splice cannot skip a
+     neighbour, which is the classic way this loop goes wrong. */
+  for (let i = swarm.length - 1; i >= 0; i--) {
+    if (swarm[i].until && t > swarm[i].until) swarm.splice(i, 1);
+  }
   if (!swarm.length) return;
   const beatS = 1 + beatPulse * CFG.tunnelBreath;
   const lite = isLite();
@@ -2626,7 +2639,10 @@ function stepSwarm(dt) {
     if (skip > 1 && i % skip !== 0) continue;     // thinned, but still moving
     const spr = pool[k.v % pool.length];
     const px = spr.width * k.scale * 0.5 * beatS;
-    const fade = Math.min(1, (t - k.born) * 1.6);  // ease in, never pop
+    /* ease in, and for rated skulls ease back out, so a retirement is a
+       fade and not a disappearance mid-frame */
+    const fade = Math.min(1, (t - k.born) * 1.6) *
+                 (k.until ? Math.min(1, (k.until - t) * 0.55) : 1);
     tctx.save();
     tctx.translate(k.x, k.y);
     tctx.rotate(lite ? k.rot * 0.3 : k.rot);
@@ -3098,6 +3114,7 @@ for (let i = 0; i < 130; i++) {
    spontaneous skull tumbles, rainbow third eye
    ───────────────────────────────────────────── */
 let nextEventT = 10;
+let nextFloodT = 0;
 let rainbowEyeUntil = -1;
 const sparks = [];
 
@@ -4939,6 +4956,19 @@ function frame(now) {
   if (!gateGone && gate.classList.contains('gone')) gateGone = true;
   if (gateGone && CFG.autoEvents && t > nextEventT) spawnEvent();
   else if (!CFG.autoEvents) nextEventT = t + CFG.eventMinGap;   // no burst when re-enabled
+
+  /* rated skull flood (viewer request #2). Default 0 = off, so this changes
+     nothing for anyone who does not reach for the dial. Each arrival carries
+     a lifetime, unlike the J key's, so the population settles at roughly
+     rate * lifetime / 60 instead of climbing to the cap and staying. */
+  if (gateGone && CFG.floodRate > 0) {
+    if (t > nextFloodT) {
+      spawnSkull(1, 45 + Math.random() * 30);
+      nextFloodT = t + 60 / CFG.floodRate;
+    }
+  } else {
+    nextFloodT = t + 1;                         // no burst when re-enabled
+  }
 
   /* day/night: the nebula's palette slowly wheels through dawn and dusk (off at Q4) */
   if (qLevel() < 4 && (t | 0) !== frame.lastDayTick) {
