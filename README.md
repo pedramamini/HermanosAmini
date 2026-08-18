@@ -95,7 +95,7 @@ It runs silently without audio, see [Audio](#audio) below.
 | `←` `→` | skull size | | `↑` `↓` | music volume |
 | `Shift`+`J` | clear the flood | | `Shift`+`Q` | clear the sky |
 | `!` | fiesta: new look + everything + grito | | | |
-| `Shift`+`O` | demo mode: a new look every 60s | | | |
+| `Shift`+`O` | demo mode: reroll everything every 3 min | | | |
 | `Shift`+`I` | record a clip (20s max, with sound) | | | |
 | `H` or `?` | this list, in the piece | | | |
 
@@ -208,12 +208,17 @@ the music and the gritos.
 
 ### Demo Mode
 
-`Shift`+`O` rolls a whole new look every sixty seconds, the same roll the dice
-button gives you, so a piece left running on a wall or a projector never settles
-on one palette. A small amber tell sits in the top left while it is on; press
-`Shift`+`O` again to stop. It is deliberately not remembered between visits: a
-page that started reskinning itself on load would read as a bug rather than a
-setting.
+`Shift`+`O` rerolls the entire board every three minutes: background, palette,
+hues, speeds, sizes, counts, the skull toggles, everything. It is zen while it
+runs, so no wordmark or credits, and it puts the text back when you stop.
+
+It never touches your sound: mute stays muted, unmuted stays unmuted, and the
+volume dials are left alone. It also leaves the random-event engine on, since
+those drifting artifacts are the point of an unattended display.
+
+A small amber tell sits in the top left while it is on; press `Shift`+`O` again
+to stop. It is deliberately not remembered between visits: a page that started
+reskinning itself on load would read as a bug rather than a setting.
 
 ### Take a Photo or a Clip
 

@@ -5324,7 +5324,7 @@ const HELP_ROWS = [
   [['\u21e7I'], 'record a clip with sound (20s max)', '', '\u21e7i'],
   [['Z'], 'zen mode (hide all text)', '', 'z'],
   [['O'], 'surprise me with a new look', '"restyle"', 'o'],
-  [['\u21e7O'], 'demo mode: a new look every 60s', '', '\u21e7o'],
+  [['\u21e7O'], 'demo mode: reroll everything every 3 min', '', '\u21e7o'],
   [['!'], 'fiesta: new look + everything + grito', '', '!'],
   [['Q'], 'galactic battle (3 fleets)', '"battle"', 'q'],
   [['J'], 'spawn more skulls (hold to flood)', '"skulls"', 'j'],
@@ -5415,27 +5415,82 @@ function cfgStatusSay(msg) {
 }
 
 /* ── demo mode ──
-   A gallery/wall setting: roll a whole new look on a fixed cadence so the
-   piece never sits on one palette while nobody is touching it. Deliberately
-   the same action as the dice, not a second randomizer, so what you see on a
-   timer is exactly what O gives you by hand.
+   A gallery/wall setting: reroll the WHOLE board on a fixed cadence so the
+   piece never sits on one look while nobody is touching it. Unlike the dice
+   (which rolls colours only), this randomizes every tunable: backgrounds,
+   palettes, hues, speeds, sizes, counts, the skull toggles.
 
    Not persisted, and pinned off in curated presets: a page that started
    remixing itself on load because of a setting from last week would read as
    a bug. A wall display turns it on once with the key. */
-const DEMO_EVERY_MS = 60000;
+const DEMO_EVERY_MS = 180000;                 // three minutes
+
+/* Keys demo mode must never touch, each for a stated reason. Randomizing any
+   of these would override a decision the viewer made, or quietly degrade the
+   piece on the wall it is supposed to be showing off. */
+const DEMO_KEEP = new Set([
+  'textOn',                                   // zen: demo owns this, see below
+  'musicOn',                                  // MUTE: the viewer's call, never ours
+  'musicVolume', 'gritoVolume', 'sfxVolume',  // the rest of "mute/unmute"
+  'voiceOn',                                  // microphone: never turn one on
+  'hudOn',                                    // debug overlay is not art
+  'perfMode',                                 // rolling "lite" would degrade a wall
+  'beatSync',                                 // asked for permanently engaged
+  'autoEvents',                               // the drifting artifacts ARE the demo
+]);
+
+/* A couple of dials can take the picture to nearly black, which on a wall
+   reads as "it broke" rather than "it changed". Keep them watchable. */
+const DEMO_CLAMP = { bgBright: [0.7, 2], vignette: [0, 0.9], skullSize: [0.6, 1.5] };
+
+function demoRandomize() {
+  for (const k in CFG_SCHEMA) {
+    if (DEMO_KEEP.has(k)) continue;
+    let [, min, max, step] = CFG_SCHEMA[k];
+    const cl = DEMO_CLAMP[k];
+    if (cl) { min = Math.max(min, cl[0]); max = Math.min(max, cl[1]); }
+    /* snap to the dial's own step, so palette/bgMode/rayCount stay integral
+       instead of landing on 3.7 and silently flooring somewhere downstream */
+    const steps = Math.max(1, Math.round((max - min) / step));
+    const v = min + Math.round(Math.random() * steps) * step;
+    CFG[k] = +Math.max(min, Math.min(max, v)).toFixed(4);
+  }
+  /* the event gap is a RANGE: rolled independently, min can exceed max and
+     the random engine stops firing entirely */
+  if (CFG.eventMinGap > CFG.eventMaxGap) {
+    const a = CFG.eventMinGap; CFG.eventMinGap = CFG.eventMaxGap; CFG.eventMaxGap = a;
+  }
+  applyPalette();
+  schedulePaletteRebuild();
+  syncSlidersSafe();                          // also runs applyToggles + resize
+}
+
 let demoTimer = null;
+let demoPrevText = null;                      // restore zen exactly as found
 function demoTick() {
-  document.getElementById('cfgRestyle').click();   // one source of truth
+  demoRandomize();
+  CFG.textOn = 0;                             // demo is always zen: no words
+  applyToggles({ skipVoice: true });
+  const BG = ['smoke', 'galaxy', 'aurora', 'candlelight', 'the void'];
+  cfgStatusSay(`demo: palette ${CFG.palette}, ${BG[CFG.bgMode] || 'smoke'} background`);
 }
 function setDemo(on) {
   clearInterval(demoTimer);
   demoTimer = null;
   document.body.classList.toggle('demo', !!on);
-  if (!on) { cfgStatusSay('demo mode off'); return; }
-  demoTick();                                   // start with a fresh look
+  if (!on) {
+    if (demoPrevText !== null) {              // give the words back
+      CFG.textOn = demoPrevText;
+      demoPrevText = null;
+      applyToggles({ skipVoice: true });
+    }
+    cfgStatusSay('demo mode off');
+    return;
+  }
+  if (demoPrevText === null) demoPrevText = CFG.textOn;
+  demoTick();                                 // start with a fresh board
   demoTimer = setInterval(demoTick, DEMO_EVERY_MS);
-  cfgStatusSay(`demo mode on: a new look every ${DEMO_EVERY_MS / 1000}s`);
+  cfgStatusSay(`demo mode on: everything rerolls every ${DEMO_EVERY_MS / 60000} min`);
 }
 function toggleDemo() { setDemo(!demoTimer); }
 
