@@ -37,9 +37,12 @@ static const NSTimeInterval kRetry = 30.0;
   self.layer.backgroundColor = NSColor.blackColor.CGColor;
 
   WKWebViewConfiguration *cfg = [WKWebViewConfiguration new];
-  // ?kiosk=1 is silent, but leave autoplay open so ?kiosk=1&sound=1 works
-  // for anyone who edits kSaverURL and rebuilds.
-  cfg.mediaTypesRequiringUserActionForPlayback = WKAudiovisualMediaTypeNone;
+  /* A screensaver is silent. Requiring a user gesture for audible playback
+     means the web view itself refuses to make noise, no matter what the page
+     asks for: a second, independent lock on top of the page's own kiosk rule.
+     Video is exempt so the canvas art is unaffected. Anyone who genuinely
+     wants sound edits kSaverURL to add &sound=1 AND relaxes this line. */
+  cfg.mediaTypesRequiringUserActionForPlayback = WKAudiovisualMediaTypeAudio;
 
   /* Ask for kiosk mode twice: once in the URL, once with a flag injected
      before any of the page's own script runs. The query alone is one redirect

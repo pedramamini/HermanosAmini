@@ -1455,6 +1455,11 @@ function updateTempo(gap) {
   bpm = 60 / sorted[sorted.length >> 1];
 }
 let gateGone = false;
+/* kiosk without &sound: audio is forbidden. Declared HERE, beside gateGone,
+   rather than next to the kiosk block that sets it: startMusic, grito and
+   sfxReady all read it, and a `let` still in its temporal dead zone throws a
+   ReferenceError instead of simply reading false. */
+let kioskSilent = false;
 
 /* ── mouse state: position (0..1), movement energy, last-move time ── */
 const mouse = { x: .5, y: .5, str: 0, lastMove: -99 };
@@ -1514,6 +1519,7 @@ let sfxBus = null;
 const sfxLast = Object.create(null);
 
 function sfxReady() {
+  if (kioskSilent) return null;          // no synthesized percussion either
   if (!CFG.sfxVolume || muted) return null;
   if (!actx) return null;                       // no gesture has started audio yet
   if (actx.state === 'suspended') actx.resume();
@@ -4827,6 +4833,7 @@ setTimeout(checkVersion, 8000);
 
 let musicStarted = false;
 function startMusic() {
+  if (kioskSilent) return;               // screensaver: never, by any path
   initAudio();
   if (actx.state === 'suspended') actx.resume();
   music.play().catch(() => {});
@@ -4864,14 +4871,28 @@ gate.addEventListener('click', enterGate);
   /* a screensaver is zen by definition: no wordmark, no tagline, no credit */
   CFG.textOn = 0;
   document.body.classList.add('notext');
-  if (q.has('sound') || window.SKLZ_KIOSK_SOUND) enterGate();
-  else { gate.classList.add('gone'); gateGone = true; }   // never touch audio
+  if (q.has('sound') || window.SKLZ_KIOSK_SOUND) { enterGate(); }
+  else {
+    /* A screensaver is silent, and "silent" has to mean IMPOSSIBLE, not
+       merely "nobody asked". Three separate paths start the music without
+       the gate (autoResume after a version reload, the pointerdown safety
+       net, the first keydown), so not-calling-them is a promise that will be
+       broken by the next feature. Forbid it once, here. */
+    kioskSilent = true;
+    CFG.musicOn = 0;
+    muted = true;
+    applyMuteGain();                     // masterBus to zero: music, gritos, sfx
+    music.muted = true;                  // and the element itself, belt and braces
+    gate.classList.add('gone');
+    gateGone = true;
+  }
 })();
 
 /* came back from an auto-update: skip the gate, pick the track back up.
    Called at the END of the script: it touches gritoIdx and other bindings
    declared further down, which would be in the temporal dead zone here. */
 function autoResume() {
+  if (kioskSilent) return;               // a saver must not resume a track either
   const s = readResume();
   if (!s) return;
   CFG.musicOn = s.muted ? 0 : 1;       // keep CFG the source of truth
@@ -5065,6 +5086,7 @@ function tapGrito(el) {
 }
 
 function grito() {
+  if (kioskSilent) return;               // silent means silent, yells included
   if (!gritos.length) return;
   if (!gritoBag.length) shuffleBag();
   const pick = gritoBag.shift();

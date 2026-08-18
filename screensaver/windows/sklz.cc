@@ -105,6 +105,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR cmd, int) {
      so does this script, which runs before the page's own code. A lost query
      string would otherwise strand the screensaver on the enter gate. */
   webview_init(g_w, "window.SKLZ_KIOSK = 1;");
+  /* Belt and braces on silence: the page's kiosk rule already forbids audio,
+     and this neuters the elements too in case a future page change forgets. */
+  webview_init(g_w,
+      "document.addEventListener('DOMContentLoaded',function(){"
+      "document.querySelectorAll('audio,video').forEach(function(m){m.muted=true;m.volume=0;});"
+      "});");
   webview_navigate(g_w, kUrl);
   webview_run(g_w);
 
