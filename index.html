@@ -886,6 +886,23 @@
     background: rgba(255,47,160,.1); border-left: 3px solid #ff2fa0; border-radius: 7px;
     max-height: 92px; overflow-y: auto;
   }
+    /* the follow-up question. Deliberately quiet: it is a conversation, not
+       a form, and anything that looks like a form field set makes people
+       abandon a request they were happy to make one second earlier. */
+    #ideaProbe, #reqProbe { margin: 14px 0 2px; }
+    .ideaask {
+      font-size: 14px; line-height: 1.45; color: #ffb347;
+      margin-bottom: 8px; text-align: left;
+    }
+    .ideaask::before { content: '\260E\FE0E'; margin-right: 7px; opacity: .7; }
+    #ideaDetail, #reqDetail {
+      width: 100%; box-sizing: border-box; resize: vertical;
+      background: rgba(0,0,0,.35); color: #f5eadf;
+      border: 1px solid rgba(245,234,223,.18); border-radius: 9px;
+      padding: 9px 11px; font: inherit; font-size: 14px;
+    }
+    #ideaDetail:focus, #reqDetail:focus { outline: none; border-color: rgba(255,179,71,.6); }
+
   #ideaEmail {
     width: 100%; box-sizing: border-box; padding: 11px 13px; margin-bottom: 10px;
     background: rgba(245,234,223,.08); color: #f5eadf;
@@ -1124,6 +1141,10 @@
       themselves: if they approve it, an agent builds it, it ships, and the art
       comes back changed.</p>
     <div class="ideaquote" id="ideaQuote"></div>
+    <div id="ideaProbe" hidden>
+      <div class="ideaask" id="ideaAsk"></div>
+      <textarea id="ideaDetail" maxlength="600" rows="3" placeholder="the more you say, the closer it lands"></textarea>
+    </div>
     <input id="ideaEmail" type="email" maxlength="120" placeholder="email (only to tell you when it ships)" autocomplete="email">
     <div class="idearow">
       <button id="ideaSend">send it</button>
@@ -1177,6 +1198,10 @@
     artist approves it, an agent builds it and it lands in the art. We'll email
     you when it ships.</p>
   <textarea id="reqText" maxlength="400" rows="3" placeholder="a comet that sheds marigold petals..."></textarea>
+  <div id="reqProbe" hidden>
+    <div class="ideaask" id="reqAsk"></div>
+    <textarea id="reqDetail" maxlength="600" rows="3" placeholder="the more you say, the closer it lands"></textarea>
+  </div>
   <div class="galrow">
     <input id="reqEmail" type="email" maxlength="120" placeholder="your email" autocomplete="email">
     <button id="reqSend">send</button>
@@ -5843,6 +5868,9 @@ const ideaModal = document.getElementById('ideaModal');
 const ideaQuote = document.getElementById('ideaQuote');
 const ideaEmail = document.getElementById('ideaEmail');
 const ideaSend  = document.getElementById('ideaSend');
+const ideaProbe = document.getElementById('ideaProbe');
+const ideaAsk   = document.getElementById('ideaAsk');
+const ideaDetail= document.getElementById('ideaDetail');
 const ideaSkip  = document.getElementById('ideaSkip');
 
 const cfgPanel = document.getElementById('cfgPanel');
@@ -6562,14 +6590,47 @@ applyToggles({ skipVoice: true });   // restored toggles take effect (voice need
    whether it was a wish and take an email so the person learns when it ships.
    The email is optional on purpose: a request is worth filing either way. */
 let ideaPending = '';
+let ideaQuestion = '';
+
+/* Ask the Worker for ONE follow-up question about this request.
+   Never blocks the send: if the model is slow or down, the caller carries on
+   with what the viewer already typed. A request with thin detail is still
+   worth filing, and holding it hostage to an LLM round trip would lose it. */
+async function probeRequest(text) {
+  try {
+    const r = await fetch(GALLERY_API.replace('/presets', '/requests/probe'), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ request: text }),
+    });
+    if (!r.ok) return '';
+    const d = await r.json();
+    return typeof d.question === 'string' ? d.question : '';
+  } catch (_) { return ''; }
+}
+
 function captureIdea(text) {
   if (!text || ideaModal.classList.contains('show')) return;
   ideaPending = text.slice(0, 600);
   ideaQuote.textContent = '\u201c' + ideaPending + '\u201d';
   ideaEmail.value = localStorage.getItem('sklz.email.v1') || '';
+  ideaProbe.hidden = true; ideaAsk.textContent = ''; ideaDetail.value = '';
+  ideaQuestion = '';
+  ideaSend.textContent = 'send it';
   ideaModal.classList.add('show');
+  /* fetch the question while they are reading the card, so the follow-up is
+     usually already there by the time they reach for the button */
+  probeRequest(ideaPending).then(q => {
+    if (!q || !ideaModal.classList.contains('show') || ideaQuestion) return;
+    ideaQuestion = q;
+    ideaAsk.textContent = q;
+    ideaProbe.hidden = false;
+  });
 }
-function closeIdea() { ideaModal.classList.remove('show'); ideaPending = ''; }
+function closeIdea() {
+  ideaModal.classList.remove('show');
+  ideaPending = ''; ideaQuestion = '';
+  ideaProbe.hidden = true; ideaDetail.value = '';
+}
 
 ideaSkip.addEventListener('click', closeIdea);
 ideaModal.addEventListener('click', e => { if (e.target === ideaModal) closeIdea(); });
@@ -6584,7 +6645,9 @@ ideaSend.addEventListener('click', async () => {
   try {
     const r = await fetch(GALLERY_API.replace('/presets', '/requests'), {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ request: body, email, config: galConfigPayload() })
+      body: JSON.stringify({ request: body, email, config: galConfigPayload(),
+                             probe: ideaQuestion,
+                             detail: (ideaDetail.value || '').trim() })
     });
     if (!r.ok) throw new Error('rejected');
     if (email) { try { localStorage.setItem('sklz.email.v1', email); } catch (_) {} }
@@ -6599,7 +6662,42 @@ ideaSend.addEventListener('click', async () => {
   const txt = document.getElementById('reqText');
   const mail = document.getElementById('reqEmail');
   const btn = document.getElementById('reqSend');
+  const probe = document.getElementById('reqProbe');
+  const ask = document.getElementById('reqAsk');
+  const detail = document.getElementById('reqDetail');
   if (!btn) return;
+
+  /* Two presses, not two screens. The first press asks a follow-up question
+     and relabels the button; the second sends. Anyone who has nothing to add
+     just presses again, so the extra step costs one click and never blocks a
+     request. Sending on the first press when the probe fails is deliberate:
+     a dead model must not be able to swallow a request. */
+  let asked = '', asking = false;
+
+  const reset = () => {
+    asked = ''; probe.hidden = true; ask.textContent = ''; detail.value = '';
+    btn.textContent = 'send'; btn.disabled = false;
+  };
+  txt.addEventListener('input', () => { if (asked) reset(); });
+
+  const send = async (body, email) => {
+    btn.textContent = '...'; btn.disabled = true;
+    try {
+      const r = await fetch(GALLERY_API.replace('/presets', '/requests'), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ request: body, email, config: galConfigPayload(),
+                               probe: asked, detail: (detail.value || '').trim() })
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || 'could not send');
+      txt.value = ''; reset();
+      galSay(email ? 'sent. we will email you when it ships.' : 'sent. thank you.');
+    } catch (e) {
+      galSay(String(e.message || e));
+      btn.textContent = asked ? 'send it' : 'send'; btn.disabled = false;
+    }
+  };
+
   btn.addEventListener('click', async () => {
     const body = (txt.value || '').trim();
     const email = (mail.value || '').trim();
@@ -6607,21 +6705,20 @@ ideaSend.addEventListener('click', async () => {
     if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(email)) {
       galSay('that email does not look right'); mail.focus(); return;
     }
+    if (asked || asking) { send(body, email); return; }
+
+    asking = true;
     btn.textContent = '...'; btn.disabled = true;
-    try {
-      const r = await fetch(GALLERY_API.replace('/presets', '/requests'), {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ request: body, email, config: galConfigPayload() })
-      });
-      const d = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(d.error || 'could not send');
-      txt.value = '';
-      galSay(email ? 'sent. we will email you when it ships.' : 'sent. thank you.');
-    } catch (e) {
-      galSay(String(e.message || e));
-    } finally {
-      btn.textContent = 'send'; btn.disabled = false;
-    }
+    const q = await probeRequest(body);
+    asking = false;
+    btn.disabled = false;
+    if (!q) { send(body, email); return; }        // probe down: do not lose it
+    asked = q;
+    ask.textContent = q;
+    probe.hidden = false;
+    btn.textContent = 'send it';
+    galSay('one question, then it goes to the board');
+    detail.focus();
   });
 })();
 

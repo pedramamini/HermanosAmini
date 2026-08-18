@@ -33,7 +33,9 @@ CREATE TABLE IF NOT EXISTS requests (
   filed_at     INTEGER,
   notified_open   INTEGER NOT NULL DEFAULT 0,  -- "we got it" mail sent
   notified_closed INTEGER NOT NULL DEFAULT 0,  -- "it shipped" mail sent
-  author_hash  TEXT
+  author_hash  TEXT,
+  probe_q      TEXT,             -- the follow-up we asked
+  detail       TEXT              -- what they answered, if they did
 );
 CREATE INDEX IF NOT EXISTS idx_req_issue ON requests (issue_number);
 CREATE INDEX IF NOT EXISTS idx_req_pending ON requests (notified_closed, issue_number);

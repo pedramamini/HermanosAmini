@@ -170,6 +170,65 @@ export default {
         return json({ ok: true }, 200, request);
       }
 
+      /* ── interrogate a request before it is filed ──
+         Viewer requests arrive as one short line ("skeleton with hair"), and
+         a line like that is not buildable: it does not say where the hair
+         goes, what it is made of, or how it moves. Every one of those gaps
+         becomes a decision an agent makes on the artist's behalf, which is
+         the wrong person to be deciding.
+
+         So we ask ONE question back. One, not a form: this is a piece of art
+         someone is enjoying, and a five-field intake form is how you turn a
+         casual "wouldn't it be cool if" into a bounce. The question is
+         generated from their own words so it can name the specific thing
+         that is missing, and it is always skippable. */
+      if (request.method === 'POST' && path === '/api/requests/probe') {
+        const body = await request.json().catch(() => null);
+        const text = String((body && body.request) || '').trim();
+        if (text.length < 8) return json({ error: 'say a little more' }, 400, request);
+
+        const sys = [
+          'You help an artist collect BUILDABLE feature requests for a Dia de los',
+          'Muertos generative art piece: a living calavera adrift in deep space, with a',
+          'tunnel of sugar skulls, nebula smoke, comets, auroras, UFOs and marigolds.',
+          '',
+          'A viewer just asked for something. Ask exactly ONE short follow-up question',
+          'that would most change how it gets built. Target the biggest ambiguity:',
+          'where it appears, what it looks like, how it moves, when it triggers, or',
+          'whether it replaces something that already exists.',
+          '',
+          'Rules:',
+          '- ONE question, under 20 words, plain and warm, no preamble.',
+          '- Be specific to what they asked. Never a generic "can you tell me more?".',
+          '- Offer a concrete choice when there is one ("on the skull, or drifting past?").',
+          '- Never promise it will be built. Never mention labels, issues or GitHub.',
+          '- Output ONLY the question text. No quotes, no JSON, no explanation.',
+        ].join('\n');
+
+        let q = '';
+        try {
+          const out = await env.AI.run('@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
+            messages: [{ role: 'system', content: sys },
+                       { role: 'user', content: text.slice(0, 400) }],
+            max_tokens: 60, temperature: 0.6,
+          });
+          q = String((out && (out.response || out)) || '').trim();
+        } catch (_) { q = ''; }
+
+        /* Strip the model's habits: wrapping quotes, a "Question:" label, and
+           anything past the first question mark. A second sentence here turns
+           one question into a form, which is the exact thing we are avoiding. */
+        q = q.replace(/^["'\s]+|["'\s]+$/g, '').replace(/^(question|follow.?up)\s*[:\-]\s*/i, '');
+        const cut = q.indexOf('?');
+        if (cut > 0) q = q.slice(0, cut + 1);
+        if (q.length > 160 || q.length < 8 || !q.includes('?')) {
+          /* A generic fallback is still better than none, and it keeps the UI
+             shape identical whether or not the model cooperated. */
+          q = 'What should it look like, and where on screen should it happen?';
+        }
+        return json({ question: q }, 200, request);
+      }
+
       /* ── element request from the site ──
          Stored here; a separate pipeline files the GitHub issue and mails the
          requester. We deliberately do NOT file the issue inline: that needs a
@@ -188,6 +247,14 @@ export default {
           return json({ error: 'keep it PG' }, 400, request);
         }
 
+        /* the answer to the follow-up question, and the question itself, so
+           the issue can show the exchange rather than a bare second sentence */
+        const detail = String(body.detail || '').trim().slice(0, 600);
+        const probeQ = String(body.probe || '').trim().slice(0, 200);
+        if (detail && BAD_ANY.some(w => normalizeForFilter(detail).replace(/ /g, '').includes(w.replace(/ /g, '')))) {
+          return json({ error: 'keep it PG' }, 400, request);
+        }
+
         const email = String(body.email || '').trim().slice(0, 120);
         if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(email)) {
           return json({ error: 'that email does not look right' }, 400, request);
@@ -203,11 +270,11 @@ export default {
 
         const id = makeId();
         await env.sklz_presets.prepare(
-          `INSERT INTO requests (id, body, email, config, created_at, author_hash)
-           VALUES (?, ?, ?, ?, ?, ?)`
+          `INSERT INTO requests (id, body, email, config, created_at, author_hash, probe_q, detail)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
         ).bind(id, text, email || null,
                body.config ? JSON.stringify(cleanConfig(body.config) || {}) : null,
-               Date.now(), author).run();
+               Date.now(), author, probeQ || null, detail || null).run();
         await env.sklz_presets.prepare(
           `INSERT INTO writes (author_hash, hour_bucket, n) VALUES (?, ?, 1)
            ON CONFLICT(author_hash, hour_bucket) DO UPDATE SET n = n + 1`

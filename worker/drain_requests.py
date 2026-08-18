@@ -99,8 +99,24 @@ def issue_body(row):
             pass
     when = time.strftime("%Y-%m-%d %H:%M %Z", time.localtime(row["created_at"] / 1000))
     who = "left an email" if row.get("email") else "asked anonymously"
+
+    # The follow-up exchange, when there is one. Rendered as Q and A rather
+    # than glued onto the request, because who said what matters: the answer
+    # is the viewer's own words about their own idea, and an agent reading
+    # this later should not have to guess which half we prompted for.
+    followup = ""
+    if row.get("detail"):
+        q = (row.get("probe_q") or "What should it look like?").strip()
+        followup = (f"\n**We asked:** {q}\n\n"
+                    f"**They said:**\n\n> {row['detail'].strip()}\n")
+    elif row.get("probe_q"):
+        followup = (f"\n**We asked:** {row['probe_q'].strip()}\n\n"
+                    f"They skipped it, so this one still needs scoping before it "
+                    f"can be built.\n")
+
     return (
-        f"> {row['body']}\n\n"
+        f"> {row['body']}\n"
+        f"{followup}\n"
         f"Asked at hermanosamini.com on {when}. The viewer {who}.\n\n"
         f"**This is not approved yet.** Per "
         f"[ART_DIRECTION.md](https://github.com/{REPO}/blob/main/ART_DIRECTION.md), "
@@ -111,13 +127,24 @@ def issue_body(row):
     )
 
 
+def labels_for(row):
+    """Flag the ones that are not buildable yet.
+
+    An issue with no follow-up answer is a one-line wish, and approving it
+    means an agent invents the missing half. `needs-detail` makes that visible
+    on the board instead of discovering it at build time."""
+    if row.get("detail"):
+        return LABELS
+    return LABELS + ",needs-detail"
+
+
 def title_for(body):
     t = " ".join(body.split())
     return (t[:68] + "...") if len(t) > 71 else t
 
 
 def file_issues(apply):
-    rows = d1("SELECT id, body, email, config, created_at FROM requests "
+    rows = d1("SELECT id, body, email, config, created_at, probe_q, detail FROM requests "
               "WHERE issue_number IS NULL ORDER BY created_at ASC;")
     if not rows:
         print("no unfiled requests")
@@ -130,7 +157,7 @@ def file_issues(apply):
             continue
         url = sh(["gh", "issue", "create", "--repo", REPO,
                   "--title", title, "--body", issue_body(r),
-                  "--label", LABELS]).strip().splitlines()[-1]
+                  "--label", labels_for(r)]).strip().splitlines()[-1]
         num = int(url.rstrip("/").rsplit("/", 1)[-1])
         d1(f"UPDATE requests SET issue_number = {num}, filed_at = {int(time.time()*1000)} "
            f"WHERE id = '{q(r['id'])}';")
