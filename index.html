@@ -279,6 +279,59 @@
     flex: 0 0 auto; font-size: 10px; letter-spacing: .14em;
     text-transform: uppercase; color: rgba(245,234,223,.4);
   }
+
+  /* ── controls filter ──
+     Same vocabulary as the dial filter above, but genuinely transparent: the
+     art is the background of this panel and the point is to keep seeing it.
+     That costs contrast, so the bar carries its own blur rather than a solid
+     fill. Sticky, because the list is 40 rows and a filter you have to scroll
+     back up to reach is a filter nobody uses twice. */
+  #helpFilter {
+    display: flex; gap: 9px; align-items: center;
+    position: sticky; top: -18px; z-index: 3;
+    margin: 0 0 10px; padding: 9px 12px;
+    border: 1px solid rgba(245,234,223,.16); border-radius: 10px;
+    /* Same frosted recipe as the panel itself (blur + a dark translucent
+       tint), one step stronger. A LIGHT tint looked better standing still and
+       failed the moment you scrolled: 39 rows slide under this bar, and a 5%
+       wash does not stop them ghosting through the placeholder. Dark glass
+       keeps the art visible and the text legible at the same time, which is
+       the only version of "transparent" that actually works here. */
+    background: rgba(12,6,26,.55);
+    backdrop-filter: blur(16px) saturate(1.3);
+    -webkit-backdrop-filter: blur(16px) saturate(1.3);
+    transition: border-color .18s, background .18s;
+  }
+  #helpFilter:focus-within {
+    border-color: rgba(145,70,255,.7);
+    background: rgba(20,10,38,.62);
+  }
+  .hfglass {
+    flex: 0 0 auto; font-size: 14px; line-height: 1;
+    color: rgba(245,234,223,.42); transform: rotate(-45deg);
+  }
+  #helpFilter:focus-within .hfglass { color: #ffb347; }
+  #helpSearch {
+    flex: 1 1 auto; min-width: 0;
+    font-family: 'Space Grotesk', sans-serif; font-size: 13px;
+    color: #f5eadf; background: none; border: 0; outline: none; padding: 0;
+  }
+  #helpSearch::placeholder { color: rgba(245,234,223,.34); }
+  /* the browser's own clear affordance is a light X on a light field here */
+  #helpSearch::-webkit-search-cancel-button { -webkit-appearance: none; }
+  #helpShown {
+    flex: 0 0 auto; font-size: 10px; letter-spacing: .14em;
+    text-transform: uppercase; color: rgba(245,234,223,.38);
+    font-variant-numeric: tabular-nums;
+  }
+  #helpTable tr.hid { display: none; }
+  /* the matched characters. Weight AND color, so it survives being read at a
+     glance on a moving background. */
+  #helpTable b.hl { color: #ffb347; font-weight: 600; }
+  #helpNone {
+    padding: 16px 2px; text-align: center;
+    font-size: 12px; color: rgba(245,234,223,.45);
+  }
   /* a row the filter excluded. `display: contents` is the normal state, so
      this has to be display:none, not visibility */
   #cfgSliders .dial.hid { display: none !important; }
@@ -586,6 +639,10 @@
       from { opacity: 0; transform: translateY(16px); }
       to   { opacity: 1; transform: none; }
     }
+
+    /* the filter sticks to the sheet body's own padding, not the desktop
+       panel's, or it floats 4px adrift of the top edge while scrolling */
+    #helpFilter { top: -14px; }
 
     /* CONTROLS: the 3-column table wraps into a key + two stacked lines */
     #helpPanel table { border-spacing: 0; }
@@ -1156,6 +1213,12 @@
 </div>
 <div id="helpPanel" class="panel">
   <h2>CONTROLS</h2>
+  <div id="helpFilter">
+    <span class="hfglass" aria-hidden="true">&#9906;</span>
+    <input id="helpSearch" type="search" placeholder="filter&hellip; try &quot;str&quot; or &quot;sound&quot;"
+           autocomplete="off" spellcheck="false" aria-label="filter the controls">
+    <span id="helpShown"></span>
+  </div>
   <table id="helpTable">
     <thead><tr><th></th><th>action</th><th>&#127908; say</th></tr></thead>
     <tbody></tbody>
@@ -6170,9 +6233,187 @@ const HELP_ROWS = [
     const tdA = document.createElement('td'); tdA.textContent = action;
     const tdV = document.createElement('td'); tdV.textContent = voice;
     tr.appendChild(tdK); tr.appendChild(tdA); tr.appendChild(tdV);
+    /* the filter searches these, not the rendered cells: reading text back
+       out of the DOM every keystroke is both slower and fragile once a cell
+       carries highlight markup */
+    tr.dataset.action = action;
+    /* Glyph keys need their names spelled out or they are unsearchable: the
+       shift rows render as an arrow, so typing "shift" found nothing at all,
+       and the volume/size rows are pure arrows with no letters to match. */
+    const GLYPH = {
+      '\u21e7': 'shift', '\u2191': 'arrow up', '\u2193': 'arrow down',
+      '\u2190': 'arrow left', '\u2192': 'arrow right',
+      '\u{1F3A4}': 'mic microphone', '.': 'period push to talk',
+    };
+    const alias = keys.map(k => [...k].map(ch => GLYPH[ch] || '').join(' ')).join(' ');
+    tr.dataset.hay = [action, voice, keys.join(' '), alias]
+      .join(' \u00b7 ').toLowerCase();
     tb.appendChild(tr);
   }
+  helpFilter(tb);
 })();
+
+/* ── fuzzy filter for the controls list ──
+   Subsequence matching, not substring: "shtstr" finds "shooting star" and
+   "blkhl" finds the black hole. Someone reaching for this knows roughly what
+   the thing is called and wants it in three keystrokes, so requiring the
+   exact spelling of "alebrije" defeats the point.
+
+   Deliberately NOT autofocused. This panel is a list of hotkeys you press,
+   and every one of them is a printable character: focusing the field would
+   turn the whole table into a typing target and break H-to-close along with
+   it. Click to filter, and every key still does what the row says it does. */
+function fuzzyScore(hay, needle) {
+  /* TIER FIRST, score second. Scoring alone put "spin the eye rings" above
+     "shooting star" for "str", because three scattered word-initial letters
+     can out-point a real substring. No amount of weight tuning fixes that
+     reliably, and a filter whose order you cannot predict is worse than an
+     unordered one. So: a prefix beats a substring, a substring beats a
+     scattered match, always, and the score only breaks ties inside a tier. */
+  const at0 = hay.indexOf(needle);
+  if (at0 === 0) return { tier: 0, score: 100 - hay.length * 0.2, hits: span(0, needle.length) };
+  if (at0 > 0)   return { tier: 1, score: 100 - at0 - hay.length * 0.2, hits: span(at0, needle.length) };
+
+  /* Try EVERY occurrence of the first character, not just the leftmost.
+     Greedy-from-the-left is the classic fuzzy-match bug and it bit here
+     exactly as advertised: for "str" it aligned "shooting star" as
+     S-hooting s-T-a-R (scattered, weak) instead of shooting-S-T-a-R
+     (consecutive, obviously right), so "spin the eye rings" outranked it.
+     The list is 39 short strings; the extra passes cost nothing. */
+  let bestScore = -Infinity, bestHits = null;
+  for (let s0 = hay.indexOf(needle[0]); s0 >= 0; s0 = hay.indexOf(needle[0], s0 + 1)) {
+    let score = 0, at = s0 - 1, prev = s0 - 2, run = 0;
+    const hits = [];
+    let ok = true;
+    for (let i = 0; i < needle.length; i++) {
+      at = hay.indexOf(needle[i], i === 0 ? s0 : at + 1);
+      if (at < 0) { ok = false; break; }
+      hits.push(at);
+      /* Consecutive characters are worth far MORE than scattered ones, and
+         the run bonus compounds. These weights are not arbitrary: at the
+         first values I tried, three word-initial letters ("Spin The eye
+         Rings") beat a real adjacent pair ("shooting STaR") for "str", which
+         is the opposite of what anyone means when they type it. Adjacency
+         has to dominate word-start, not merely compete with it. */
+      if (at === prev + 1) { run++; score += 18 + run * 8; } else { run = 0; }
+      /* start of a word beats the middle of one */
+      if (at === 0 || /[^a-z0-9]/.test(hay[at - 1])) score += 12;
+      if (i > 0) score -= Math.min(at - prev - 1, 10);   // gap penalty, bounded
+      prev = at;
+    }
+    if (!ok) break;                          // no later start can do better
+    /* Density gate. Without it "sound" matches "black hole (eats the
+       background)" by taking one letter from each of five words, which is a
+       true subsequence and complete noise. */
+    const spanLen = prev - s0 + 1;
+    if (needle.length >= 3 && spanLen > needle.length * 3 + 5) continue;
+    score -= s0 * 0.3;                       // an earlier match is a better one
+    if (score > bestScore) { bestScore = score; bestHits = hits; }
+  }
+  if (!bestHits) return null;
+  return { tier: 2, score: bestScore - hay.length * 0.12, hits: bestHits };
+}
+function span(from, len) {
+  const a = [];
+  for (let i = 0; i < len; i++) a.push(from + i);
+  return a;
+}
+
+function helpFilter(tb) {
+  const box = document.getElementById('helpFilter');
+  const input = document.getElementById('helpSearch');
+  const shown = document.getElementById('helpShown');
+  const table = document.getElementById('helpTable');
+  if (!input) return;
+
+  /* the alphabetical order the builder produced. Filtering reorders by
+     relevance, so the original has to be kept to restore on clear. */
+  const order = [...tb.querySelectorAll('tr')];
+
+  const none = document.createElement('div');
+  none.id = 'helpNone';
+  none.textContent = 'nothing matches that';
+  none.style.display = 'none';
+  table.insertAdjacentElement('afterend', none);
+
+  function paint(tr, hits) {
+    const td = tr.children[1];
+    const text = tr.dataset.action;
+    if (!hits || !hits.length) { td.textContent = text; return; }
+    const mark = new Set(hits);
+    const frag = document.createDocumentFragment();
+    let run = '';
+    const flush = on => {
+      if (!run) return;
+      if (on) { const b = document.createElement('b'); b.className = 'hl'; b.textContent = run; frag.appendChild(b); }
+      else frag.appendChild(document.createTextNode(run));
+      run = '';
+    };
+    let on = false;
+    for (let i = 0; i < text.length; i++) {
+      const m = mark.has(i);
+      if (m !== on) { flush(on); on = m; }
+      run += text[i];
+    }
+    flush(on);
+    td.textContent = '';
+    td.appendChild(frag);
+  }
+
+  function apply() {
+    const q = input.value.trim().toLowerCase();
+    if (!q) {
+      order.forEach(tr => { tr.classList.remove('hid'); paint(tr, null); tb.appendChild(tr); });
+      none.style.display = 'none';
+      shown.textContent = order.length + ' keys';
+      return;
+    }
+    const hit = [];
+    for (const tr of order) {
+      /* Score the action alone AND the full haystack. The action is what the
+         highlight can point at; the haystack is what makes '"nova"' and the
+         key letters findable. Best of the two, highlight only when the action
+         is the reason it matched. */
+      const a = fuzzyScore(tr.dataset.action, q);
+      const h = fuzzyScore(tr.dataset.hay, q);
+      /* Prefer the action when it is no worse: its hits are the ones the
+         highlight can point at, and a highlight that lands on nothing visible
+         reads as a bug. The haystack still carries the row when the match is
+         really in the voice word or the key letter. */
+      const best = !a ? h : !h ? a
+                 : (a.tier < h.tier || (a.tier === h.tier && a.score >= h.score - 6)) ? a : h;
+      if (!best) { tr.classList.add('hid'); continue; }
+      tr.classList.remove('hid');
+      hit.push({ tr, tier: best.tier, score: best.score, hits: best === a ? a.hits : null });
+    }
+    hit.sort((x, y) => x.tier - y.tier || y.score - x.score);
+    hit.forEach(r => { paint(r.tr, r.hits); tb.appendChild(r.tr); });
+    none.style.display = hit.length ? 'none' : 'block';
+    shown.textContent = hit.length + '/' + order.length;
+  }
+
+  input.addEventListener('input', () => {
+    apply();
+    /* The list reorders by relevance, so whatever you were looking at is no
+       longer where you left it. Staying put shows you the middle of a list
+       you did not ask for; going to the top shows you the best match, which
+       is the reason you typed. */
+    const sc = helpPanel.querySelector('.sheetbody') || helpPanel;
+    if (sc.scrollTop) sc.scrollTop = 0;
+  });
+  /* Escape clears before it does anything else. The global handler blurs the
+     field on Escape and the panel's own handler would close the panel, so
+     without stopping here one press would throw away both the query and the
+     panel you were reading. */
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && input.value) {
+      e.stopPropagation(); e.preventDefault();
+      input.value = ''; apply();
+    }
+  });
+  box.addEventListener('click', e => { if (e.target !== input) input.focus(); });
+  apply();
+}
 /* photo lives on the I key now; the bar button was retired for the gear */
 document.getElementById('settings').addEventListener('click', () => togglePanel(cfgPanel));
 /* The config panel's status line, usable from outside the buildCfg IIFE.

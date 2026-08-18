@@ -60,3 +60,7 @@ screensaver/windows/build/
 screensaver/windows/vendor/
 bridge/.venv/
 bridge.log
+
+# scratch harness: index.html + an inline test script, written by agents
+_shot.html
+interceptor-screenshot-*.png
