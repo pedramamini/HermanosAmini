@@ -1359,6 +1359,7 @@ const CFG_SCHEMA = {
   socketGlow:     [1.0,   0,     2.5,  0.1,   'eye socket glow'],
   auraSize:       [1.0,   0,     2.5,  0.1,   'skull aura'],
   petalCount:     [12,    4,     20,   1,     'eye petals'],
+  crownBlooms:    [7,     3,     14,   1,     'flower crown blooms'],
 };
 /* ── categories ──
    Every dial belongs to exactly one, for the filter dropdown. Kept as a
@@ -1377,7 +1378,8 @@ const CFG_CATEGORY = {
          'ringBeatKick', 'nosePulse', 'teethClack', 'pupilBeat', 'tempoRef',
          'beatSync'],
   skull: ['skullSize', 'socketGlow', 'auraSize', 'petalCount', 'rayLength',
-          'rayCount', 'flickForce', 'skullOnTop', 'skullBreathe'],
+          'rayCount', 'flickForce', 'skullOnTop', 'skullBreathe',
+          'flowerCrown', 'crownBlooms'],
   sky: ['tunnelCount', 'starDensity', 'dustCount', 'smokeScale', 'smokeStir',
         'smokeDecay', 'eventMinGap', 'eventMaxGap', 'autoEvents'],
   sound: ['musicVolume', 'gritoVolume', 'sfxVolume', 'musicOn'],
@@ -1406,6 +1408,7 @@ const CFG_TOGGLES = {
   beatSync:    [1, 0, 1, 1, 'sync to the beat', 'toggle'],
   skullOnTop:  [0, 0, 1, 1, 'skull always on top', 'toggle'],
   skullBreathe:[0, 0, 1, 1, 'skull breathing', 'toggle'],
+  flowerCrown: [1, 0, 1, 1, 'flower crown', 'toggle'],
   hudOn:       [0, 0, 1, 1, 'fps monitor', 'toggle'],
 };
 Object.assign(CFG_SCHEMA, CFG_TOGGLES);
@@ -2303,6 +2306,103 @@ function faceHit(cx, cy) {
   return false;
 }
 
+/* ── flower crown (viewer request #9) ──
+   Cempasuchil across the crown of the head: the marigold is the flower of the
+   ofrenda and a flower crown is what La Catrina wears, so this sits inside
+   both themes rather than being an ornament bolted on.
+
+   The blooms follow the REAL silhouette. My first attempt placed them on an
+   ellipse, which looked obvious and was wrong: the skull's top is far flatter
+   than an ellipse, so every bloom landed inside the outline and read as paint
+   on the forehead, crowding the third eye. These sample the same bezier
+   `skullOutlinePath` uses and push outward along the normal, so the crown
+   rests ON the head and cannot drift if the silhouette is ever retuned. */
+const CROWN_P0 = [-390, 0], CROWN_P1 = [-390, -270],
+      CROWN_P2 = [-215, -440], CROWN_P3 = [0, -440];
+function crownPoint(f) {
+  /* f 0..1 sweeps left temple to right temple. The left half samples the
+     outline's own top-left bezier; the right half mirrors it. */
+  const side = f < 0.5 ? -1 : 1;
+  const u = f < 0.5 ? f * 2 : (1 - f) * 2;        // 0 at the temple, 1 at centre
+  const t = 0.42 + u * 0.58;                       // skip the steep lower flank
+  const m = 1 - t;
+  const bx = m*m*m*CROWN_P0[0] + 3*m*m*t*CROWN_P1[0] + 3*m*t*t*CROWN_P2[0] + t*t*t*CROWN_P3[0];
+  const by = m*m*m*CROWN_P0[1] + 3*m*m*t*CROWN_P1[1] + 3*m*t*t*CROWN_P2[1] + t*t*t*CROWN_P3[1];
+  /* push out along the normal from a point inside the cranium, so blooms
+     straddle the bone edge instead of sitting on the forehead */
+  const cx = 0, cy = -120;
+  const dx = bx - cx, dy = by - cy;
+  const d = Math.hypot(dx, dy) || 1;
+  const OUT = 26;
+  return [side * (bx + dx / d * OUT), by + dy / d * OUT];
+}
+
+function drawFlowerCrown() {
+  const n = Math.round(CFG.crownBlooms);
+  if (!CFG.flowerCrown || n < 1) return;
+  const q = qLevel();
+  /* the quality ladder sheds petals per bloom, not blooms: a phone still gets
+     the crown the viewer asked for, just a simpler one */
+  const PET = q >= 4 ? 5 : q >= 3 ? 6 : 8;
+  const sway = Math.sin(t * 0.35) * 0.04 + beatPulse * 0.03;
+  for (let i = 0; i < n; i++) {
+    const f = n === 1 ? 0.5 : i / (n - 1);
+    const [x, y] = crownPoint(f);
+    /* biggest at the centre, tapering to the temples, like a real garland.
+       The per-index jitter matters: identical blooms read as a stamped
+       pattern, and the whole point is that this looks gathered by hand. */
+    const edge = 0.35 + 0.65 * Math.sin(f * Math.PI);
+    const jit = 0.86 + 0.28 * ((i * 2654435761 % 97) / 97);
+    const r = (36 + 32 * edge) * jit * (1 + sway);
+    const spin = t * 0.1 * (i % 2 ? 1 : -1) + i * 1.7;
+    const c1 = i % 3 === 0 ? PAL.gold : i % 3 === 1 ? PAL.magenta : PAL.violet;
+    const c2 = i % 3 === 0 ? PAL.magenta : i % 3 === 1 ? PAL.gold : PAL.teal;
+    hctx.save();
+    hctx.translate(x, y);
+    /* Seat the bloom. Without this they float above the bone like stickers:
+       flat fills on a flat skull have nothing to separate them. */
+    hctx.beginPath();
+    hctx.arc(0, r * 0.10, r * 1.02, 0, Math.PI * 2);
+    hctx.fillStyle = PAL.dark;
+    hctx.globalAlpha = 0.32;
+    hctx.fill();
+    hctx.globalAlpha = 1;
+    for (let p = 0; p < PET; p++) {
+      hctx.save();
+      hctx.rotate((p / PET) * Math.PI * 2 + spin);
+      hctx.beginPath();
+      /* narrow and long, not round: a round petal is a daisy, and the
+         cempasuchil this is meant to be has tight, elongated florets */
+      hctx.ellipse(0, -r * 0.62, r * 0.30, r * 0.62, 0, 0, Math.PI * 2);
+      hctx.fillStyle = p % 2 ? c1 : c2;
+      hctx.globalAlpha = 0.96;
+      hctx.fill();
+      hctx.restore();
+    }
+    /* Second ring ON TOP of the first, rotated half a petal. Drawn under the
+       outer ring it was invisible at this scale, which made every bloom a
+       flat cartoon flower; over the top it reads as marigold layering. */
+    if (q < 3) {
+      for (let p = 0; p < PET; p++) {
+        hctx.save();
+        hctx.rotate((p / PET) * Math.PI * 2 - spin * 0.6 + Math.PI / PET);
+        hctx.beginPath();
+        hctx.ellipse(0, -r * 0.36, r * 0.20, r * 0.38, 0, 0, Math.PI * 2);
+        hctx.fillStyle = c1;
+        hctx.globalAlpha = 0.85;
+        hctx.fill();
+        hctx.restore();
+      }
+    }
+    hctx.beginPath();
+    hctx.arc(0, 0, r * 0.17, 0, Math.PI * 2);
+    hctx.fillStyle = PAL.bone1;
+    hctx.globalAlpha = 1;
+    hctx.fill();
+    hctx.restore();
+  }
+}
+
 function drawEyeAssembly(side) {
   const ex = side * 178, ey = -60, er = 128;
   const rot = face.ringRot * side * 2.2;             // left and right counter-rotate
@@ -2831,6 +2931,15 @@ function drawHero(dt) {
     }
     hctx.restore();
   }
+  hctx.restore();
+
+  /* the crown rides on top of the head, so it re-enters skull-unit space
+     WITHOUT the silhouette clip the face parts just used */
+  hctx.save();
+  hctx.scale(sY, sY);
+  hctx.translate(0, 32);
+  hctx.scale(4 / 3, 4 / 3);
+  drawFlowerCrown();
   hctx.restore();
 
   /* socket glow, skull-space socket centers: (±178,-60), third eye (0,-300)
