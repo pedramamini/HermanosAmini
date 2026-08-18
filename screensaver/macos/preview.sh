@@ -11,6 +11,9 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 SAVER="${SAVER:-build/SKLZ.saver}"
+# absolute paths must survive: pointing this at a downloaded .saver elsewhere
+# on disk is the whole reason it takes an override
+case "$SAVER" in /*) ;; *) SAVER="$PWD/$SAVER" ;; esac
 [ -d "$SAVER" ] || { echo "no bundle at $SAVER (run ./build.sh first)"; exit 1; }
 
 SHOT=""; SECS=12
@@ -74,5 +77,5 @@ if !shot.isEmpty {
 app.run()
 SWIFT
 swiftc -O "$TMP/main.swift" -o "$TMP/preview" 2>&1 | grep -v '^$' || true
-if [ -n "$SHOT" ]; then "$TMP/preview" "$PWD/$SAVER" "$SHOT" "$SECS"; else "$TMP/preview" "$PWD/$SAVER"; fi
+if [ -n "$SHOT" ]; then "$TMP/preview" "$SAVER" "$SHOT" "$SECS"; else "$TMP/preview" "$SAVER"; fi
 rm -rf "$TMP"
