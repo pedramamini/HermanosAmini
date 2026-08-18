@@ -26,5 +26,8 @@ RewriteRule ^(.*)$ https://hermanosamini.com/$1 [R=301,L]
 #    With no trailing slash the "directory" of /demo is /, so every relative
 #    URL resolves exactly as it does at the root. So: send /demo/ to /demo,
 #    then serve the real file without changing the address bar.
-RewriteRule ^demo/$ /demo [R=301,L]
+#    The scheme is spelled out. A bare "/demo" target made Apache build an
+#    http:// Location, which cost a plaintext hop and a second redirect before
+#    landing on https. Measured: 2 hops. Now it is 1.
+RewriteRule ^demo/$ https://hermanosamini.com/demo [R=301,L]
 RewriteRule ^demo$ index.html [L]
