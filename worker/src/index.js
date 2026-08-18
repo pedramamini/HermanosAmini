@@ -88,7 +88,10 @@ function cleanConfig(raw) {
   const out = {};
   let n = 0;
   for (const k in LIMITS) {
-    if (!(k in raw)) continue;
+    /* hasOwnProperty: `k in raw` is true for inherited names, so a posted
+       body could make "constructor" or "toString" look like a submitted dial.
+       Same hole as cfgApply had on the page side. */
+    if (!Object.prototype.hasOwnProperty.call(raw, k)) continue;
     const v = Number(raw[k]);
     if (!isFinite(v)) continue;
     const [lo, hi] = LIMITS[k];
@@ -96,6 +99,48 @@ function cleanConfig(raw) {
     n++;
   }
   return n >= 5 ? out : null;      // a preset with almost nothing in it is junk
+}
+
+/* Short-code alphabet: mixed case + digits, as asked. 0/O and 1/l/I are all
+   in here on purpose, because these codes are copy-pasted from a share sheet
+   rather than read aloud off a whiteboard, and dropping them would cost a
+   third of the keyspace for a problem this link does not have. 6 chars of
+   base62 is 56 billion codes. */
+const shortChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+const SHORT_LEN = 6;
+function makeShort() {
+  let s = '';
+  const b = crypto.getRandomValues(new Uint8Array(SHORT_LEN));
+  for (const x of b) s += shortChars[x % shortChars.length];
+  return s;
+}
+
+/* THE SECURITY PROPERTY OF THIS SHORTENER: it stores a CONFIG, never a URL.
+   A shortener that stores arbitrary URLs is an open redirect, which is a
+   phishing primitive someone else gets to point at any domain they like from
+   ours. Here the stored value is parsed against LIMITS and re-serialized, so
+   what comes back out is provably a list of known dials inside their declared
+   ranges, and the page can only ever feed it to CFG. There is no code path
+   that turns a stored value into a navigation. */
+function cleanShareString(raw) {
+  const src = String(raw || '');
+  if (src.length > 2000) return null;
+  const out = [];
+  for (const pair of src.split(',')) {
+    const i = pair.indexOf(':');
+    if (i < 1) continue;
+    const k = pair.slice(0, i).trim();
+    if (!Object.prototype.hasOwnProperty.call(LIMITS, k)) continue;
+    const v = Number(pair.slice(i + 1).trim());
+    if (!isFinite(v)) continue;
+    const [lo, hi] = LIMITS[k];
+    out.push(k + ':' + Math.min(hi, Math.max(lo, v)));
+  }
+  return out.length ? out.join(',') : null;
+}
+async function shareHash(s, salt) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(salt + '|' + s));
+  return [...new Uint8Array(buf)].slice(0, 12).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 const slugChars = 'abcdefghijkmnpqrstuvwxyz23456789';   // no look-alikes
@@ -127,7 +172,7 @@ const json = (obj, status, request) => new Response(JSON.stringify(obj), {
 });
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const path = url.pathname.replace(/\/+$/, '');
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(request) });
@@ -168,6 +213,72 @@ export default {
         await env.sklz_presets.prepare('UPDATE presets SET views = views + 1 WHERE id = ?')
           .bind(vw[1]).run();
         return json({ ok: true }, 200, request);
+      }
+
+      /* ── short links ──
+         POST /api/s  { c: "palette:3,..." }  -> { code, url }
+         GET  /api/s/<code>                   -> { c }
+         The page at hermanosamini.com/<code> resolves the code itself and
+         applies the config; nothing here ever issues a redirect. */
+      if (request.method === 'POST' && path === '/api/s') {
+        const body = await request.json().catch(() => null);
+        const clean = cleanShareString(body && body.c);
+        if (!clean) return json({ error: 'nothing to share' }, 400, request);
+
+        const ip = request.headers.get('CF-Connecting-IP') || '0.0.0.0';
+        const author = await hashIp(ip, env.SALT || 'sklz');
+        const h = await shareHash(clean, env.SALT || 'sklz');
+
+        /* Idempotent by content. Clicking share twice on the same board must
+           not mint a second code: it fills the table for nothing and hands
+           out two links that are the same link. */
+        const seen = await env.sklz_presets.prepare(
+          'SELECT code FROM shorts WHERE hash = ? LIMIT 1').bind(h).first();
+        if (seen) return json({ code: seen.code, reused: true }, 200, request);
+
+        const hour = Math.floor(Date.now() / 3600000);
+        const quota = await env.sklz_presets.prepare(
+          'SELECT n FROM writes WHERE author_hash = ? AND hour_bucket = ?'
+        ).bind(author, hour).first();
+        if (quota && quota.n >= 40) return json({ error: 'easy there, try again later' }, 429, request);
+
+        /* Retry on collision rather than trusting 56 billion. The whole
+           feature is worthless if a code ever resolves to someone else's
+           board, and the INSERT is the only place that can be certain. */
+        let code = null;
+        for (let attempt = 0; attempt < 6 && !code; attempt++) {
+          const c = makeShort();
+          try {
+            await env.sklz_presets.prepare(
+              'INSERT INTO shorts (code, q, hash, created_at, author_hash) VALUES (?, ?, ?, ?, ?)'
+            ).bind(c, clean, h, Date.now(), author).run();
+            code = c;
+          } catch (_) { /* PK collision: roll again */ }
+        }
+        if (!code) return json({ error: 'could not mint a code' }, 500, request);
+
+        await env.sklz_presets.prepare(
+          `INSERT INTO writes (author_hash, hour_bucket, n) VALUES (?, ?, 1)
+           ON CONFLICT(author_hash, hour_bucket) DO UPDATE SET n = n + 1`
+        ).bind(author, hour).run();
+        return json({ code }, 200, request);
+      }
+
+      if (request.method === 'GET' && path.startsWith('/api/s/')) {
+        const code = path.slice(7);
+        if (!/^[A-Za-z0-9]{4,12}$/.test(code)) return json({ error: 'no' }, 400, request);
+        const row = await env.sklz_presets.prepare(
+          'SELECT q FROM shorts WHERE code = ?').bind(code).first();
+        if (!row) return json({ error: 'unknown code' }, 404, request);
+        /* Re-clean on the way out too. The row was clean going in, but this
+           costs nothing and means a future migration or a hand-edited row can
+           never hand the page something the current LIMITS would reject. */
+        const clean = cleanShareString(row.q);
+        if (!clean) return json({ error: 'unknown code' }, 404, request);
+        /* fire-and-forget: a hit counter must never delay the art */
+        ctx.waitUntil(env.sklz_presets.prepare(
+          'UPDATE shorts SET hits = hits + 1 WHERE code = ?').bind(code).run());
+        return json({ c: clean }, 200, request);
       }
 
       /* ── interrogate a request before it is filed ──

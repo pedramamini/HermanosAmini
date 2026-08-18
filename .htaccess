@@ -31,3 +31,24 @@ RewriteRule ^(.*)$ https://hermanosamini.com/$1 [R=301,L]
 #    landing on https. Measured: 2 hops. Now it is 1.
 RewriteRule ^demo/$ https://hermanosamini.com/demo [R=301,L]
 RewriteRule ^demo$ index.html [L]
+
+# 3. Short share links: hermanosamini.com/AbC123 -> the art, which resolves the
+#    code against the Worker and applies that board. See "short code
+#    resolution" in index.html.
+#
+#    THE TWO CONDITIONS ARE LOAD-BEARING. Without !-f and !-d this rule
+#    swallows real files and directories: qr.png survives on its dot, but any
+#    future extensionless file or a directory like /gritos would be served the
+#    art instead of itself, and it would fail silently in exactly the way
+#    nobody notices until a wall display has been wrong for a month.
+#
+#    Same no-trailing-slash reasoning as /demo above: relative assets must
+#    resolve against /, so /AbC123/ is sent to /AbC123 first. The scheme is
+#    spelled out so it is one https hop, not an http hop and then a redirect.
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^([A-Za-z0-9]{4,12})/$ https://hermanosamini.com/$1 [R=301,L]
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^([A-Za-z0-9]{4,12})$ index.html [L]

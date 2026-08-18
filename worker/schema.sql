@@ -39,3 +39,17 @@ CREATE TABLE IF NOT EXISTS requests (
 );
 CREATE INDEX IF NOT EXISTS idx_req_issue ON requests (issue_number);
 CREATE INDEX IF NOT EXISTS idx_req_pending ON requests (notified_closed, issue_number);
+
+/* ── short links ──
+   Stores a CONFIG STRING, never a URL. See cleanShareString() in src/index.js:
+   a shortener that stores URLs is an open redirect, and this one structurally
+   cannot become one. `hash` makes the mint idempotent per board. */
+CREATE TABLE IF NOT EXISTS shorts (
+  code        TEXT PRIMARY KEY,
+  q           TEXT NOT NULL,             -- "palette:3,hueShift:-40"
+  hash        TEXT,                      -- salted hash of q, for dedupe
+  created_at  INTEGER NOT NULL,
+  hits        INTEGER NOT NULL DEFAULT 0,
+  author_hash TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_shorts_hash ON shorts (hash);

@@ -339,6 +339,18 @@
     grid-column: 1 / -1; text-align: center; padding: 14px 0;
     font-size: 12px; color: rgba(245,234,223,.45);
   }
+  /* the minted link, shown so it can be read and hand-copied when the
+     clipboard API is unavailable (it needs a secure context, and this page is
+     opened from file:// often enough to matter) */
+  #cfgLinkOut {
+    margin: -4px 0 8px; padding: 8px 11px;
+    background: rgba(0,0,0,.32); border: 1px solid rgba(245,234,223,.14);
+    border-radius: 8px; word-break: break-all;
+  }
+  #cfgLinkText {
+    font-family: 'SF Mono', 'Menlo', monospace; font-size: 11px;
+    color: #2fe8d0; user-select: all;
+  }
   #cfgPanel label {
     color: rgba(245,234,223,.72); text-align: right;
     font-size: 12px; white-space: nowrap;
@@ -1231,7 +1243,7 @@
     <thead><tr><th></th><th>action</th><th>&#127908; say</th></tr></thead>
     <tbody></tbody>
   </table>
-  <p style="margin-top:10px;color:rgba(245,234,223,.4)">click a key to try it &middot; eyes follow clicks &middot; face parts react &middot; skulls flick &middot; pick a bloom off the crown</p>
+  <p style="margin-top:10px;color:rgba(245,234,223,.4)">click a key to try it &middot; eyes follow clicks &middot; face parts react &middot; skulls flick &middot; pick a bloom off the crown &middot; C &rarr; copy a link to your board</p>
 </div>
 
 <div id="cfgPanel" class="panel">
@@ -1261,6 +1273,8 @@
     <button id="galPublish">share</button>
   </div>
   <button id="cfgSave" class="reset">save privately to this browser</button>
+  <button id="cfgLink" class="reset">&#128279;&nbsp; copy a link to this exact board</button>
+  <div id="cfgLinkOut" hidden><code id="cfgLinkText"></code></div>
   <button id="cfgCopy" class="reset">copy settings JSON</button>
   <div class="cfgsec">4 &middot; start over</div>
   <button id="cfgReset" class="reset">reset defaults</button>
@@ -1522,7 +1536,13 @@ const BUILD_ID = '__BUILD_ID__';       /* stamped by deploy.sh on every push */
 function cfgApply(obj) {
   let n = 0;
   for (const k in obj) {
-    if (!(k in CFG_SCHEMA)) continue;
+    /* hasOwnProperty, NOT `k in CFG_SCHEMA`. `in` walks the prototype chain,
+       so a key named "constructor" or "toString" passed the guard, and the
+       next line destructured a FUNCTION and threw "function is not iterable",
+       taking the whole config load with it. Reachable from every caller:
+       a share link, a gallery preset, or a hand-edited localStorage entry.
+       Found by feeding this deliberate junk, not by reading it. */
+    if (!Object.prototype.hasOwnProperty.call(CFG_SCHEMA, k)) continue;
     const v = parseFloat(obj[k]);
     if (!isFinite(v)) continue;
     const [, min, max] = CFG_SCHEMA[k];
@@ -1546,6 +1566,64 @@ function cfgClear() {
   try { localStorage.removeItem(CFG_STORE); } catch (_) {}
 }
 const CFG_RESTORED = cfgLoad();          // apply before anything reads CFG
+
+/* ── share links ──
+   A board travels as a URL: `?c=palette:3,hueShift:-40,skullSize:1.4`. Only
+   dials that differ from their default are carried, so the string stays short
+   and, more importantly, a link made today still means the same thing after a
+   new dial is added tomorrow: unmentioned dials take whatever default the
+   current build has, which is exactly what someone sharing "the palette I
+   picked" meant.
+
+   Keys are spelled out rather than packed into indices. An index scheme is
+   maybe 4x smaller and would silently REINTERPRET every existing link the
+   first time a key is inserted anywhere but the end, turning old links into
+   plausible-looking wrong boards. That is the worst failure mode available
+   here, and the shortener removes the only reason to care about length.
+
+   `:` and `,` are both legal unencoded in a query string (RFC 3986 sub-delims
+   and `:` are permitted in the query component), so the URL stays readable and
+   hand-editable instead of turning into a base64 smear. */
+function cfgShareString() {
+  const out = [];
+  for (const k in CFG_SCHEMA) {
+    const [def, , , step] = CFG_SCHEMA[k];
+    const v = CFG[k];
+    /* Compare on the dial's own step, not exact equality. A slider that has
+       been dragged and dragged back lands on 1.0000000000000002, and without
+       this every such dial rides along in the URL as noise. */
+    if (Math.abs(v - def) < (step || 0.001) / 2) continue;
+    out.push(k + ':' + cfgTrim(v, step));
+  }
+  return out.join(',');
+}
+/* Round to the step and drop trailing zeros: 1.0600000000000001 -> 1.06 */
+function cfgTrim(v, step) {
+  const dp = (String(step || 1).split('.')[1] || '').length;
+  return String(parseFloat(v.toFixed(Math.min(6, dp + 1))));
+}
+function cfgFromShareString(str) {
+  /* null prototype: nothing inherited can be mistaken for a submitted key,
+     and `__proto__` in the input becomes an ordinary own property instead of
+     reassigning a prototype */
+  const obj = Object.create(null);
+  for (const pair of String(str || '').split(',')) {
+    const i = pair.indexOf(':');
+    if (i < 1) continue;
+    obj[pair.slice(0, i).trim()] = pair.slice(i + 1).trim();
+  }
+  return cfgApply(obj);                  // validates keys, finiteness, range
+}
+/* A share link beats a saved board, because it is the more deliberate act:
+   you clicked someone's link to see THEIR board, not your own. Runs here, in
+   the same statement position as cfgLoad, so it is applied before a single
+   pixel is drawn. */
+const CFG_SHARED = (() => {
+  try {
+    const c = new URLSearchParams(location.search).get('c');
+    return c ? cfgFromShareString(c) : 0;
+  } catch (_) { return 0; }
+})();
 
 /* ── palette ── */
 /* ── palette engine ──
@@ -6535,6 +6613,35 @@ function toggleDemo() { setDemo(!demoTimer); }
    Not kiosk mode. Kiosk hides all chrome and force-mutes because a native
    screensaver has no keyboard; here the panels, hotkeys and sound all still
    work, so a person can walk up and take over. */
+/* ── short code resolution ──
+   hermanosamini.com/AbC123 : Apache rewrites any bare base62 path to this
+   page (see .htaccess), and the page asks the Worker what that code means.
+
+   This is a fetch, so unlike `?c=` it cannot land before first paint. That is
+   fine and mostly invisible: the gate is up and waiting for a click, and the
+   fetch beats a human hand every time. When it does land after someone has
+   already clicked through, the board simply changes, which is the honest
+   behaviour and better than holding a blank screen against a network. */
+(function shortCode() {
+  const m = location.pathname.match(/^\/([A-Za-z0-9]{4,12})\/?$/);
+  if (!m) return;
+  const code = m[1];
+  if (/^demo$/i.test(code)) return;               // a route, not a code
+  if (new URLSearchParams(location.search).has('c')) return;  // explicit wins
+  fetch(GALLERY_API.replace('/presets', '/s/' + encodeURIComponent(code)))
+    .then(r => r.ok ? r.json() : null)
+    .then(d => {
+      if (!d || !d.c) return;
+      if (!cfgFromShareString(d.c)) return;
+      applyPalette();
+      schedulePaletteRebuild();
+      applyToggles({ skipVoice: true });
+      syncSlidersSafe();
+      cfgStatusSay('loaded a shared board');
+    })
+    .catch(() => {});                              // offline: the art still runs
+})();
+
 (function demoPath() {
   const q = new URLSearchParams(location.search);
   const path = location.pathname.replace(/\/+$/, '');   // /demo/ and /demo alike
@@ -6746,6 +6853,50 @@ let syncSliders = () => {};   // real one is assigned inside buildCfg below
     if (n) { syncSliders(); say(`restored ${n} settings`); }
     else say('no saved settings yet');
   });
+  /* ── copy a link to this board ──
+     Always hands back a working link. The short one needs the Worker; if that
+     is slow, down, or the board is entirely default, it falls back to the long
+     `?c=` URL, which needs nothing but this page. A share button that can fail
+     is a share button people stop trusting. */
+  document.getElementById('cfgLink').addEventListener('click', async e => {
+    const btn = e.currentTarget;
+    const out = document.getElementById('cfgLinkOut');
+    const outText = document.getElementById('cfgLinkText');
+    const label = '\uD83D\uDD17\u00A0 copy a link to this exact board';
+    const q = cfgShareString();
+    const long = location.origin + '/' + (q ? '?c=' + q : '');
+    btn.disabled = true; btn.textContent = 'minting...';
+
+    let url = long;
+    if (q) {
+      try {
+        const r = await fetch(GALLERY_API.replace('/presets', '/s'), {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ c: q }),
+        });
+        const d = await r.json();
+        if (r.ok && d.code) url = location.origin + '/' + d.code;
+      } catch (_) { /* long link it is */ }
+    }
+
+    outText.textContent = url;
+    out.hidden = false;
+    /* Clipboard needs a secure context and a live gesture. It has both here,
+       but it still refuses in some embedded webviews, so the link is ALSO
+       printed above and selectable. Never claim "copied" without proof. */
+    let copied = false;
+    try {
+      await navigator.clipboard.writeText(url);
+      copied = true;
+    } catch (_) {}
+    btn.textContent = copied
+      ? (url.length < long.length ? 'copied a short link!' : 'copied!')
+      : 'ready to copy \u2191';
+    btn.disabled = false;
+    setTimeout(() => { btn.textContent = label; }, 2400);
+    if (!q) say('this is the default board: the link opens it as-is');
+  });
+
   document.getElementById('cfgCopy').addEventListener('click', e => {
     navigator.clipboard.writeText(JSON.stringify(CFG, null, 2)).then(() => {
       e.target.textContent = 'copied!';
