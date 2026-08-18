@@ -20,6 +20,16 @@
 static NSString *const kSaverURL = @"https://hermanosamini.com/?kiosk=1";
 static const NSTimeInterval kRetry = 30.0;
 
+/* Stamped by build.sh. It is in the status line for one specific reason:
+   macOS keeps legacyScreenSaver.appex RESIDENT, and an Objective-C bundle
+   cannot be unloaded, so a host started before you installed a new .saver
+   keeps running the OLD code forever. Reinstalling looks like it did nothing.
+   Printing the build makes a stale host obvious in one glance instead of
+   costing a day of "but it works on my machine". */
+#ifndef SKLZ_BUILD
+#define SKLZ_BUILD "dev"
+#endif
+
 @interface SKLZView : ScreenSaverView <WKNavigationDelegate>
 @property (nonatomic, strong) WKWebView *web;
 @property (nonatomic, strong) NSTextField *statusLabel;   // ABOVE the web view
@@ -76,7 +86,7 @@ static const NSTimeInterval kRetry = 30.0;
   _statusLabel.drawsBackground = NO;
   _statusLabel.font = [NSFont monospacedSystemFontOfSize:13 weight:NSFontWeightRegular];
   _statusLabel.textColor = [NSColor colorWithCalibratedRed:1 green:0.70 blue:0.28 alpha:0.9];
-  _statusLabel.stringValue = @"SKLZ  ·  starting";
+  _statusLabel.stringValue = @"SKLZ " @SKLZ_BUILD @"  ·  starting";
   [self addSubview:_statusLabel];
 
   [self load];
@@ -87,7 +97,8 @@ static const NSTimeInterval kRetry = 30.0;
   /* AppKit from the main thread only; the JS completion handler is already on
      it, but the timer path is safer explicit than implicit. */
   dispatch_async(dispatch_get_main_queue(), ^{
-    self.statusLabel.stringValue = [@"SKLZ  ·  " stringByAppendingString:msg];
+    self.statusLabel.stringValue =
+        [@"SKLZ " @SKLZ_BUILD @"  ·  " stringByAppendingString:msg];
   });
 }
 

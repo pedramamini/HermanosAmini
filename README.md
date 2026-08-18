@@ -246,6 +246,12 @@ Native screensavers for both platforms live in
 enter gate, hides every control, and hides the cursor. Silent by design; the
 art keeps evolving because a screensaver runs the live site, not a copy.
 
+> **If you reinstall and nothing changes, macOS is running the old code.**
+> `legacyScreenSaver.appex` stays resident and cannot reload a bundle, so a
+> host started before your install keeps the previous build alive for hours.
+> `screensaver/macos/install.sh` copies the bundle and kills those hosts. The
+> saver prints its build stamp on screen, so a stale one is visible at a glance.
+
 **macOS** (`SKLZ.saver`, signed and notarized): download from the
 [latest release](https://github.com/pedramamini/HermanosAmini/releases/latest), unzip,
 double-click, and System Settings offers to install it. No Gatekeeper warning:

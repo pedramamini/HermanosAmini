@@ -30,7 +30,9 @@ OUT=build/SKLZ.saver
 rm -rf build
 mkdir -p "$OUT/Contents/MacOS" "$OUT/Contents/Resources"
 
+BUILD_STAMP="${BUILD_STAMP:-$(date +%Y%m%d-%H%M)}"
 clang -arch arm64 -arch x86_64 -mmacosx-version-min=11.0 -fobjc-arc -Wall \
+  -DSKLZ_BUILD="\"$BUILD_STAMP\"" \
   -bundle SKLZView.m \
   -framework ScreenSaver -framework WebKit -framework AppKit -framework Foundation \
   -o "$OUT/Contents/MacOS/SKLZ"
