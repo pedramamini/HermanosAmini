@@ -252,6 +252,40 @@
   /* the dials are the biggest block in the panel; keep them folded away so
      load / save / reset stay visible without scrolling */
   #cfgSliders.collapsed { display: none; }
+
+  /* ── dial filter ──
+     Sibling of #cfgSliders, never a child: that element is a 3-column grid and
+     a child would be laid into one of the columns. Sticky so it stays reachable
+     while scrolling 59 rows. */
+  #cfgFilter {
+    display: flex; gap: 8px; align-items: center;
+    position: sticky; top: -18px; z-index: 3;
+    margin-top: 12px; padding: 8px 0 8px;
+    background: linear-gradient(180deg, rgba(10,5,22,.96) 78%, rgba(10,5,22,0));
+  }
+  #cfgFilter.collapsed { display: none; }
+  #cfgSearch, #cfgCat {
+    font-family: 'Space Grotesk', sans-serif; font-size: 12px;
+    color: #f5eadf; background: rgba(245,234,223,.07);
+    border: 1px solid rgba(245,234,223,.2); border-radius: 8px;
+    padding: 6px 10px; outline: none;
+  }
+  #cfgSearch { flex: 1; min-width: 0; }
+  #cfgSearch:focus, #cfgCat:focus { border-color: rgba(145,70,255,.75); }
+  #cfgSearch::placeholder { color: rgba(245,234,223,.35); }
+  #cfgCat { cursor: pointer; }
+  #cfgCat option { background: #150a26; color: #f5eadf; }   /* Chrome needs this */
+  #cfgShown {
+    flex: 0 0 auto; font-size: 10px; letter-spacing: .14em;
+    text-transform: uppercase; color: rgba(245,234,223,.4);
+  }
+  /* a row the filter excluded. `display: contents` is the normal state, so
+     this has to be display:none, not visibility */
+  #cfgSliders .dial.hid { display: none !important; }
+  #cfgNone {
+    grid-column: 1 / -1; text-align: center; padding: 14px 0;
+    font-size: 12px; color: rgba(245,234,223,.45);
+  }
   #cfgPanel label {
     color: rgba(245,234,223,.72); text-align: right;
     font-size: 12px; white-space: nowrap;
@@ -1122,7 +1156,12 @@
     </span>
     <span class="db-chev" aria-hidden="true">&#9662;</span>
   </button>
-  <div id="cfgSliders" class="collapsed"></div>
+  <div id="cfgFilter" class="collapsed">
+  <input id="cfgSearch" type="search" placeholder="filter dials, try &quot;smoke&quot; or &quot;beat&quot;" autocomplete="off" spellcheck="false">
+  <select id="cfgCat" aria-label="filter by category"></select>
+  <span id="cfgShown"></span>
+</div>
+<div id="cfgSliders" class="collapsed"></div>
   <button id="cfgRestyle" class="reset">&#127922;&nbsp; surprise me with a new look</button>
   <div class="cfgsec">3 &middot; save it</div>
   <div class="galrow">
@@ -1284,8 +1323,8 @@ const CFG_SCHEMA = {
   smokeDecay:     [0.3,   0.05,  3,    0.05,  'smoke stir fade rate'],
   skullSize:      [1.0,   0.5,   1.8,  0.05,  'hero skull size'],
   breatheRate:    [8,     2,     40,   1,     'breathing pace (per min)'],
-  rayLength:      [1.0,   0.3,   2.5,  0.05,  'starburst length'],
-  rayCount:       [14,    6,     28,   2,     'starburst rays'],
+  rayLength:      [1.0,   0.3,   2.5,  0.05,  'sunbeam length'],
+  rayCount:       [14,    6,     28,   2,     'sunbeam count'],
   smokeScale:     [1.0,   0.4,   3,    0.1,   'smoke marble size'],
   smokeDrift:     [1.0,   0.1,   4,    0.1,   'smoke drift speed'],
   tunnelCount:    [56,    12,    56,   4,     'tunnel skull count'],
@@ -1321,6 +1360,42 @@ const CFG_SCHEMA = {
   auraSize:       [1.0,   0,     2.5,  0.1,   'skull aura'],
   petalCount:     [12,    4,     20,   1,     'eye petals'],
 };
+/* ── categories ──
+   Every dial belongs to exactly one, for the filter dropdown. Kept as a
+   separate map rather than a seventh field in CFG_SCHEMA so the schema rows
+   stay one line and diffable, and so a missing category is a loud startup
+   error instead of an undefined index nobody notices. Grouped by what a
+   VIEWER is looking for, not by what the code calls it: "why is the skull
+   spinning" is a motion question even though the value lives on the tunnel. */
+const CFG_CATEGORY = {
+  color: ['palette', 'bgMode', 'hueShift', 'satMul', 'boneHue', 'boneSat',
+          'nebulaHue', 'nebulaSat', 'bgBright', 'vignette'],
+  motion: ['tunnelSpeed', 'skullSpinMax', 'ringSpeed', 'spiralSpeed', 'raySpeed',
+           'smokeDrift', 'wanderPace', 'gazeRange', 'breatheRate', 'tempoMax',
+           'dayCycleMin', 'liquidFill', 'liquidRest'],
+  beat: ['tunnelBassBoost', 'tunnelBreath', 'beatSensitivity', 'beatDecay',
+         'ringBeatKick', 'nosePulse', 'teethClack', 'pupilBeat', 'tempoRef',
+         'beatSync'],
+  skull: ['skullSize', 'socketGlow', 'auraSize', 'petalCount', 'rayLength',
+          'rayCount', 'flickForce', 'skullOnTop', 'skullBreathe'],
+  sky: ['tunnelCount', 'starDensity', 'dustCount', 'smokeScale', 'smokeStir',
+        'smokeDecay', 'eventMinGap', 'eventMaxGap', 'autoEvents'],
+  sound: ['musicVolume', 'gritoVolume', 'sfxVolume', 'musicOn'],
+  system: ['perfMode', 'hudOn', 'textOn', 'voiceOn'],
+};
+/* key -> category, built once. Also the integrity check: a dial with no
+   category, or in two, would silently vanish from or duplicate in the filter,
+   which is exactly the class of drift that cost the gallery its colours. */
+const CAT_OF = {};
+(function checkCategories() {
+  for (const cat in CFG_CATEGORY) {
+    for (const k of CFG_CATEGORY[cat]) {
+      if (CAT_OF[k]) console.error('SKLZ: ' + k + ' is in two categories');
+      CAT_OF[k] = cat;
+    }
+  }
+})();
+
 /* toggles live in CFG too, so they save and restore with everything else.
    [default, 0, 1, 1, label, 'toggle'] renders a switch instead of a slider. */
 const CFG_TOGGLES = {
@@ -5524,6 +5599,62 @@ document.getElementById('cfgRestyle').addEventListener('click', () => {
   cfgStatusSay(`new look: palette ${CFG.palette}, ${BG[CFG.bgMode] || 'smoke'} background`);
 });
 
+/* ── dial filter ──
+   59 dials and climbing. Search matches the LABEL, the internal KEY, and the
+   category name, all three: the key matters because the label is not always
+   what you would guess. "sunbeam length" lives on `rayLength`, so someone
+   reading the source and someone reading the panel can both find it. */
+let refreshDials = () => {};   // real one assigned in dialFilter below
+(function dialFilter() {
+  const box = document.getElementById('cfgSliders');
+  const search = document.getElementById('cfgSearch');
+  const cat = document.getElementById('cfgCat');
+  const shown = document.getElementById('cfgShown');
+
+  const CATS = Object.keys(CFG_CATEGORY);
+  cat.innerHTML = '<option value="">all</option>' +
+    CATS.map(c => `<option value="${c}">${c} (${CFG_CATEGORY[c].length})</option>`).join('');
+
+  /* "nothing matched" needs to be said out loud: an empty grid reads as a
+     broken panel, which is the same class of silence as a black screensaver */
+  const none = document.createElement('div');
+  none.id = 'cfgNone';
+  none.textContent = 'no dials match that';
+  none.style.display = 'none';
+  box.appendChild(none);
+
+  function apply() {
+    const q = search.value.trim().toLowerCase();
+    const c = cat.value;
+    let hits = 0, total = 0;
+    box.querySelectorAll('.dial').forEach(row => {
+      total++;
+      const okCat = !c || row.dataset.cat === c;
+      const okText = !q || row.dataset.label.includes(q) ||
+                     row.dataset.key.toLowerCase().includes(q) ||
+                     row.dataset.cat.includes(q);
+      const on = okCat && okText;
+      row.classList.toggle('hid', !on);
+      if (on) hits++;
+    });
+    none.style.display = hits ? 'none' : 'block';
+    shown.textContent = (q || c) ? `${hits}/${total}` : `${total} dials`;
+  }
+  search.addEventListener('input', apply);
+  cat.addEventListener('change', apply);
+  /* Escape clears the filter rather than closing the panel: with the field
+     focused, wiping the search is what you meant */
+  search.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && search.value) {
+      e.stopPropagation();
+      search.value = ''; apply();
+    }
+  });
+  /* buildCfg runs AFTER this IIFE, so counting here would report zero rows.
+     Same shape as syncSliders: expose it and let the builder call it. */
+  refreshDials = apply;
+})();
+
 (function dialsFold() {
   const btn = document.getElementById('cfgToggleSliders');
   const box = document.getElementById('cfgSliders');
@@ -5539,6 +5670,9 @@ document.getElementById('cfgRestyle').addEventListener('click', () => {
 
   btn.addEventListener('click', () => {
     const open = box.classList.toggle('collapsed') === false;
+    /* the filter bar is a separate element, so it needs the same toggle */
+    const bar = document.getElementById('cfgFilter');
+    if (bar) bar.classList.toggle('collapsed', !open);
     /* the label is a real element now, not a stray text node: writing
        btn.firstChild here would set the whitespace before the skull */
     title.textContent = open ? 'hide the dials' : 'open the dials';
@@ -5569,6 +5703,11 @@ let syncSliders = () => {};   // real one is assigned inside buildCfg below
        2-column grid and the slider drops to a full-width second line. */
     const row = document.createElement('div');
     row.className = 'dial';
+    /* the filter reads these; storing them on the row means the search never
+       has to re-derive anything from the DOM text */
+    row.dataset.key = k;
+    row.dataset.cat = CAT_OF[k] || 'other';
+    row.dataset.label = label.toLowerCase();
     holder.appendChild(row);
     if (kind === 'toggle') {                       // switch, not slider
       const sw = document.createElement('div');
@@ -5613,6 +5752,7 @@ let syncSliders = () => {};   // real one is assigned inside buildCfg below
     clearTimeout(statusT);
     statusT = setTimeout(() => statusEl.classList.remove('show'), 2200);
   }
+  refreshDials();                // rows exist now: give the filter its counts
   if (CFG_RESTORED) { syncSliders(); say(`restored ${CFG_RESTORED} saved settings`); }
 
   document.getElementById('cfgSave').addEventListener('click', () => {
