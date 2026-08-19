@@ -98,10 +98,9 @@ It runs silently without audio, see [Audio](#audio) below.
 | `!` | fiesta: new look + everything + grito | | | |
 | `Shift`+`O` | demo mode: reroll everything every 3 min | | | |
 | `Shift`+`I` | record a clip (20s max, with sound) | | | |
-| `Shift`+`C` | crown: off / corona / flores | | | |
+| `Shift`+`C` | crown on / off | | | |
 | `Shift`+`B` | skull breathing on / off | | | |
 | `Shift`+`S` | sombrero on / off | | | |
-| `Shift`+`G` | marigold garland on / off | | | |
 | `H` or `?` | this list, in the piece | | | |
 
 The full list lives on `?` in the piece itself, alphabetized, with a fuzzy
@@ -133,22 +132,24 @@ and it is told to refuse if you ask.
 
 ### Crown the Calavera
 
-`Shift`+`C` cycles the crown: **la corona real**, a jewelled gold band whose
-metal takes its colour from the active palette, then **corona de flores**, a
-gathered marigold garland two rows deep.
+`Shift`+`C` puts a worked metal crown on the skull: a beaded band, hollowed
+spires, ball finials, and **marigolds set into the settings** where a crown
+would normally carry stones.
 
-Both are pluckable. Click a bloom or a jewel and it pops off, tumbles down
-through the frame, and a new one grows back in its place a few seconds later.
+The metal is tunable: gold, silver, copper, rose gold, obsidian, or derived
+from whatever palette is active.
 
-### Sombrero and Garland
+**Pick the flowers.** Click one and it lifts out of its setting, floats down
+through the frame, and a new one grows back a few seconds later. The empty
+bezel stays behind while it is gone, so a picked crown looks picked rather
+than broken.
+
+### Sombrero
 
 `Shift`+`S` puts a wide-brimmed sombrero on the calavera, tilted, with a
-marigold tucked into the hatband and pom-poms swinging off the brim. `Shift`+`G`
-strings a marigold garland where the collarbones would be, hanging on a real
-catenary so it sags like rope rather than arcing like a hoop.
-
-Together they are the mariachi. The hat quietly hides the flower crown while it
-is on, and gives it back untouched when you take it off.
+marigold tucked into the hatband and pom-poms swinging off the brim. It quietly
+hides the crown while it is on, and gives it back untouched when you take it
+off.
 
 ### A Black Hole
 

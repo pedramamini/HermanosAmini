@@ -1605,9 +1605,8 @@ const CFG_SCHEMA = {
   socketGlow:     [1.0,   0,     2.5,  0.1,   'eye socket glow'],
   auraSize:       [1.0,   0,     2.5,  0.1,   'skull aura'],
   petalCount:     [12,    4,     20,   1,     'eye petals'],
-  crownBlooms:    [10,    3,     22,   1,     'flower crown blooms'],
-  garlandBlooms:  [11,    5,     24,   1,     'garland marigolds'],
-  crownStyle:     [1,     0,     1,    1,     'crown: 0 flores 1 corona'],
+  crownBlooms:    [5,     3,     12,   1,     'crown flowers'],
+  crownMetal:     [0,     0,     5,    1,     'crown metal: gold..palette'],
   crownPeaks:     [4,     3,     7,    1,     'crown points'],
 };
 /* ── categories ──
@@ -1627,8 +1626,8 @@ const CFG_CATEGORY = {
          'ringBeatKick', 'nosePulse', 'teethClack', 'pupilBeat', 'tempoRef',
          'beatSync'],
   skull: ['skullSize', 'socketGlow', 'auraSize', 'petalCount', 'rayLength',
-          'rayCount', 'flickForce', 'skullOnTop', 'skullBreathe', 'floodRate', 'crownStyle', 'crownPeaks',
-          'sombrero', 'garland', 'garlandBlooms',
+          'rayCount', 'flickForce', 'skullOnTop', 'skullBreathe', 'floodRate', 'crownMetal', 'crownPeaks',
+          'sombrero',
           'flowerCrown', 'crownBlooms'],
   sky: ['tunnelCount', 'starDensity', 'dustCount', 'smokeScale', 'smokeStir',
         'smokeDecay', 'eventMinGap', 'eventMaxGap', 'autoEvents'],
@@ -1660,7 +1659,6 @@ const CFG_TOGGLES = {
   skullBreathe:[0, 0, 1, 1, 'skull breathing', 'toggle'],
   flowerCrown: [0, 0, 1, 1, 'flower crown', 'toggle'],
   sombrero:    [0, 0, 1, 1, 'sombrero', 'toggle'],
-  garland:     [0, 0, 1, 1, 'marigold garland', 'toggle'],
   hudOn:       [0, 0, 1, 1, 'fps monitor', 'toggle'],
 };
 Object.assign(CFG_SCHEMA, CFG_TOGGLES);
@@ -1853,10 +1851,29 @@ function applyPalette() {
   /* the crown is metal, so it needs light/mid/dark of the palette's gold
      rather than one flat fill. Derived from the palette so a noir board gets
      a silver crown and an ice board gets a pewter one, for free. */
-  const [gh, gsat] = hex2hsl(p.a[2]);
-  PAL.gold1 = hsl(gh + dh, gsat * sm, 0.87);
-  PAL.gold2 = hsl(gh + dh, gsat * sm, 0.58);
-  PAL.gold3 = hsl(gh + dh, gsat * sm, 0.30);
+  /* METALS are named, not a hue slider. "Make it silver" is how anyone
+     actually asks, and a raw hue dial cannot express silver at all: silver is
+     a LOW-SATURATION grey, not a hue. Each entry is [hue, sat, lightness
+     bias], and index 5 falls back to deriving from the palette so a board
+     with a wild palette still gets a crown that belongs to it. */
+  const METALS = [
+    [ 46, 0.78,  0.00],   // 0 gold
+    [220, 0.06,  0.06],   // 1 silver
+    [ 20, 0.62, -0.04],   // 2 copper
+    [345, 0.42,  0.02],   // 3 rose gold
+    [265, 0.30, -0.16],   // 4 obsidian
+  ];
+  const mi = Math.round(CFG.crownMetal);
+  let gh, gsat, gl;
+  if (mi >= METALS.length) {                 // 5: take it from the palette
+    const [ph, ps] = hex2hsl(p.a[2]);
+    gh = ph + dh; gsat = ps * sm; gl = 0;
+  } else {
+    [gh, gsat, gl] = METALS[mi];
+  }
+  PAL.gold1 = hsl(gh, gsat, 0.87 + gl);
+  PAL.gold2 = hsl(gh, gsat, 0.58 + gl);
+  PAL.gold3 = hsl(gh, gsat, 0.30 + gl * 0.6);
   const bh = p.bone + CFG.boneHue, bs = CFG.boneSat;
   PAL.bone1 = hsl(bh, 0.62 * bs, 0.90);
   PAL.bone2 = hsl(bh, 0.60 * bs, 0.67);
@@ -2062,6 +2079,46 @@ const SFX = {
     noiseHit(t0, 0.05, 900, 1.4, 0.1);
   },
   /* third eye: a struck bell, three detuned partials ringing out */
+  /* Picking a flower off the crown. A bell was wrong for it: a bell is a
+     STRUCK metal sound and this is a soft snap of a stem, so the old cue said
+     "you hit the crown" when the event is "you took a flower from it".
+
+     Two parts, which is what makes it read as organic rather than as a beep:
+     a very short filtered noise transient (the snap), and a triangle that
+     bends DOWN a minor third and dies fast (the release). Pitch rises a
+     little with each pick so a run of them sounds like a phrase instead of a
+     stuck key. Synthesized, per the no-audio-files rule. */
+  pluck(step) {
+    if (!sfxReady() || !sfxThrottle('pluck', 55)) return;
+    const t0 = actx.currentTime;
+    const base = 392 * Math.pow(2, ((step || 0) % 5) / 12);
+
+    /* the snap: 18ms of bandpassed noise */
+    const n = actx.createBufferSource();
+    const buf = actx.createBuffer(1, 1024, actx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
+    n.buffer = buf;
+    const bp = actx.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.value = base * 3.2; bp.Q.value = 1.4;
+    const ng = actx.createGain();
+    ng.gain.setValueAtTime(0.16, t0);
+    ng.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.05);
+    n.connect(bp); bp.connect(ng); ng.connect(sfxBus);
+    n.start(t0); n.stop(t0 + 0.06);
+
+    /* the release: a short bent tone */
+    const o = actx.createOscillator();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(base * 1.19, t0);          // a minor third up
+    o.frequency.exponentialRampToValueAtTime(base, t0 + 0.09);
+    const g = actx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(0.13, t0 + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.42);
+    o.connect(g); g.connect(sfxBus);
+    o.start(t0); o.stop(t0 + 0.45);
+  },
   bell() {
     if (!sfxReady() || !sfxThrottle('bell', 160)) return;
     const t0 = actx.currentTime;
@@ -2631,7 +2688,7 @@ function rebuildSprites() {
 rebuildSprites();
 
 /* re-baking 10 canvases is ~40ms, far too slow to run per slider tick */
-const PALETTE_KEYS = ['palette','hueShift','satMul','boneHue','boneSat','petalCount'];
+const PALETTE_KEYS = ['palette','hueShift','satMul','boneHue','boneSat','petalCount','crownMetal'];
 let repaintT = null;
 function schedulePaletteRebuild() {
   clearTimeout(repaintT);
@@ -2830,6 +2887,7 @@ const crownPos = [];
    only its scale animates. That also keeps the layout stable, instead of the
    crown reflowing every time someone picks a flower. */
 const crownOut = new Map();
+let pluckSeq = 0;                                // walks the pick sound up a scale
 const CROWN_REGROW = 2.6;                       // seconds of bare metal
 const CROWN_GROW   = 1.9;                       // seconds to swell back
 
@@ -3008,23 +3066,39 @@ function drawRoyalCrown() {
   }
   crownBeads(inner, 5, PAL.gold3, every + 1);
 
-  /* jewels ride the upper band */
-  const JN = Math.max(3, Math.round(CFG.crownPeaks) + 1);
-  const GEMS = [PAL.magenta, PAL.teal, PAL.gold, PAL.violet];
+  /* FLOWERS in the settings, not stones. The crown keeps its goldsmithing:
+     each bloom still sits in a beaded bezel, so it reads as a flower SET into
+     metal rather than one resting on top of it. That distinction is what
+     stops it looking like the flower crown that used to be a separate style. */
+  const JN = Math.max(3, Math.round(CFG.crownBlooms));
+  const PET = q >= 4 ? 5 : q >= 3 ? 6 : 8;
   for (let j = 0; j < JN; j++) {
     const f = (j + 0.5) / JN;
     const [jx, jy] = crownAt(f, CR_BAND * 0.60);
-    const jr = 30 * (0.66 + 0.34 * Math.sin(Math.PI * f));
-    crownMark('j' + j, jx, jy, jr * 1.5);
-    const k = crownScale('j' + j);
-    if (k <= 0.01) {
-      /* an empty setting, not a hole: the bezel stays so the crown does not
-         look damaged while the stone is away */
-      hctx.beginPath(); hctx.arc(jx, jy, jr * 1.10, 0, Math.PI * 2);
-      hctx.fillStyle = PAL.gold3; hctx.fill();
-      continue;
+    /* 1/sqrt falloff, same as everywhere else: linear would make the crown
+       LOOK sparser as you added flowers */
+    const jr = (118 / Math.sqrt(JN)) * (0.72 + 0.28 * Math.sin(Math.PI * f));
+    crownMark('j' + j, jx, jy, jr * 1.15);
+
+    /* The empty setting always draws, whether or not a bloom is in it. A
+       plucked flower must leave a socket behind, or the crown looks damaged
+       rather than picked. */
+    for (let b = 0; b < 14; b++) {
+      const a = (b / 14) * Math.PI * 2;
+      hctx.beginPath();
+      hctx.arc(jx + Math.cos(a) * jr * 0.95, jy + Math.sin(a) * jr * 0.95, jr * 0.17, 0, Math.PI * 2);
+      hctx.fillStyle = PAL.gold1; hctx.fill();
     }
-    crownJewel(jx, jy, jr * k, GEMS[j % GEMS.length], q < 4);
+    hctx.beginPath(); hctx.arc(jx, jy, jr * 0.82, 0, Math.PI * 2);
+    hctx.fillStyle = PAL.gold3; hctx.fill();
+
+    const k = crownScale('j' + j);
+    if (k <= 0.01) continue;                   // bare setting: it regrows
+    hctx.save();
+    hctx.translate(jx, jy);
+    /* a slow turn so a crown of flowers is alive rather than stamped */
+    drawBloom(jr * 0.86 * k, j, t * 0.11 * (j % 2 ? 1 : -1) + j * 1.7, PET, false);
+    hctx.restore();
   }
 
   /* ball finials: the thing that most says "crown" at a glance */
@@ -3042,122 +3116,14 @@ function drawRoyalCrown() {
   }
 }
 
-/* ── style 0: corona de flores ──
-   Same band, so the marigolds wrap the cranium instead of arcing over it,
-   and they OVERLAP. A garland is gathered; evenly spaced flowers that never
-   touch are exactly what made the first version read as a sticker sheet. */
-function drawFlowerCrown() {
-  const n = Math.max(3, Math.round(CFG.crownBlooms));
-  const q = qLevel();
-  const PET = q >= 4 ? 5 : q >= 3 ? 6 : 8;
-  const sway = Math.sin(t * 0.35) * 0.04 + beatPulse * 0.04;
-
-  /* NO foliage rope. I drew one here as a "substrate for the blooms to be
-     gathered on", a band of dark ellipses at 55% alpha. Against pale bone it
-     did not read as greenery at all: it read as a clump of black HAIR
-     sticking out from behind the petals, which is both wrong and slightly
-     unsettling on a calavera. The blooms overlap each other enough to look
-     gathered on their own, so the fix is deletion, not a better rope.
-
-     Worth remembering: I added the rope to solve "the flowers look like
-     stickers", and the real fix for that was the band geometry underneath.
-     The rope was a second solution to an already-solved problem, and it
-     brought its own artifact. */
-
-  /* A BACK ROW, drawn first and slightly smaller, sitting higher and offset
-     by half a step. This is what the rope was really reaching for: depth.
-     Real flower crowns are two or three blooms deep, and a single row of
-     evenly spaced flowers is the thing that read as a sticker sheet. Drawn
-     before the front row so it is genuinely behind, and skipped at Q3+
-     because it is pure density.
-
-     Not plucked and not registered in crownPos: the back row is texture, and
-     hit-testing two overlapping rows would make clicking a front bloom
-     unreliable, which is worse than the depth is good. */
-  const backN = q >= 3 ? 0 : Math.max(2, Math.round(n * 0.7));
-  for (let i = 0; i < backN; i++) {
-    const f = (i + 1) / (backN + 1);
-    const jit = 0.8 + 0.3 * ((i * 40503 % 89) / 89);
-    const [x, y] = crownAt(f, CR_BAND * 0.86);
-    const r = (CR_SPAN * 0.36 / Math.sqrt(n)) * jit * (0.8 + 0.3 * Math.sin(Math.PI * f)) * (1 + sway) * 0.82;
-    const spin = -t * 0.07 + i * 2.3;
-    const c1 = i % 3 === 0 ? PAL.violet : i % 3 === 1 ? PAL.teal : PAL.gold;
-    const c2 = i % 3 === 0 ? PAL.teal : i % 3 === 1 ? PAL.magenta : PAL.violet;
-    hctx.save();
-    hctx.translate(x, y);
-    hctx.globalAlpha = 0.85;                   // sits back, not a peer
-    for (let p = 0; p < PET; p++) {
-      hctx.save();
-      hctx.rotate((p / PET) * Math.PI * 2 + spin);
-      hctx.beginPath();
-      hctx.ellipse(0, -r * 0.62, r * 0.30, r * 0.62, 0, 0, Math.PI * 2);
-      hctx.fillStyle = p % 2 ? c1 : c2;
-      hctx.fill();
-      hctx.restore();
-    }
-    hctx.beginPath(); hctx.arc(0, 0, r * 0.17, 0, Math.PI * 2);
-    hctx.fillStyle = PAL.bone1; hctx.fill();
-    hctx.globalAlpha = 1;
-    hctx.restore();
-  }
-
-  for (let i = 0; i < n; i++) {
-    const f = (i + 0.5) / n;
-    const jit = 0.84 + 0.32 * ((i * 2654435761 % 97) / 97);
-    const [x, y] = crownAt(f, CR_BAND * (0.34 + 0.34 * (i % 2)));
-    /* Radius falls off as 1/SQRT(n), not 1/n. Linear falloff meant every
-       bloom you added made all of them smaller by the same factor, so the
-       crown got THINNER as the count went up: at 22 it was a line of
-       confetti. Square-root keeps the blooms chunky and lets them overlap
-       instead, which is what "more flowers" is supposed to look like.
-       Calibrated so 10 blooms are the size they were before. */
-    const r0 = (CR_SPAN * 0.41 / Math.sqrt(n)) * jit * (0.80 + 0.30 * Math.sin(Math.PI * f)) * (1 + sway);
-    crownMark('b' + i, x, y, r0);
-    const k = crownScale('b' + i);
-    if (k <= 0.01) continue;                     // the rope shows through
-    const r = r0 * k;
-    const spin = t * 0.1 * (i % 2 ? 1 : -1) + i * 1.7;
-    const c1 = i % 3 === 0 ? PAL.gold : i % 3 === 1 ? PAL.magenta : PAL.violet;
-    const c2 = i % 3 === 0 ? PAL.magenta : i % 3 === 1 ? PAL.gold : PAL.teal;
-    hctx.save();
-    hctx.translate(x, y);
-    hctx.beginPath();
-    hctx.arc(0, r * 0.12, r * 1.06, 0, Math.PI * 2);
-    hctx.fillStyle = PAL.dark; hctx.globalAlpha = 0.34; hctx.fill();
-    hctx.globalAlpha = 1;
-    for (let p = 0; p < PET; p++) {
-      hctx.save();
-      hctx.rotate((p / PET) * Math.PI * 2 + spin);
-      hctx.beginPath();
-      hctx.ellipse(0, -r * 0.62, r * 0.30, r * 0.62, 0, 0, Math.PI * 2);
-      hctx.fillStyle = p % 2 ? c1 : c2;
-      hctx.globalAlpha = 0.96; hctx.fill();
-      hctx.restore();
-    }
-    if (q < 3) {
-      for (let p = 0; p < PET; p++) {
-        hctx.save();
-        hctx.rotate((p / PET) * Math.PI * 2 - spin * 0.6 + Math.PI / PET);
-        hctx.beginPath();
-        hctx.ellipse(0, -r * 0.36, r * 0.20, r * 0.38, 0, 0, Math.PI * 2);
-        hctx.fillStyle = c1; hctx.globalAlpha = 0.85; hctx.fill();
-        hctx.restore();
-      }
-    }
-    hctx.beginPath(); hctx.arc(0, 0, r * 0.17, 0, Math.PI * 2);
-    hctx.fillStyle = PAL.bone1; hctx.globalAlpha = 1; hctx.fill();
-    hctx.restore();
-  }
-}
-
-/* One marigold, drawn at the origin. Factored out so the crown and the
-   garland cannot drift into looking like different flowers, which is exactly
-   what happens when the same 20 lines get copied and then tuned twice. */
+/* One marigold, drawn at the origin. Lives here rather than inside the crown
+   because the falling piece and the hatband flower draw it too; three copies
+   of the same twenty lines is how one ornament ends up looking like three
+   different species. */
 function drawBloom(r, idx, spin, petals, shade) {
   const c1 = idx % 3 === 0 ? PAL.gold : idx % 3 === 1 ? PAL.magenta : PAL.violet;
   const c2 = idx % 3 === 0 ? PAL.magenta : idx % 3 === 1 ? PAL.gold : PAL.teal;
   if (shade !== false) {
-    /* seat it: a flat fill on a flat background has nothing separating it */
     hctx.beginPath();
     hctx.arc(0, r * 0.12, r * 1.06, 0, Math.PI * 2);
     hctx.fillStyle = PAL.dark; hctx.globalAlpha = 0.34; hctx.fill();
@@ -3184,73 +3150,6 @@ function drawBloom(r, idx, spin, petals, shade) {
   }
   hctx.beginPath(); hctx.arc(0, 0, r * 0.17, 0, Math.PI * 2);
   hctx.fillStyle = PAL.bone1; hctx.globalAlpha = 1; hctx.fill();
-}
-
-/* ── the marigold garland (viewer request #5) ──
-   Cempasuchil strung in a catenary below the jaw, where a neck and shoulders
-   would be. The request was "skeleton with sombrero and marigold garland",
-   and this is the half of it that implies the BODY without drawing one:
-   ART_DIRECTION forbids replacing the core art, and the piece is a floating
-   calavera, so a garland hanging where the collarbones would be reads as an
-   ofrenda figure while the hero skull stays exactly what it is.
-
-   A real catenary, not an arc. A rope hung between two points sags fastest
-   at the ends and flattens in the middle; a circular arc does the opposite
-   and reads as a hoop someone is holding up. cosh gives it for free. */
-/* Numbers taken from the silhouette, not picked: skullOutlinePath runs y
-   -440 (crown) to 560 (chin) and narrows to about x +/-205 at the jaw. My
-   first values put GAR_TOP at 300, which is CHEEK height, so the garland hung
-   straight across the teeth and covered the mouth. It has to clear the chin
-   entirely or it stops being a garland worn at the collarbone and becomes a
-   gag over the face. */
-const GAR_SPAN = 395;        // ends just outside the jaw, not out in space
-const GAR_TOP  = 470;        // below the cheeks, level with the lower jaw
-const GAR_SAG  = 300;        // middle lands at 770: clear of the 560 chin
-
-function garlandAt(f) {
-  const u = (f * 2 - 1) * 1.65;                  // -1.65..1.65 across the span
-  const c = Math.cosh(u), c0 = Math.cosh(1.65);
-  /* normalise so f=0 and f=1 sit exactly at GAR_TOP and the middle at
-     GAR_TOP + GAR_SAG, whatever the shape constant */
-  return [u / 1.65 * GAR_SPAN, GAR_TOP + GAR_SAG * (c0 - c) / (c0 - 1)];
-}
-
-function drawGarland() {
-  if (!CFG.garland) return;
-  const q = qLevel();
-  const n = Math.max(5, Math.round(CFG.garlandBlooms));
-  const PET = q >= 4 ? 5 : q >= 3 ? 6 : 8;
-  const sway = Math.sin(t * 0.5) * 0.05 + beatPulse * 0.05;
-
-  /* the cord first, so the blooms sit ON it. Thin and dark: it is twine, not
-     the foliage rope that read as hair on the crown. */
-  hctx.save();
-  hctx.beginPath();
-  const STEP = q >= 3 ? 16 : 34;
-  for (let i = 0; i <= STEP; i++) {
-    const [x, y] = garlandAt(i / STEP);
-    if (i) hctx.lineTo(x, y * (1 + sway * 0.12)); else hctx.moveTo(x, y);
-  }
-  hctx.strokeStyle = PAL.bone3;
-  hctx.lineWidth = 9;
-  hctx.globalAlpha = 0.55;
-  hctx.stroke();
-  hctx.globalAlpha = 1;
-
-  for (let i = 0; i < n; i++) {
-    const f = (i + 0.5) / n;
-    const [x, y] = garlandAt(f);
-    const jit = 0.82 + 0.34 * ((i * 2654435761 % 89) / 89);
-    /* Same 1/sqrt(n) falloff as the crown: linear falloff makes a garland
-       THINNER as you add flowers, which is the opposite of the ask. */
-    const r = (GAR_SPAN * 0.40 / Math.sqrt(n)) * jit * (1 + sway);
-    hctx.save();
-    hctx.translate(x, y * (1 + sway * 0.12));
-    hctx.rotate(Math.sin(f * Math.PI * 2 + t * 0.4) * 0.15);
-    drawBloom(r, i, t * 0.09 * (i % 2 ? 1 : -1) + i * 1.9, PET);
-    hctx.restore();
-  }
-  hctx.restore();
 }
 
 /* ── the sombrero (viewer request #5) ──
@@ -3368,9 +3267,7 @@ function drawSombrero() {
 
 function drawCrown() {
   crownPos.length = 0;                           // stale positions are worse
-  /* The GARLAND hangs below the jaw, so it is drawn first and is independent
-     of whatever is on the head. */
-  drawGarland();
+
   /* A hat COVERS the head, so it suppresses the crown rather than stacking on
      it. Mutual exclusion enforced here, in the drawing, rather than by having
      the toggles fight each other: a viewer who turns on a sombrero while a
@@ -3382,7 +3279,7 @@ function drawCrown() {
      from drawHero's tail. See drawSombrero's call site. */
   if (CFG.sombrero) { crownOut.clear(); return; }
   if (!CFG.flowerCrown) { crownOut.clear(); return; }
-  if (CFG.crownStyle >= 0.5) drawRoyalCrown(); else drawFlowerCrown();
+  drawRoyalCrown();
 }
 
 /* Pluck whatever is under the pointer. Returns true if it ate the click, so
@@ -3398,7 +3295,7 @@ function crownPluck(cx, cy) {
   }
   if (!best) return false;
 
-  const royal = CFG.crownStyle >= 0.5;
+
   crownOut.set(best.id, t + CROWN_REGROW);
   if (canSpawn('crownbit')) {
     /* Falls in FRONT of the skull. `behind` is a spawn roll for most sparks,
@@ -3410,11 +3307,11 @@ function crownPluck(cx, cy) {
       vy: -108 - Math.random() * 54,             // pops UP first, so you see it detach
       life: 0, max: 6.5, hue: Math.random(),
       rot: 0, vr: (Math.random() < 0.5 ? -1 : 1) * (0.7 + Math.random() * 1.1),
-      r: best.r * (royal ? 0.62 : 0.86), royal,
+      r: best.r * 0.70,
       idx: parseInt(best.id.slice(1), 10) || 0,
     });
   }
-  SFX.bell();
+  SFX.pluck(pluckSeq++);
   return true;
 }
 
@@ -4843,13 +4740,10 @@ function fxRestyle() {
 
   const flourish = (Math.random() * 6) | 0;
   CFG.flowerCrown  = flourish === 0 || flourish === 1 ? 1 : 0;
-  CFG.crownStyle   = flourish === 0 ? 1 : 0;
   CFG.skullBreathe = flourish === 2 ? 1 : 0;
   CFG.skullOnTop   = flourish === 3 ? 1 : 0;
   CFG.sombrero     = flourish === 4 ? 1 : 0;
-  /* the garland hangs below the jaw and the hat sits above it, so unlike the
-     head ornaments these two can coexist: the pair IS the request */
-  CFG.garland      = flourish === 4 || flourish === 5 ? 1 : 0;
+  CFG.crownMetal   = (Math.random() * 6) | 0;
 
   applyToggles({ skipVoice: true });
   applyPalette();
@@ -5128,7 +5022,6 @@ const VOICE_MAP = [
   [['black hole', 'blackhole', 'agujero'],        fxBlackHole],
   [['crown', 'corona'],                           () => CHAT_FX.crown()],
   [['sombrero', 'hat', 'sombrero hat'],           () => CHAT_FX.sombrero()],
-  [['garland', 'guirnalda'],                      () => CHAT_FX.garland()],
   /* Wrapped in an arrow, NOT `CHAT_FX.clear`. This table is built at module
      level and CHAT_FX is a `const` declared ~140 lines further down, so the
      direct reference is a temporal dead zone error that kills the whole
@@ -5321,10 +5214,8 @@ const CHAT_FX = {
   demo:    () => toggleDemo(),
   /* the crown as a single verb, so "put a crown on" does not need the model
      to know that two dials cooperate */
-  crown:   () => { CFG.flowerCrown = 1; CFG.crownStyle = 1; applyToggles({ skipVoice: true }); },
+  crown:   () => { CFG.flowerCrown = 1; applyToggles({ skipVoice: true }); },
   sombrero:() => { CFG.sombrero = 1; applyToggles({ skipVoice: true }); },
-  garland: () => { CFG.garland = 1; applyToggles({ skipVoice: true }); },
-  flores:  () => { CFG.flowerCrown = 1; CFG.crownStyle = 0; applyToggles({ skipVoice: true }); },
   breathe: () => { CFG.skullBreathe = CFG.skullBreathe ? 0 : 1; applyToggles({ skipVoice: true }); },
 };
 
@@ -5388,13 +5279,12 @@ function applyActions(actions) {
       /* a few dials do nothing until something is told about them: writing
          CFG.musicSeek moves a slider, it does not move the audio */
       if (a.key === 'musicSeek') { applySeek(CFG.musicSeek); seekReadout(); }
-      /* crownStyle PICKS a crown, it does not turn one on, and the model
-         reliably sets only the style: "put a crown on the skull" produced
-         crownStyle=1 with flowerCrown still 0, so nothing appeared and the
-         chat cheerfully reported success. Fixed here rather than in the
-         prompt, because a two-dial feature will keep catching every future
-         model, and applyActions is the enforcement boundary by design. */
-      if (a.key === 'crownStyle' && !CFG.flowerCrown) {
+      /* crownMetal PICKS a finish, it does not turn the crown on, and a model
+         asked for "a silver crown" reliably sets only the metal. Same trap
+         crownStyle had: the chat reported success while nothing appeared.
+         Enforced here rather than in the prompt, because applyActions is the
+         enforcement boundary and it holds for every future model. */
+      if (a.key === 'crownMetal' && !CFG.flowerCrown) {
         CFG.flowerCrown = 1;
         done.push('crown on');
       }
@@ -6019,62 +5909,46 @@ function drawDust(dt) {
       dctx.fillStyle = gg;
       dctx.beginPath(); dctx.arc(sp.x, sp.y, 14, 0, Math.PI * 2); dctx.fill();
     } else if (sp.kind === 'crownbit') {
-      /* A piece knocked off the crown. It does NOT fall like a rock: the
-         request was that it "slowly floats down", so gravity is gentle and a
-         sideways sway makes it drift like a real petal shedding. The jewel
-         version falls faster and swings less, because it is a stone. */
-      const heavy = sp.royal;
-      /* Terminal velocity, not free fall: the ask was that it "slowly floats
-         down". But my first numbers were so slow the piece never left the
-         crown it fell off, which reads as a rendering glitch rather than as
-         an event. A petal has to clear the frame inside its lifetime or the
-         interaction has no follow-through. */
-      sp.vy += (heavy ? 460 : 190) * dt;
-      sp.vy = Math.min(sp.vy, heavy ? 780 : 290);
-      sp.x += Math.sin(t * (heavy ? 2.2 : 2.6) + sp.hue * 7) * (heavy ? 22 : 96) * dt;
-      sp.rot += sp.vr * dt * (heavy ? 1.4 : 1);
+      /* A flower knocked out of the crown. It does NOT fall like a rock: the
+         ask was that it float down slowly, so gravity is gentle and a
+         sideways sway makes it drift the way a real bloom sheds.
+
+         My first numbers were so slow the flower never left the crown it fell
+         off, which reads as a rendering glitch rather than an event. It has
+         to clear the frame inside its lifetime or the interaction has no
+         follow-through. */
+      sp.vy += 190 * dt;
+      sp.vy = Math.min(sp.vy, 290);              // terminal velocity: it FLOATS
+      sp.x += Math.sin(t * 2.6 + sp.hue * 7) * 96 * dt;
+      sp.rot += sp.vr * dt;
       /* fade only over the last third, so it stays solid for most of the fall
          instead of dissolving the moment it leaves the crown */
       const cf = Math.min(1, (sp.max - sp.life) / (sp.max * 0.34));
       const cr = sp.r;
       dctx.save();
       /* The spark layer runs in 'lighter' because everything else on it is a
-         glow. This is not a glow, it is a solid object, and additive blending
-         summed its overlapping petals straight to pure white: the piece fell
-         off the crown as a featureless blob. Verified by sampling the canvas,
-         not by looking, because at thumbnail size white-on-dark still reads
-         as "a flower is falling". */
+         glow. This is a solid object, and additive blending summed its
+         overlapping petals straight to pure white: the flower fell off the
+         crown as a featureless blob. Found by sampling the canvas, not by
+         looking, because at a glance white-on-dark still reads as "a flower
+         is falling". */
       dctx.globalCompositeOperation = 'source-over';
       dctx.translate(sp.x, sp.y);
       dctx.rotate(sp.rot);
       dctx.globalAlpha = cf;
-      if (heavy) {
-        const GEMS = [PAL.magenta, PAL.teal, PAL.gold, PAL.violet];
-        dctx.beginPath(); dctx.arc(0, 0, cr * 1.24, 0, Math.PI * 2);
-        dctx.fillStyle = PAL.gold3; dctx.fill();
-        dctx.beginPath(); dctx.arc(0, 0, cr, 0, Math.PI * 2);
-        dctx.fillStyle = GEMS[sp.idx % GEMS.length]; dctx.fill();
-        const gg = dctx.createRadialGradient(-cr * 0.34, -cr * 0.4, cr * 0.05, 0, 0, cr);
-        gg.addColorStop(0, 'rgba(255,255,255,.92)');
-        gg.addColorStop(0.3, 'rgba(255,255,255,.16)');
-        gg.addColorStop(1, 'rgba(0,0,0,.34)');
-        dctx.fillStyle = gg;
-        dctx.beginPath(); dctx.arc(0, 0, cr, 0, Math.PI * 2); dctx.fill();
-      } else {
-        const c1 = sp.idx % 3 === 0 ? PAL.gold : sp.idx % 3 === 1 ? PAL.magenta : PAL.violet;
-        const c2 = sp.idx % 3 === 0 ? PAL.magenta : sp.idx % 3 === 1 ? PAL.gold : PAL.teal;
-        for (let p = 0; p < 8; p++) {
-          dctx.save();
-          dctx.rotate((p / 8) * Math.PI * 2);
-          dctx.beginPath();
-          dctx.ellipse(0, -cr * 0.62, cr * 0.30, cr * 0.62, 0, 0, Math.PI * 2);
-          dctx.fillStyle = p % 2 ? c1 : c2;
-          dctx.fill();
-          dctx.restore();
-        }
-        dctx.beginPath(); dctx.arc(0, 0, cr * 0.17, 0, Math.PI * 2);
-        dctx.fillStyle = PAL.bone1; dctx.fill();
+      const c1 = sp.idx % 3 === 0 ? PAL.gold : sp.idx % 3 === 1 ? PAL.magenta : PAL.violet;
+      const c2 = sp.idx % 3 === 0 ? PAL.magenta : sp.idx % 3 === 1 ? PAL.gold : PAL.teal;
+      for (let p = 0; p < 8; p++) {
+        dctx.save();
+        dctx.rotate((p / 8) * Math.PI * 2);
+        dctx.beginPath();
+        dctx.ellipse(0, -cr * 0.62, cr * 0.30, cr * 0.62, 0, 0, Math.PI * 2);
+        dctx.fillStyle = p % 2 ? c1 : c2;
+        dctx.fill();
+        dctx.restore();
       }
+      dctx.beginPath(); dctx.arc(0, 0, cr * 0.17, 0, Math.PI * 2);
+      dctx.fillStyle = PAL.bone1; dctx.fill();
       dctx.globalAlpha = 1;
       dctx.restore();
 
@@ -7038,9 +6912,8 @@ const HELP_ROWS = [
   [['Z'], 'zen mode (hide all text)', '', 'z'],
   [['O'], 'surprise me with a new look', '"restyle"', 'o'],
   [['\u21e7O'], 'demo mode: reroll everything every 3 min', '', '\u21e7o'],
-  [['\u21e7C'], 'crown: off / corona / flores', '"crown"', '\u21e7c'],
+  [['\u21e7C'], 'crown on / off', '"crown"', '\u21e7c'],
   [['\u21e7S'], 'sombrero on / off', '"sombrero"', '\u21e7s'],
-  [['\u21e7G'], 'marigold garland on / off', '"garland"', '\u21e7g'],
   [['\u21e7B'], 'skull breathing on / off', '', '\u21e7b'],
   [['!'], 'fiesta: new look + everything + grito', '', '!'],
   [['Q'], 'galactic battle (3 fleets)', '"battle"', 'q'],
@@ -7819,13 +7692,7 @@ addEventListener('keydown', e => {
     else { userPaused = true; music.pause(); }
     syncMuteIcon();          // belt and braces: the media events also fire
   }
-  else if (k === 'g') {
-    if (e.shiftKey) {
-      CFG.garland = CFG.garland ? 0 : 1;
-      applyToggles({ skipVoice: true }); syncSlidersSafe();
-      cfgStatusSay('garland ' + (CFG.garland ? 'on' : 'off'));
-    } else grito();
-  }
+  else if (k === 'g') grito();
   else if (k === 'm') toggleMute();
   else if (k === 'arrowup')   { e.preventDefault(); CFG.musicVolume = Math.min(1, CFG.musicVolume + 0.05); if (!muted) music.volume = CFG.musicVolume; }
   else if (k === 'arrowdown') { e.preventDefault(); CFG.musicVolume = Math.max(0, CFG.musicVolume - 0.05); if (!muted) music.volume = CFG.musicVolume; }
@@ -7901,18 +7768,14 @@ addEventListener('keydown', e => {
   }
   else if (k === 'i') { if (e.shiftKey) toggleClip(); else savePhoto(); }
   else if (k === 'c') {
-    /* Shift-C CYCLES rather than toggles: there are two crown styles and a
-       plain toggle would strand whichever one you were not on, so the only
-       way to reach the flower crown from the keyboard would still be the
-       panel. off -> corona -> flores -> off covers every state in one key. */
+    /* A plain toggle again. It used to CYCLE because there were two crown
+       styles and a toggle would strand whichever one you were not on. There
+       is one crown now, so cycling would be ceremony over nothing. */
     if (e.shiftKey) {
-      if (!CFG.flowerCrown) { CFG.flowerCrown = 1; CFG.crownStyle = 1; }
-      else if (CFG.crownStyle >= 0.5) { CFG.crownStyle = 0; }
-      else { CFG.flowerCrown = 0; }
+      CFG.flowerCrown = CFG.flowerCrown ? 0 : 1;
       applyToggles({ skipVoice: true });
       syncSlidersSafe();
-      cfgStatusSay(!CFG.flowerCrown ? 'crown off'
-                 : CFG.crownStyle >= 0.5 ? 'la corona real' : 'corona de flores');
+      cfgStatusSay('crown ' + (CFG.flowerCrown ? 'on' : 'off'));
     } else togglePanel(cfgPanel);
   }
   else if (k === 'h' || k === '?') togglePanel(helpPanel);
