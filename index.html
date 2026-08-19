@@ -1605,7 +1605,7 @@ const CFG_SCHEMA = {
   socketGlow:     [1.0,   0,     2.5,  0.1,   'eye socket glow'],
   auraSize:       [1.0,   0,     2.5,  0.1,   'skull aura'],
   petalCount:     [12,    4,     20,   1,     'eye petals'],
-  crownBlooms:    [7,     3,     14,   1,     'flower crown blooms'],
+  crownBlooms:    [10,    3,     22,   1,     'flower crown blooms'],
   crownStyle:     [1,     0,     1,    1,     'crown: 0 flores 1 corona'],
   crownPeaks:     [4,     3,     7,    1,     'crown points'],
 };
@@ -3017,26 +3017,66 @@ function drawFlowerCrown() {
   const PET = q >= 4 ? 5 : q >= 3 ? 6 : 8;
   const sway = Math.sin(t * 0.35) * 0.04 + beatPulse * 0.04;
 
-  /* foliage first: the dark rope the blooms are tied to. Without a substrate
-     the flowers have nothing to be gathered ON, which is half the problem. */
-  const RN = q >= 3 ? 26 : 48;
-  hctx.globalAlpha = 0.55; hctx.fillStyle = PAL.dark;
-  for (let i = 0; i <= RN; i++) {
-    const f = i / RN;
-    const [x, y] = crownAt(f, CR_BAND * 0.34);
-    hctx.beginPath();
-    hctx.ellipse(x, y, 34, 19, Math.sin(f * 9) * 0.8, 0, Math.PI * 2);
-    hctx.fill();
+  /* NO foliage rope. I drew one here as a "substrate for the blooms to be
+     gathered on", a band of dark ellipses at 55% alpha. Against pale bone it
+     did not read as greenery at all: it read as a clump of black HAIR
+     sticking out from behind the petals, which is both wrong and slightly
+     unsettling on a calavera. The blooms overlap each other enough to look
+     gathered on their own, so the fix is deletion, not a better rope.
+
+     Worth remembering: I added the rope to solve "the flowers look like
+     stickers", and the real fix for that was the band geometry underneath.
+     The rope was a second solution to an already-solved problem, and it
+     brought its own artifact. */
+
+  /* A BACK ROW, drawn first and slightly smaller, sitting higher and offset
+     by half a step. This is what the rope was really reaching for: depth.
+     Real flower crowns are two or three blooms deep, and a single row of
+     evenly spaced flowers is the thing that read as a sticker sheet. Drawn
+     before the front row so it is genuinely behind, and skipped at Q3+
+     because it is pure density.
+
+     Not plucked and not registered in crownPos: the back row is texture, and
+     hit-testing two overlapping rows would make clicking a front bloom
+     unreliable, which is worse than the depth is good. */
+  const backN = q >= 3 ? 0 : Math.max(2, Math.round(n * 0.7));
+  for (let i = 0; i < backN; i++) {
+    const f = (i + 1) / (backN + 1);
+    const jit = 0.8 + 0.3 * ((i * 40503 % 89) / 89);
+    const [x, y] = crownAt(f, CR_BAND * 0.86);
+    const r = (CR_SPAN * 0.36 / Math.sqrt(n)) * jit * (0.8 + 0.3 * Math.sin(Math.PI * f)) * (1 + sway) * 0.82;
+    const spin = -t * 0.07 + i * 2.3;
+    const c1 = i % 3 === 0 ? PAL.violet : i % 3 === 1 ? PAL.teal : PAL.gold;
+    const c2 = i % 3 === 0 ? PAL.teal : i % 3 === 1 ? PAL.magenta : PAL.violet;
+    hctx.save();
+    hctx.translate(x, y);
+    hctx.globalAlpha = 0.85;                   // sits back, not a peer
+    for (let p = 0; p < PET; p++) {
+      hctx.save();
+      hctx.rotate((p / PET) * Math.PI * 2 + spin);
+      hctx.beginPath();
+      hctx.ellipse(0, -r * 0.62, r * 0.30, r * 0.62, 0, 0, Math.PI * 2);
+      hctx.fillStyle = p % 2 ? c1 : c2;
+      hctx.fill();
+      hctx.restore();
+    }
+    hctx.beginPath(); hctx.arc(0, 0, r * 0.17, 0, Math.PI * 2);
+    hctx.fillStyle = PAL.bone1; hctx.fill();
+    hctx.globalAlpha = 1;
+    hctx.restore();
   }
-  hctx.globalAlpha = 1;
 
   for (let i = 0; i < n; i++) {
     const f = (i + 0.5) / n;
     const jit = 0.84 + 0.32 * ((i * 2654435761 % 97) / 97);
     const [x, y] = crownAt(f, CR_BAND * (0.34 + 0.34 * (i % 2)));
-    /* radius from the SPACING, so a higher bloom count packs tighter instead
-       of leaving gaps between stamps */
-    const r0 = (CR_SPAN * 1.30 / n) * jit * (0.80 + 0.30 * Math.sin(Math.PI * f)) * (1 + sway);
+    /* Radius falls off as 1/SQRT(n), not 1/n. Linear falloff meant every
+       bloom you added made all of them smaller by the same factor, so the
+       crown got THINNER as the count went up: at 22 it was a line of
+       confetti. Square-root keeps the blooms chunky and lets them overlap
+       instead, which is what "more flowers" is supposed to look like.
+       Calibrated so 10 blooms are the size they were before. */
+    const r0 = (CR_SPAN * 0.41 / Math.sqrt(n)) * jit * (0.80 + 0.30 * Math.sin(Math.PI * f)) * (1 + sway);
     crownMark('b' + i, x, y, r0);
     const k = crownScale('b' + i);
     if (k <= 0.01) continue;                     // the rope shows through
