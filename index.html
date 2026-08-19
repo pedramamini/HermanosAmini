@@ -342,6 +342,37 @@
   /* the minted link, shown so it can be read and hand-copied when the
      clipboard API is unavailable (it needs a secure context, and this page is
      opened from file:// often enough to matter) */
+  /* ── scrub bar ──
+     A real transport, not a generic dial row: it needs a live playhead and a
+     time readout, and the dial `musicSeek` only ever describes where playback
+     STARTS. Both exist on purpose and they are not the same control. */
+  #cfgScrub {
+    margin: 10px 0 4px; padding: 10px 12px;
+    background: rgba(245,234,223,.05);
+    border: 1px solid rgba(245,234,223,.14); border-radius: 10px;
+  }
+  .scrubhead {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 7px;
+  }
+  .scrublabel {
+    font-size: 11px; letter-spacing: .16em; text-transform: uppercase;
+    color: rgba(245,234,223,.6);
+  }
+  #scrubTime {
+    font-family: 'SF Mono', 'Menlo', monospace; font-size: 11px;
+    color: #2fe8d0; font-variant-numeric: tabular-nums;
+  }
+  #scrubBar { width: 100%; margin: 0; }
+  .scrubnote {
+    margin-top: 6px; font-size: 10px; letter-spacing: .06em;
+    color: rgba(245,234,223,.38);
+  }
+  kbd.mini {
+    display: inline-block; padding: 0 4px; border-radius: 4px;
+    background: rgba(245,234,223,.12); border: 1px solid rgba(245,234,223,.2);
+    font-family: 'SF Mono', 'Menlo', monospace; font-size: 10px;
+  }
   #cfgLinkOut {
     margin: -4px 0 8px; padding: 8px 11px;
     background: rgba(0,0,0,.32); border: 1px solid rgba(245,234,223,.14);
@@ -1266,6 +1297,15 @@
   <span id="cfgShown"></span>
 </div>
 <div id="cfgSliders" class="collapsed"></div>
+  <div id="cfgScrub">
+    <div class="scrubhead">
+      <span class="scrublabel">&#9835;&nbsp; scrub the track</span>
+      <span id="scrubTime">0:00 / 0:00</span>
+    </div>
+    <input id="scrubBar" type="range" min="0" max="100" step="0.1" value="0"
+           aria-label="scrub through the track">
+    <div class="scrubnote">shared links start here &middot; <kbd class="mini">[</kbd> <kbd class="mini">]</kbd> jump 10s</div>
+  </div>
   <button id="cfgRestyle" class="reset">&#127922;&nbsp; surprise me with a new look</button>
   <div class="cfgsec">3 &middot; save it</div>
   <div class="galrow">
@@ -1452,6 +1492,7 @@ const CFG_SCHEMA = {
   liquidFill:     [11,    2,     30,   1,     'logo travel time (s)'],
   liquidRest:     [6,     0,     20,   1,     'logo dwell max (s)'],
   musicVolume:    [0.9,   0,     1,    0.05,  'music volume'],
+  musicSeek:      [0,     0,     100,  0.1,   'start at (% of track)'],
   gritoVolume:    [1.0,   0,     1,    0.05,  'grito volume'],
   sfxVolume:      [0.55,  0,     1,    0.05,  'gesture sfx volume'],
   /* ── color ── */
@@ -1495,7 +1536,7 @@ const CFG_CATEGORY = {
           'flowerCrown', 'crownBlooms'],
   sky: ['tunnelCount', 'starDensity', 'dustCount', 'smokeScale', 'smokeStir',
         'smokeDecay', 'eventMinGap', 'eventMaxGap', 'autoEvents'],
-  sound: ['musicVolume', 'gritoVolume', 'sfxVolume', 'musicOn'],
+  sound: ['musicVolume', 'musicSeek', 'gritoVolume', 'sfxVolume', 'musicOn'],
   system: ['perfMode', 'hudOn', 'textOn', 'voiceOn'],
 };
 /* key -> category, built once. Also the integrity check: a dial with no
@@ -1614,6 +1655,26 @@ function cfgFromShareString(str) {
   }
   return cfgApply(obj);                  // validates keys, finiteness, range
 }
+/* Mint a link for the CURRENT board. One implementation, two callers (the
+   button and the chat's `share` action): two copies would drift, and the
+   fallback behaviour is the part that must not. Always resolves to a working
+   URL, never rejects: if the Worker is slow or down, the long `?c=` form
+   needs nothing but this page. */
+async function mintShareLink() {
+  const q = cfgShareString();
+  const long = location.origin + '/' + (q ? '?c=' + q : '');
+  if (!q) return long;                      // default board: nothing to shorten
+  try {
+    const r = await fetch(GALLERY_API.replace('/presets', '/s'), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ c: q }),
+    });
+    const d = await r.json();
+    if (r.ok && d.code) return location.origin + '/' + d.code;
+  } catch (_) {}
+  return long;
+}
+
 /* A share link beats a saved board, because it is the more deliberate act:
    you clicked someone's link to see THEIR board, not your own. Runs here, in
    the same statement position as cfgLoad, so it is applied before a single
@@ -4526,6 +4587,13 @@ const VOICE_MAP = [
   [['petal', 'petals', 'flores', 'flowers'],      fxPetalBurst],
   [['alebrije', 'dragon'],                        fxAlebrije],
   [['black hole', 'blackhole', 'agujero'],        fxBlackHole],
+  /* Wrapped in an arrow, NOT `CHAT_FX.clear`. This table is built at module
+     level and CHAT_FX is a `const` declared ~140 lines further down, so the
+     direct reference is a temporal dead zone error that kills the whole
+     script on load. Same trap as invariant 3's autoResume(); deferring the
+     lookup to call time is the fix. */
+  [['clear', 'stop', 'calma'],                    () => CHAT_FX.clear()],
+  [['photo', 'foto'],                             savePhoto],
   [['rainbow', 'arcoiris'],                       () => { rainbowEyeUntil = t + 5; }],
   [['restyle', 'remix', 'makeover', 'new look'],   fxRestyle],
   [['everything', 'todo', 'fiesta', 'all at once'], fxEverything],
@@ -4696,6 +4764,18 @@ const CHAT_FX = {
   rainbow: () => { rainbowEyeUntil = t + 5; },
   teeth:   () => { face.chatterUntil = t + 1.6; },
   stare:   () => { stare.until = t + 3.2; },
+  rings:   () => { face.ringSpin += 10; },
+  spirals: () => { face.spiralSpin += (Math.random() < 0.5 ? -12 : 12); },
+  /* The chat could START a battle and FLOOD the screen with skulls but had no
+     way to undo either, so "actually, clear that" was the one request it could
+     only apologise for. Both shift-clears in one verb. */
+  clear:   () => {
+    ufos.length = 0; lasers.length = 0; battleLive = false;
+    swarm.length = 0; hole.live = false;
+  },
+  photo:   () => savePhoto(),
+  clip:    () => toggleClip(),
+  demo:    () => toggleDemo(),
 };
 
 function chatSay(who, text) {
@@ -4743,17 +4823,48 @@ function applyActions(actions) {
   for (const a of actions || []) {
     if (!a || typeof a !== 'object') continue;
 
-    if (a.op === 'set' && a.key in CFG_SCHEMA) {
+    /* hasOwnProperty, not `in`. This is MODEL-supplied input, so a key of
+       "constructor" or "toString" passes an `in` check via the prototype
+       chain and the next line destructures a function: same bug that was
+       sitting in cfgApply. `CHAT_FX[a.name]` had the twin of it, where
+       "constructor" resolves to a callable and would have been invoked. */
+    if (a.op === 'set' && Object.prototype.hasOwnProperty.call(CFG_SCHEMA, a.key)) {
       const [, min, max] = CFG_SCHEMA[a.key];
       const v = parseFloat(a.value);
       if (!isFinite(v)) continue;
       CFG[a.key] = Math.max(min, Math.min(max, v));
       touched = true;
       if (RECOLOR_KEYS.has(a.key)) recolor = true;
+      /* a few dials do nothing until something is told about them: writing
+         CFG.musicSeek moves a slider, it does not move the audio */
+      if (a.key === 'musicSeek') { applySeek(CFG.musicSeek); seekReadout(); }
+      if (a.key === 'musicVolume' && !muted) music.volume = CFG.musicVolume;
       done.push(`${CFG_SCHEMA[a.key][4]} \u2192 ${CFG[a.key]}`);
 
-    } else if (a.op === 'fx' && CHAT_FX[a.name]) {
+    } else if (a.op === 'fx' && Object.prototype.hasOwnProperty.call(CHAT_FX, a.name)) {
       try { CHAT_FX[a.name](); done.push(a.name); } catch (_) {}
+
+    } else if (a.op === 'seek' && isFinite(parseFloat(a.value))) {
+      /* Seeking by SECONDS as well as by percent. "skip ahead 30 seconds" is
+         how a person says it, and making the model convert to a percentage of
+         a duration it cannot see is how you get a wrong answer confidently. */
+      const sec = parseFloat(a.value);
+      if (a.relative) {
+        if (seekBy(sec)) done.push((sec > 0 ? 'skipped +' : 'went back ') + Math.abs(sec) + 's');
+      } else {
+        const d = music.duration;
+        if (isFinite(d) && d > 0) {
+          CFG.musicSeek = +Math.max(0, Math.min(100, sec / d * 100)).toFixed(1);
+          applySeek(CFG.musicSeek);
+          seekReadout(); touched = true;
+          done.push('jumped to ' + fmtTime(sec));
+        }
+      }
+
+    } else if (a.op === 'share') {
+      /* Async, so it reports itself rather than joining `done`. */
+      mintShareLink().then(url => chatSay('did', url)).catch(() => {});
+      done.push('minting a link');
 
     } else if (a.op === 'request' && typeof a.text === 'string' && a.text.length > 6) {
       captureIdea(a.text.trim());
@@ -5742,11 +5853,69 @@ function startMusic() {
   })();
   if (!musicStarted) { musicStarted = true; loadGritos(); }
 }
+/* ── seeking ──
+   `musicSeek` is a START POSITION, not a playhead. It is written INTO the
+   audio and never written back out of it. That distinction is the whole
+   design: a dial that tracked the playhead would change 60 times a second,
+   so every share link and every saved board would carry a meaningless
+   timestamp, and no two links to "the same board" would ever match. As a
+   start position it means exactly what was asked for, "the part of the song
+   you start in", and it survives sharing.
+
+   Percent rather than seconds because the value has to make sense before
+   metadata arrives. `duration` is NaN until the browser has read the header,
+   which on a 175MB track can be well after the first frame, and a share link
+   that says 42% can be honoured the moment duration exists. Seconds would
+   need the same wait plus a clamp against a length nobody knows yet. */
+let seekPending = false;
+let seekReadout = () => {};            // real one assigned in scrubTransport
+function applySeek(pct) {
+  const p = Math.max(0, Math.min(100, pct)) / 100;
+  const d = music.duration;
+  if (!isFinite(d) || d <= 0) {                  // metadata not in yet
+    seekPending = true;
+    music.addEventListener('loadedmetadata', () => {
+      if (seekPending) { seekPending = false; applySeek(CFG.musicSeek); }
+    }, { once: true });
+    return false;
+  }
+  /* Never land exactly on the end. currentTime === duration fires `ended`,
+     and on a looping element that snaps straight back to 0, so asking for
+     100% would silently give you the beginning. */
+  try { music.currentTime = Math.min(p * d, Math.max(0, d - 0.25)); } catch (_) { return false; }
+  seekPending = false;
+  return true;
+}
+/* Jump by seconds, for the [ and ] keys. Clamps rather than wrapping: a
+   viewer nudging the end of the track expects to sit at the end, not to be
+   thrown back to the start. Updates the dial so the position is shareable
+   straight after a nudge. */
+function seekBy(sec) {
+  const d = music.duration;
+  if (!isFinite(d) || d <= 0) return false;
+  const to = Math.max(0, Math.min(d - 0.25, music.currentTime + sec));
+  try { music.currentTime = to; } catch (_) { return false; }
+  CFG.musicSeek = +(to / d * 100).toFixed(1);
+  syncSlidersSafe();
+  seekReadout();
+  return true;
+}
+function fmtTime(s) {
+  if (!isFinite(s) || s < 0) s = 0;
+  const m = Math.floor(s / 60);
+  return m + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+}
+
 /* One way in, whether it was a click or a keypress. Idempotent: the keydown
    path and the click path can both fire on the same interaction. */
 function enterGate() {
   if (gate.classList.contains('gone')) return false;
   startMusic();
+  /* Honour a shared start position, but only on the way IN. Doing it inside
+     startMusic would re-seek on every autoplay retry and on the pointerdown
+     safety net, so a viewer who scrubbed forward would get yanked back to the
+     shared position the next time they clicked anywhere. */
+  if (CFG.musicSeek > 0) applySeek(CFG.musicSeek);
   gate.classList.add('gone');
   return true;
 }
@@ -6240,6 +6409,7 @@ const HELP_ROWS = [
   [['Enter'], 'surprise me (random event)', '"random"', 'Enter'],
   [['B'], 'alebrije spirit', '"dragon"', 'b'],
   [['0'], 'black hole (eats the background)', '"black hole"', '0'],
+  [['[', ']'], 'scrub 10s back / forward (shift: 30s)', '', '['],
   [['F'], 'flick a random skull', '"calavera"', 'f'],
   [['P'], 'petal burst', '"flores"', 'p'],
   [['Y'], 'mean mug (the stare)', '"mirada"', 'y'],
@@ -6293,8 +6463,20 @@ const HELP_ROWS = [
            without it every shift binding here was a dead button */
         const shifted = evKey.startsWith('\u21e7');
         const bareKey = shifted ? evKey.slice(1) : evKey;
-        const dispatchKey = idx === 1 && kLabel === '↓' ? 'ArrowDown'
-                         : idx === 1 && kLabel === '\u2192' ? 'ArrowRight' : bareKey;
+        /* A two-key row's SECOND cap must dispatch its own key, not the
+           row's. This was special-cased for the two arrow pairs only, so the
+           moment a non-arrow pair was added ("[" and "]") the second cap
+           silently fired the first one's action. General rule now: arrows map
+           to their event names, any other single printable character IS its
+           own key, and everything else falls back to the row. */
+        const dispatchKey =
+            idx === 0 ? bareKey
+          : kLabel === '\u2193' ? 'ArrowDown'
+          : kLabel === '\u2192' ? 'ArrowRight'
+          : kLabel === '\u2191' ? 'ArrowUp'
+          : kLabel === '\u2190' ? 'ArrowLeft'
+          : /^[\x21-\x7e]$/.test(kLabel) ? kLabel.toLowerCase()
+          : bareKey;
         kb.addEventListener('click', ev => {
           ev.stopPropagation();
           kb.classList.add('pressed');
@@ -6819,6 +7001,7 @@ let syncSliders = () => {};   // real one is assigned inside buildCfg below
       CFG[k] = parseFloat(r.value);
       v.textContent = r.value;
       if (k === 'musicVolume' && !muted) music.volume = CFG.musicVolume;
+      if (k === 'musicSeek') { applySeek(CFG.musicSeek); seekReadout(); }
       if (k === 'perfMode') resize();
       if (PALETTE_KEYS.includes(k)) schedulePaletteRebuild();
     });
@@ -6853,7 +7036,53 @@ let syncSliders = () => {};   // real one is assigned inside buildCfg below
     if (n) { syncSliders(); say(`restored ${n} settings`); }
     else say('no saved settings yet');
   });
-  /* ── copy a link to this board ──
+    /* ── the scrub transport ──
+     Two jobs that must not fight: follow the playhead while playing, and
+     accept a drag. `dragging` is the whole trick. Without it the 4Hz tick
+     rewrites the slider's value underneath the pointer and the thumb snaps
+     back mid-drag, which feels broken and is the classic way a seek bar is
+     got wrong. */
+  (function scrubTransport() {
+    const bar = document.getElementById('scrubBar');
+    const out = document.getElementById('scrubTime');
+    if (!bar) return;
+    let dragging = false;
+
+    seekReadout = function () {
+      const d = music.duration, c = music.currentTime;
+      out.textContent = fmtTime(c) + ' / ' + (isFinite(d) ? fmtTime(d) : '--:--');
+      if (!dragging && isFinite(d) && d > 0) bar.value = (c / d * 100).toFixed(1);
+    };
+
+    bar.addEventListener('pointerdown', () => { dragging = true; });
+    /* pointerup on the WINDOW, not the bar: releasing outside the element is
+       normal at the ends of a drag and would otherwise leave it stuck. */
+    addEventListener('pointerup', () => {
+      if (!dragging) return;
+      dragging = false;
+      seekReadout();
+    });
+    bar.addEventListener('input', () => {
+      const pct = parseFloat(bar.value);
+      CFG.musicSeek = +pct.toFixed(1);       // the shareable start position
+      applySeek(pct);
+      const d = music.duration;
+      out.textContent = fmtTime(isFinite(d) ? pct / 100 * d : 0) + ' / ' +
+                        (isFinite(d) ? fmtTime(d) : '--:--');
+      /* keep the dial slider in the list honest too, or the panel shows two
+         different answers for one value */
+      const twin = document.querySelector('#cfgSliders input[data-key="musicSeek"]');
+      if (twin) { twin.value = CFG.musicSeek; if (twin.nextElementSibling) twin.nextElementSibling.textContent = twin.value; }
+    });
+    music.addEventListener('loadedmetadata', seekReadout);
+    music.addEventListener('seeked', seekReadout);
+    /* 4Hz, not rAF: this is a text readout, and tying it to the render loop
+       would burn frames on the art to animate a clock. */
+    setInterval(() => { if (!music.paused) seekReadout(); }, 250);
+    seekReadout();
+  })();
+
+/* ── copy a link to this board ──
      Always hands back a working link. The short one needs the Worker; if that
      is slow, down, or the board is entirely default, it falls back to the long
      `?c=` URL, which needs nothing but this page. A share button that can fail
@@ -6866,19 +7095,7 @@ let syncSliders = () => {};   // real one is assigned inside buildCfg below
     const q = cfgShareString();
     const long = location.origin + '/' + (q ? '?c=' + q : '');
     btn.disabled = true; btn.textContent = 'minting...';
-
-    let url = long;
-    if (q) {
-      try {
-        const r = await fetch(GALLERY_API.replace('/presets', '/s'), {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ c: q }),
-        });
-        const d = await r.json();
-        if (r.ok && d.code) url = location.origin + '/' + d.code;
-      } catch (_) { /* long link it is */ }
-    }
-
+    const url = await mintShareLink();
     outText.textContent = url;
     out.hidden = false;
     /* Clipboard needs a secure context and a live gesture. It has both here,
@@ -7011,6 +7228,12 @@ addEventListener('keydown', e => {
   else if (k === 'u') fxUfo();
   else if (k === 'b') fxAlebrije();
   else if (k === '0') fxBlackHole();       // zero: the void. Every letter was taken.
+  else if (k === '[' || k === ']') {
+    /* bracket keys sit where a transport belongs on a QWERTY board, and they
+       were the only unbound pair left that is not a digit */
+    const step = e.shiftKey ? 30 : 10;
+    if (seekBy(k === '[' ? -step : step)) cfgStatusSay(fmtTime(music.currentTime));
+  }
   else if (k === 'y') { stare.until = t + 3.2; SFX.glare(); }
   else if (k === 'z') toggleText();
   else if (k === 'd') { CFG.hudOn = CFG.hudOn ? 0 : 1; applyToggles({ skipVoice: true }); }
