@@ -1002,6 +1002,27 @@
       padding: 9px 11px; font: inherit; font-size: 14px;
     }
     #ideaDetail:focus, #reqDetail:focus { outline: none; border-color: rgba(255,179,71,.6); }
+    /* the exchange so far: their own words back, so a second question does not
+       feel like the first one was ignored */
+    #ideaThread:empty, #reqThread:empty { display: none; }
+    #ideaThread, #reqThread {
+      margin-bottom: 10px; padding-left: 11px;
+      border-left: 2px solid rgba(255,179,71,.28);
+    }
+    .pturn { margin-bottom: 8px; }
+    .pq {
+      font-size: 12px; color: rgba(255,179,71,.72); line-height: 1.4;
+    }
+    .pa {
+      font-size: 13px; color: rgba(245,234,223,.82); line-height: 1.45;
+      margin-top: 2px;
+    }
+    .probrow { margin-top: 7px; align-items: center; }
+    button.small { padding: 5px 13px; font-size: 12px; }
+    .idearounds {
+      font-size: 10px; letter-spacing: .14em; text-transform: uppercase;
+      color: rgba(245,234,223,.34); margin-left: auto;
+    }
 
   #ideaEmail {
     width: 100%; box-sizing: border-box; padding: 11px 13px; margin-bottom: 10px;
@@ -1250,8 +1271,13 @@
       comes back changed.</p>
     <div class="ideaquote" id="ideaQuote"></div>
     <div id="ideaProbe" hidden>
+      <div id="ideaThread"></div>
       <div class="ideaask" id="ideaAsk"></div>
-      <textarea id="ideaDetail" maxlength="600" rows="3" placeholder="the more you say, the closer it lands"></textarea>
+      <textarea id="ideaDetail" maxlength="600" rows="2" placeholder="the more you say, the closer it lands"></textarea>
+      <div class="idearow probrow">
+        <button id="ideaMore" class="ghost small">answer</button>
+        <span class="idearounds" id="ideaRounds"></span>
+      </div>
     </div>
     <input id="ideaEmail" type="email" maxlength="120" placeholder="email (only to tell you when it ships)" autocomplete="email">
     <div class="idearow">
@@ -1324,8 +1350,13 @@
     you when it ships.</p>
   <textarea id="reqText" maxlength="400" rows="3" placeholder="a comet that sheds marigold petals..."></textarea>
   <div id="reqProbe" hidden>
+    <div id="reqThread"></div>
     <div class="ideaask" id="reqAsk"></div>
-    <textarea id="reqDetail" maxlength="600" rows="3" placeholder="the more you say, the closer it lands"></textarea>
+    <textarea id="reqDetail" maxlength="600" rows="2" placeholder="the more you say, the closer it lands"></textarea>
+    <div class="galrow probrow">
+      <button id="reqMore" class="reset small">answer</button>
+      <span class="idearounds" id="reqRounds"></span>
+    </div>
   </div>
   <div class="galrow">
     <input id="reqEmail" type="email" maxlength="120" placeholder="your email" autocomplete="email">
@@ -6189,6 +6220,9 @@ const ideaSend  = document.getElementById('ideaSend');
 const ideaProbe = document.getElementById('ideaProbe');
 const ideaAsk   = document.getElementById('ideaAsk');
 const ideaDetail= document.getElementById('ideaDetail');
+const ideaThread= document.getElementById('ideaThread');
+const ideaMore  = document.getElementById('ideaMore');
+const ideaRounds= document.getElementById('ideaRounds');
 const ideaSkip  = document.getElementById('ideaSkip');
 
 const cfgPanel = document.getElementById('cfgPanel');
@@ -7271,21 +7305,37 @@ applyToggles({ skipVoice: true });   // restored toggles take effect (voice need
    The email is optional on purpose: a request is worth filing either way. */
 let ideaPending = '';
 let ideaQuestion = '';
+let ideaTurns = [];
 
-/* Ask the Worker for ONE follow-up question about this request.
-   Never blocks the send: if the model is slow or down, the caller carries on
-   with what the viewer already typed. A request with thin detail is still
-   worth filing, and holding it hostage to an LLM round trip would lose it. */
-async function probeRequest(text) {
+/* Ask the Worker for the NEXT follow-up question, given the exchange so far.
+   Returns '' for "stop asking", which covers three cases that all mean the
+   same thing to the caller: the model is satisfied, the model is unreachable,
+   or we hit the cap. Never blocks the send: a request with thin detail is
+   still worth filing, and holding one hostage to an LLM round trip is how you
+   lose it. */
+async function probeRequest(text, turns) {
   try {
     const r = await fetch(GALLERY_API.replace('/presets', '/requests/probe'), {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ request: text }),
+      body: JSON.stringify({ request: text, turns: turns || [] }),
     });
     if (!r.ok) return '';
     const d = await r.json();
-    return typeof d.question === 'string' ? d.question : '';
+    return (!d.done && typeof d.question === 'string') ? d.question : '';
   } catch (_) { return ''; }
+}
+
+/* Render the answered turns above the live question. Showing their own words
+   back is what makes a second question read as a conversation rather than as
+   the form not having accepted the first answer. */
+function paintTurns(el, turns) {
+  el.textContent = '';
+  for (const t of turns) {
+    const w = document.createElement('div'); w.className = 'pturn';
+    const q = document.createElement('div'); q.className = 'pq'; q.textContent = t.q;
+    const a = document.createElement('div'); a.className = 'pa'; a.textContent = t.a;
+    w.appendChild(q); w.appendChild(a); el.appendChild(w);
+  }
 }
 
 function captureIdea(text) {
@@ -7294,25 +7344,61 @@ function captureIdea(text) {
   ideaQuote.textContent = '\u201c' + ideaPending + '\u201d';
   ideaEmail.value = localStorage.getItem('sklz.email.v1') || '';
   ideaProbe.hidden = true; ideaAsk.textContent = ''; ideaDetail.value = '';
-  ideaQuestion = '';
+  ideaQuestion = ''; ideaTurns = []; paintTurns(ideaThread, ideaTurns);
+  ideaRounds.textContent = '';
   ideaSend.textContent = 'send it';
   ideaModal.classList.add('show');
-  /* fetch the question while they are reading the card, so the follow-up is
-     usually already there by the time they reach for the button */
-  probeRequest(ideaPending).then(q => {
-    if (!q || !ideaModal.classList.contains('show') || ideaQuestion) return;
+  /* fetch the first question while they are reading the card, so the follow-up
+     is usually already on screen by the time they reach for the button */
+  askNext();
+}
+
+/* One step of the conversation. Ends silently when the model is satisfied:
+   there is nothing to announce, and "no further questions" would read as a
+   rejection of the last answer. */
+function askNext() {
+  probeRequest(ideaPending, ideaTurns).then(q => {
+    if (!ideaModal.classList.contains('show')) return;
+    if (!q) {                                  // satisfied, capped, or offline
+      ideaQuestion = '';
+      ideaAsk.textContent = '';
+      ideaDetail.value = '';
+      ideaMore.hidden = true;
+      ideaRounds.textContent = ideaTurns.length ? 'thanks, that is plenty' : '';
+      if (!ideaTurns.length) ideaProbe.hidden = true;
+      return;
+    }
     ideaQuestion = q;
     ideaAsk.textContent = q;
+    ideaDetail.value = '';
+    ideaMore.hidden = false;
+    ideaRounds.textContent = 'optional';
     ideaProbe.hidden = false;
   });
 }
+
+/* Bank the answer and ask the next one. Skipping is the same as sending: the
+   Worker stops when the last answer is empty, so "answer" with a blank box is
+   a graceful way out rather than a dead button. */
+function bankAnswer() {
+  const a = (ideaDetail.value || '').trim();
+  if (!ideaQuestion) return;
+  ideaTurns.push({ q: ideaQuestion, a });
+  paintTurns(ideaThread, ideaTurns);
+  ideaAsk.textContent = a ? '' : '';
+  ideaDetail.value = '';
+  ideaRounds.textContent = 'thinking...';
+  askNext();
+}
 function closeIdea() {
   ideaModal.classList.remove('show');
-  ideaPending = ''; ideaQuestion = '';
+  ideaPending = ''; ideaQuestion = ''; ideaTurns = [];
   ideaProbe.hidden = true; ideaDetail.value = '';
+  paintTurns(ideaThread, ideaTurns);
 }
 
 ideaSkip.addEventListener('click', closeIdea);
+ideaMore.addEventListener('click', bankAnswer);
 ideaModal.addEventListener('click', e => { if (e.target === ideaModal) closeIdea(); });
 
 ideaSend.addEventListener('click', async () => {
@@ -7325,9 +7411,14 @@ ideaSend.addEventListener('click', async () => {
   try {
     const r = await fetch(GALLERY_API.replace('/presets', '/requests'), {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
+      /* Bank whatever is in the box on the way out. Someone who typed an
+         answer and hit "send it" rather than "answer" clearly meant to
+         include it, and silently dropping it is the rudest thing this form
+         could do. */
       body: JSON.stringify({ request: body, email, config: galConfigPayload(),
-                             probe: ideaQuestion,
-                             detail: (ideaDetail.value || '').trim() })
+                             turns: ideaTurns.concat(
+                               ideaQuestion && (ideaDetail.value || '').trim()
+                                 ? [{ q: ideaQuestion, a: ideaDetail.value.trim() }] : []) })
     });
     if (!r.ok) throw new Error('rejected');
     if (email) { try { localStorage.setItem('sklz.email.v1', email); } catch (_) {} }
@@ -7345,28 +7436,34 @@ ideaSend.addEventListener('click', async () => {
   const probe = document.getElementById('reqProbe');
   const ask = document.getElementById('reqAsk');
   const detail = document.getElementById('reqDetail');
+  const thread = document.getElementById('reqThread');
+  const more = document.getElementById('reqMore');
+  const rounds = document.getElementById('reqRounds');
   if (!btn) return;
 
-  /* Two presses, not two screens. The first press asks a follow-up question
-     and relabels the button; the second sends. Anyone who has nothing to add
-     just presses again, so the extra step costs one click and never blocks a
-     request. Sending on the first press when the probe fails is deliberate:
-     a dead model must not be able to swallow a request. */
-  let asked = '', asking = false;
+  /* Same conversation as the modal, different chrome. The first press starts
+     it, "answer" advances it, and "send it" files whatever has been said so
+     far. Anyone with nothing to add just presses send again, so the extra
+     step costs one click and never blocks a request. */
+  let turns = [], question = '', busy = false;
 
   const reset = () => {
-    asked = ''; probe.hidden = true; ask.textContent = ''; detail.value = '';
+    turns = []; question = '';
+    probe.hidden = true; ask.textContent = ''; detail.value = '';
+    rounds.textContent = ''; thread.textContent = '';
     btn.textContent = 'send'; btn.disabled = false;
   };
-  txt.addEventListener('input', () => { if (asked) reset(); });
+  txt.addEventListener('input', () => { if (turns.length || question) reset(); });
 
   const send = async (body, email) => {
     btn.textContent = '...'; btn.disabled = true;
+    const all = turns.concat(
+      question && detail.value.trim() ? [{ q: question, a: detail.value.trim() }] : []);
     try {
       const r = await fetch(GALLERY_API.replace('/presets', '/requests'), {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ request: body, email, config: galConfigPayload(),
-                               probe: asked, detail: (detail.value || '').trim() })
+                               turns: all })
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.error || 'could not send');
@@ -7374,9 +7471,44 @@ ideaSend.addEventListener('click', async () => {
       galSay(email ? 'sent. we will email you when it ships.' : 'sent. thank you.');
     } catch (e) {
       galSay(String(e.message || e));
-      btn.textContent = asked ? 'send it' : 'send'; btn.disabled = false;
+      btn.textContent = question ? 'send it' : 'send'; btn.disabled = false;
     }
   };
+
+  async function step(body) {
+    busy = true;
+    const prev = btn.textContent;
+    btn.textContent = '...'; btn.disabled = true;
+    rounds.textContent = 'thinking...';
+    const q = await probeRequest(body, turns);
+    busy = false; btn.disabled = false;
+    if (!q) {                                   // satisfied, capped, or offline
+      question = '';
+      ask.textContent = '';
+      detail.value = '';
+      more.hidden = true;
+      rounds.textContent = turns.length ? 'thanks, that is plenty' : '';
+      btn.textContent = turns.length ? 'send it' : prev;
+      if (!turns.length) probe.hidden = true;
+      return false;
+    }
+    question = q;
+    ask.textContent = q;
+    detail.value = '';
+    more.hidden = false;
+    probe.hidden = false;
+    rounds.textContent = 'optional';
+    btn.textContent = 'send it';
+    detail.focus();
+    return true;
+  }
+
+  more.addEventListener('click', () => {
+    if (busy || !question) return;
+    turns.push({ q: question, a: (detail.value || '').trim() });
+    paintTurns(thread, turns);
+    step((txt.value || '').trim());
+  });
 
   btn.addEventListener('click', async () => {
     const body = (txt.value || '').trim();
@@ -7385,20 +7517,13 @@ ideaSend.addEventListener('click', async () => {
     if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(email)) {
       galSay('that email does not look right'); mail.focus(); return;
     }
-    if (asked || asking) { send(body, email); return; }
-
-    asking = true;
-    btn.textContent = '...'; btn.disabled = true;
-    const q = await probeRequest(body);
-    asking = false;
-    btn.disabled = false;
-    if (!q) { send(body, email); return; }        // probe down: do not lose it
-    asked = q;
-    ask.textContent = q;
-    probe.hidden = false;
-    btn.textContent = 'send it';
-    galSay('one question, then it goes to the board');
-    detail.focus();
+    if (busy) return;
+    /* Already in the conversation, or it is over: send. Only a cold press
+       starts the questions, so a dead model can never swallow a request. */
+    if (question || turns.length) { send(body, email); return; }
+    const asked = await step(body);
+    if (!asked) { send(body, email); return; }
+    galSay('a couple of questions, then it goes to the board');
   });
 })();
 

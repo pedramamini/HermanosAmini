@@ -105,15 +105,30 @@ def issue_body(row):
     when = time.strftime("%Y-%m-%d %H:%M %Z", time.localtime(row["created_at"] / 1000))
     who = "left an email" if row.get("email") else "asked anonymously"
 
-    # The follow-up exchange, when there is one. Rendered as Q and A rather
-    # than glued onto the request, because who said what matters: the answer
-    # is the viewer's own words about their own idea, and an agent reading
-    # this later should not have to guess which half we prompted for.
+    # The follow-up exchange. `detail` is a JSON array of {q,a} turns from
+    # 2026-08-19 onward and a bare string before that, so both render. Shown as
+    # a dialogue rather than glued onto the request, because who said what
+    # matters: an agent reading this later should not have to guess which half
+    # we prompted for.
     followup = ""
-    if row.get("detail"):
-        q = (row.get("probe_q") or "What should it look like?").strip()
-        followup = (f"\n**We asked:** {q}\n\n"
-                    f"**They said:**\n\n> {row['detail'].strip()}\n")
+    turns = []
+    raw = row.get("detail")
+    if raw:
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, list):
+                turns = [t for t in parsed if isinstance(t, dict) and t.get("q")]
+        except (ValueError, TypeError):
+            turns = [{"q": row.get("probe_q") or "What should it look like?",
+                      "a": raw}]
+    if turns:
+        lines = []
+        for t in turns:
+            a = (t.get("a") or "").strip()
+            lines.append(f"\n**We asked:** {t['q'].strip()}\n")
+            lines.append(f"\n**They said:**\n\n> {a}\n" if a
+                         else "\nThey skipped that one.\n")
+        followup = "".join(lines)
     elif row.get("probe_q"):
         followup = (f"\n**We asked:** {row['probe_q'].strip()}\n\n"
                     f"They skipped it, so this one still needs scoping before it "
@@ -138,7 +153,19 @@ def labels_for(row):
     An issue with no follow-up answer is a one-line wish, and approving it
     means an agent invents the missing half. `needs-detail` makes that visible
     on the board instead of discovering it at build time."""
-    if row.get("detail"):
+    raw = row.get("detail")
+    if raw:
+        try:
+            parsed = json.loads(raw)
+            # An array of turns where every answer is blank is a SKIPPED
+            # conversation, not a scoped one. Length alone would have marked
+            # those as detailed and quietly defeated the label.
+            if isinstance(parsed, list):
+                if any((t or {}).get("a", "").strip() for t in parsed):
+                    return LABELS
+                return LABELS + ",needs-detail"
+        except (ValueError, TypeError):
+            pass
         return LABELS
     return LABELS + ",needs-detail"
 

@@ -282,69 +282,124 @@ export default {
       }
 
       /* ── interrogate a request before it is filed ──
-         Viewer requests arrive as one short line ("skeleton with hair"), and
-         a line like that is not buildable: it does not say where the hair
-         goes, what it is made of, or how it moves. Every one of those gaps
-         becomes a decision an agent makes on the artist's behalf, which is
-         the wrong person to be deciding.
+         Viewer requests arrive as one short line ("skeleton with hair"), and a
+         line like that is not buildable: it does not say where the hair goes,
+         what it is made of, or how it moves. Every one of those gaps becomes a
+         decision an agent makes on the artist's behalf, which is the wrong
+         person to be deciding.
 
-         So we ask ONE question back. One, not a form: this is a piece of art
-         someone is enjoying, and a five-field intake form is how you turn a
-         casual "wouldn't it be cool if" into a bounce. The question is
-         generated from their own words so it can name the specific thing
-         that is missing, and it is always skippable. */
+         This is a CONVERSATION, not a form. It takes the exchange so far and
+         either asks the next question or declares itself satisfied, so a
+         request that was clear in one answer ends in one answer and a vague
+         one gets followed up. A fixed five-field intake is how you turn a
+         casual "wouldn't it be cool if" into a closed tab.
+
+         PROBE_MAX is a hard stop in CODE, not a request in the prompt. A model
+         asked to "stop when you have enough" will happily keep going, and the
+         person on the other end is enjoying a piece of art, not filling in a
+         ticket. Three questions is the ceiling; the model usually stops sooner.
+
+         POST /api/requests/probe
+           { request: "...", turns: [{q, a}, ...] }
+           -> { question }            ask this next
+           -> { done: true }          enough to build from */
       if (request.method === 'POST' && path === '/api/requests/probe') {
         const body = await request.json().catch(() => null);
         const text = String((body && body.request) || '').trim();
         if (text.length < 8) return json({ error: 'say a little more' }, 400, request);
+
+        const PROBE_MAX = 3;
+        const turns = Array.isArray(body && body.turns) ? body.turns.slice(0, PROBE_MAX) : [];
+        const asked = turns
+          .map(t => ({ q: String((t && t.q) || '').slice(0, 200).trim(),
+                       a: String((t && t.a) || '').slice(0, 600).trim() }))
+          .filter(t => t.q);
+        /* Answered nothing? Stop. Pressing on past a skip is nagging, and the
+           request is still worth filing without the detail. */
+        if (asked.length >= PROBE_MAX || (asked.length && !asked[asked.length - 1].a)) {
+          return json({ done: true }, 200, request);
+        }
 
         const sys = [
           'You help an artist collect BUILDABLE feature requests for a Dia de los',
           'Muertos generative art piece: a living calavera adrift in deep space, with a',
           'tunnel of sugar skulls, nebula smoke, comets, auroras, UFOs and marigolds.',
           '',
-          'A viewer just asked for something. Ask exactly ONE short follow-up question',
-          'that would most change how it gets built. Target the biggest ambiguity:',
-          'where it appears, what it looks like, how it moves, when it triggers, or',
-          'whether it replaces something that already exists.',
+          'You are having a SHORT conversation with a viewer about something they want',
+          'added. Aim for a description an engineer could build without guessing.',
+          '',
+          'Before you answer, check what you ALREADY know from everything they have',
+          'said so far, including their first message:',
+          '  WHERE  does it appear on screen?',
+          '  WHAT   does it look like?',
+          '  HOW    does it behave: does it move, react, or trigger?',
+          '',
+          'If you know TWO of those three, you have enough. Say ENOUGH. Do not chase',
+          'the third, and never ask about a detail that only makes it prettier: size,',
+          'exact colour, count, and duration are the artist\'s decisions, not the',
+          'viewer\'s.',
+          '',
+          'Reply with ONE of these and nothing else:',
+          '  a single question, under 20 words, ending in a question mark',
+          '  the exact word ENOUGH',
+          '',
+          'Examples:',
+          '  "a small green comet drifting in from the left, trailing marigold petals,',
+          '   passing behind the skull"',
+          '     -> WHERE yes, WHAT yes, HOW yes. Answer: ENOUGH',
+          '  "skeleton with hair"',
+          '     -> nothing is known. Answer: Flowing behind, or styled on the skull?',
+          '  "sheep theme" + "they float past in the background"',
+          '     -> WHERE yes, HOW yes, WHAT no. Answer: ENOUGH',
           '',
           'Rules:',
-          '- ONE question, under 20 words, plain and warm, no preamble.',
-          '- Be specific to what they asked. Never a generic "can you tell me more?".',
+          '- NEVER ask about something they already told you, in any wording.',
+          '- Ask about the biggest remaining gap, not the most interesting detail.',
+          '- Be specific to their idea. Never a generic "can you tell me more?".',
           '- Offer a concrete choice when there is one ("on the skull, or drifting past?").',
+          '- Warm and brief, like the art is curious. Never corporate, no preamble.',
           '- Never promise it will be built. Never mention labels, issues or GitHub.',
-          '- Output ONLY the question text. No quotes, no JSON, no explanation.',
+          '- Output ONLY the question, or ONLY the word ENOUGH.',
         ].join('\n');
+
+        const convo = [{ role: 'user', content: 'I want: ' + text.slice(0, 400) }];
+        for (const t of asked) {
+          convo.push({ role: 'assistant', content: t.q });
+          convo.push({ role: 'user', content: t.a || '(skipped)' });
+        }
 
         let q = '';
         try {
           const out = await env.AI.run('@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
-            messages: [{ role: 'system', content: sys },
-                       { role: 'user', content: text.slice(0, 400) }],
+            messages: [{ role: 'system', content: sys }, ...convo],
             max_tokens: 60, temperature: 0.6,
           });
           q = String((out && (out.response || out)) || '').trim();
         } catch (_) { q = ''; }
 
         /* Strip the model's habits: wrapping quotes, a "Question:" label, and
-           anything past the first question mark. A second sentence here turns
-           one question into a form, which is the exact thing we are avoiding. */
+           anything past the first question mark. A second sentence turns one
+           question into a form, which is the exact thing being avoided. */
         q = q.replace(/^["'\s]+|["'\s]+$/g, '').replace(/^(question|follow.?up)\s*[:\-]\s*/i, '');
+        if (/^enough\b/i.test(q)) return json({ done: true }, 200, request);
         const cut = q.indexOf('?');
         if (cut > 0) q = q.slice(0, cut + 1);
+
         if (q.length > 160 || q.length < 8 || !q.includes('?')) {
-          /* A generic fallback is still better than none, and it keeps the UI
-             shape identical whether or not the model cooperated. */
+          /* Unusable output on the FIRST question still deserves a question,
+             because a bad model minute should not silently cost the detail.
+             Mid-conversation it means stop: we already have something. */
+          if (asked.length) return json({ done: true }, 200, request);
           q = 'What should it look like, and where on screen should it happen?';
         }
-        return json({ question: q }, 200, request);
+        /* A near-duplicate of something already asked means the model has run
+           out of road. Treat it as satisfaction rather than looping. */
+        const norm = x => x.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
+        if (asked.some(t => norm(t.q) === norm(q))) return json({ done: true }, 200, request);
+
+        return json({ question: q, n: asked.length + 1, max: PROBE_MAX }, 200, request);
       }
 
-      /* ── element request from the site ──
-         Stored here; a separate pipeline files the GitHub issue and mails the
-         requester. We deliberately do NOT file the issue inline: that needs a
-         GH token, and a public unauthenticated endpoint holding one is a bad
-         trade. The pipeline runs with its own credentials. */
       if (request.method === 'POST' && path === '/api/requests') {
         const body = await request.json().catch(() => null);
         if (!body) return json({ error: 'bad json' }, 400, request);
@@ -358,11 +413,29 @@ export default {
           return json({ error: 'keep it PG' }, 400, request);
         }
 
-        /* the answer to the follow-up question, and the question itself, so
-           the issue can show the exchange rather than a bare second sentence */
-        const detail = String(body.detail || '').trim().slice(0, 600);
-        const probeQ = String(body.probe || '').trim().slice(0, 200);
-        if (detail && BAD_ANY.some(w => normalizeForFilter(detail).replace(/ /g, '').includes(w.replace(/ /g, '')))) {
+        /* The whole follow-up exchange, so the issue can show a conversation
+           rather than a bare second sentence. Stored as JSON in `detail` when
+           there is more than one turn; probe_q keeps the FIRST question so the
+           existing single-turn rows and the old drain rendering both still
+           mean exactly what they meant before. */
+        let turns = Array.isArray(body.turns) ? body.turns.slice(0, 3) : [];
+        turns = turns
+          .map(t => ({ q: String((t && t.q) || '').trim().slice(0, 200),
+                       a: String((t && t.a) || '').trim().slice(0, 600) }))
+          .filter(t => t.q && t.a);
+        const joined = turns.map(t => t.a).join(' ');
+        if (joined && BAD_ANY.some(w => normalizeForFilter(joined).replace(/ /g, '').includes(w.replace(/ /g, '')))) {
+          return json({ error: 'keep it PG' }, 400, request);
+        }
+
+        let detail = String(body.detail || '').trim().slice(0, 600);
+        let probeQ = String(body.probe || '').trim().slice(0, 200);
+        if (turns.length) {
+          probeQ = turns[0].q;
+          detail = JSON.stringify(turns).slice(0, 2000);
+        }
+        if (detail && !turns.length &&
+            BAD_ANY.some(w => normalizeForFilter(detail).replace(/ /g, '').includes(w.replace(/ /g, '')))) {
           return json({ error: 'keep it PG' }, 400, request);
         }
 
