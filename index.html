@@ -4420,6 +4420,41 @@ function fxRestyle() {
   CFG.satMul    = +(0.8 + Math.random() * 0.6).toFixed(2);
   CFG.nebulaSat = +(0.8 + Math.random() * 0.6).toFixed(2);
   CFG.socketGlow= +(0.6 + Math.random() * 1.4).toFixed(2);
+  CFG.bgBright  = +(0.85 + Math.random() * 0.5).toFixed(2);
+  CFG.vignette  = +(Math.random() * 0.6).toFixed(2);
+  CFG.boneSat   = +(0.7 + Math.random() * 0.6).toFixed(2);
+
+  /* FORM, not just colour. The dice used to roll 8 keys, all of them hue and
+     saturation, so "surprise me with a new look" reliably produced the same
+     composition in a different palette. These are the dials that change what
+     the piece IS rather than what colour it is, and they are rolled over
+     deliberately narrow bands: this is a redesign, not the slot machine that
+     demo mode is. Ranges keep the wordmark readable and the skull on screen.
+
+     Ornaments are chosen as a SET rather than independently, because a
+     flower crown on a breathing skull with a full flood is three ideas at
+     once and reads as noise. One flourish per roll. */
+  const R = (lo, hi) => +(lo + Math.random() * (hi - lo)).toFixed(2);
+  CFG.skullSize    = R(0.85, 1.35);
+  CFG.tunnelCount  = Math.round(R(28, 56));
+  CFG.tunnelSpeed  = R(0.012, 0.055);
+  CFG.rayCount     = Math.round(R(8, 24));
+  CFG.rayLength    = R(0.6, 1.6);
+  CFG.starDensity  = R(0.5, 1.8);
+  CFG.smokeScale   = R(0.7, 1.8);
+  CFG.smokeDrift   = R(0.6, 2.0);
+  CFG.petalCount   = Math.round(R(8, 16));
+  CFG.ringSpeed    = R(0.1, 0.8);
+  CFG.spiralSpeed  = R(0.1, 0.7);
+  CFG.auraSize     = R(0.7, 1.4);
+
+  const flourish = (Math.random() * 4) | 0;
+  CFG.flowerCrown  = flourish === 0 || flourish === 1 ? 1 : 0;
+  CFG.crownStyle   = flourish === 0 ? 1 : 0;
+  CFG.skullBreathe = flourish === 2 ? 1 : 0;
+  CFG.skullOnTop   = flourish === 3 ? 1 : 0;
+
+  applyToggles({ skipVoice: true });
   applyPalette();
   schedulePaletteRebuild();
   syncSlidersSafe();
@@ -4661,6 +4696,7 @@ const VOICE_MAP = [
   [['petal', 'petals', 'flores', 'flowers'],      fxPetalBurst],
   [['alebrije', 'dragon'],                        fxAlebrije],
   [['black hole', 'blackhole', 'agujero'],        fxBlackHole],
+  [['crown', 'corona'],                           () => CHAT_FX.crown()],
   /* Wrapped in an arrow, NOT `CHAT_FX.clear`. This table is built at module
      level and CHAT_FX is a `const` declared ~140 lines further down, so the
      direct reference is a temporal dead zone error that kills the whole
@@ -4850,6 +4886,11 @@ const CHAT_FX = {
   photo:   () => savePhoto(),
   clip:    () => toggleClip(),
   demo:    () => toggleDemo(),
+  /* the crown as a single verb, so "put a crown on" does not need the model
+     to know that two dials cooperate */
+  crown:   () => { CFG.flowerCrown = 1; CFG.crownStyle = 1; applyToggles({ skipVoice: true }); },
+  flores:  () => { CFG.flowerCrown = 1; CFG.crownStyle = 0; applyToggles({ skipVoice: true }); },
+  breathe: () => { CFG.skullBreathe = CFG.skullBreathe ? 0 : 1; applyToggles({ skipVoice: true }); },
 };
 
 function chatSay(who, text) {
@@ -4912,6 +4953,16 @@ function applyActions(actions) {
       /* a few dials do nothing until something is told about them: writing
          CFG.musicSeek moves a slider, it does not move the audio */
       if (a.key === 'musicSeek') { applySeek(CFG.musicSeek); seekReadout(); }
+      /* crownStyle PICKS a crown, it does not turn one on, and the model
+         reliably sets only the style: "put a crown on the skull" produced
+         crownStyle=1 with flowerCrown still 0, so nothing appeared and the
+         chat cheerfully reported success. Fixed here rather than in the
+         prompt, because a two-dial feature will keep catching every future
+         model, and applyActions is the enforcement boundary by design. */
+      if (a.key === 'crownStyle' && !CFG.flowerCrown) {
+        CFG.flowerCrown = 1;
+        done.push('crown on');
+      }
       if (a.key === 'musicVolume' && !muted) music.volume = CFG.musicVolume;
       done.push(`${CFG_SCHEMA[a.key][4]} \u2192 ${CFG[a.key]}`);
 
@@ -6495,6 +6546,8 @@ const HELP_ROWS = [
   [['Z'], 'zen mode (hide all text)', '', 'z'],
   [['O'], 'surprise me with a new look', '"restyle"', 'o'],
   [['\u21e7O'], 'demo mode: reroll everything every 3 min', '', '\u21e7o'],
+  [['\u21e7C'], 'crown: off / corona / flores', '"crown"', '\u21e7c'],
+  [['\u21e7B'], 'skull breathing on / off', '', '\u21e7b'],
   [['!'], 'fiesta: new look + everything + grito', '', '!'],
   [['Q'], 'galactic battle (3 fleets)', '"battle"', 'q'],
   [['J'], 'spawn more skulls (hold to flood)', '"skulls"', 'j'],
@@ -7303,7 +7356,14 @@ addEventListener('keydown', e => {
   else if (k === 'v') fxSupernova();
   else if (k === 'a') fxAurora();
   else if (k === 'u') fxUfo();
-  else if (k === 'b') fxAlebrije();
+  else if (k === 'b') {
+    if (e.shiftKey) {
+      CFG.skullBreathe = CFG.skullBreathe ? 0 : 1;
+      applyToggles({ skipVoice: true });
+      syncSlidersSafe();
+      cfgStatusSay('breathing ' + (CFG.skullBreathe ? 'on' : 'off'));
+    } else fxAlebrije();
+  }
   else if (k === '0') fxBlackHole();       // zero: the void. Every letter was taken.
   else if (k === '[' || k === ']') {
     /* bracket keys sit where a transport belongs on a QWERTY board, and they
@@ -7331,7 +7391,21 @@ addEventListener('keydown', e => {
     cfgStatusSay('¡fiesta!');
   }
   else if (k === 'i') { if (e.shiftKey) toggleClip(); else savePhoto(); }
-  else if (k === 'c') togglePanel(cfgPanel);
+  else if (k === 'c') {
+    /* Shift-C CYCLES rather than toggles: there are two crown styles and a
+       plain toggle would strand whichever one you were not on, so the only
+       way to reach the flower crown from the keyboard would still be the
+       panel. off -> corona -> flores -> off covers every state in one key. */
+    if (e.shiftKey) {
+      if (!CFG.flowerCrown) { CFG.flowerCrown = 1; CFG.crownStyle = 1; }
+      else if (CFG.crownStyle >= 0.5) { CFG.crownStyle = 0; }
+      else { CFG.flowerCrown = 0; }
+      applyToggles({ skipVoice: true });
+      syncSlidersSafe();
+      cfgStatusSay(!CFG.flowerCrown ? 'crown off'
+                 : CFG.crownStyle >= 0.5 ? 'la corona real' : 'corona de flores');
+    } else togglePanel(cfgPanel);
+  }
   else if (k === 'h' || k === '?') togglePanel(helpPanel);
 });
 

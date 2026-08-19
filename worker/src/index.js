@@ -580,7 +580,7 @@ export default {
           `Knobs you may set, with their allowed ranges: ${knobs}`,
           'Effects you may fire: grito, comet, ufo, aurora, supernova, meteor, star,',
           'petals, alebrije, blackhole, rainbow, flick, teeth, stare, swarm, battle, everything,',
-          'restyle, random, rings, spirals, photo, clip, demo, clear.',
+          'restyle, random, rings, spirals, photo, clip, demo, clear, crown, flores, breathe.',
           '("clear" removes the UFOs, the skull flood and the black hole: use it when',
           'they ask you to stop, undo, calm down or clean up. "photo" saves a still,',
           '"clip" starts or stops a 20 second recording, "demo" toggles a mode that',
