@@ -94,12 +94,16 @@ It runs silently without audio, see [Audio](#audio) below.
 | `Shift`+`L` | agentic chat on/off | | hold `.` | push-to-talk |
 | `←` `→` | skull size | | `↑` `↓` | music volume |
 | `Shift`+`J` | clear the flood | | `Shift`+`Q` | clear the sky |
+| `0` | black hole (eats the background) | | `[` `]` | scrub 10s (Shift: 30s) |
 | `!` | fiesta: new look + everything + grito | | | |
 | `Shift`+`O` | demo mode: reroll everything every 3 min | | | |
 | `Shift`+`I` | record a clip (20s max, with sound) | | | |
+| `Shift`+`C` | crown: off / corona / flores | | | |
+| `Shift`+`B` | skull breathing on / off | | | |
 | `H` or `?` | this list, in the piece | | | |
 
-The full list lives on `?` in the piece itself, alphabetized.
+The full list lives on `?` in the piece itself, alphabetized, with a fuzzy
+filter across the top: type `shtstr` and it finds the shooting star.
 
 Two toggles in the settings drawer change the skull itself: **skull always on
 top** keeps every spirit, spark, and saucer behind the hero calavera, and
@@ -124,6 +128,45 @@ Click the microphone to pick how you talk to it:
 
 The chat can only turn dials that already exist. It cannot retheme the piece,
 and it is told to refuse if you ask.
+
+### Crown the Calavera
+
+`Shift`+`C` cycles the crown: **la corona real**, a jewelled gold band whose
+metal takes its colour from the active palette, then **corona de flores**, a
+gathered marigold garland two rows deep.
+
+Both are pluckable. Click a bloom or a jewel and it pops off, tumbles down
+through the frame, and a new one grows back in its place a few seconds later.
+
+### A Black Hole
+
+`0` sends one across the frame. It drags the nebula into a spiral and eats the
+background: sparks, embers, petals, comets, all pulled in on inverse-square
+gravity and consumed at the horizon. The calaveras are untouched, because they
+are the subject rather than debris.
+
+### Scrub the Track
+
+The music note in the corner opens a sound panel: scrub the track, pause the
+music, mute everything. `[` and `]` jump ten seconds, thirty with `Shift`.
+
+Where you scrub is part of the board, so a link you share opens on the moment
+of the song you liked.
+
+### Share Your Board
+
+Everything you have changed travels as a link. Open the settings drawer and hit
+**copy a link to this exact board**, and you get a short one:
+
+    hermanosamini.com/FdqPpZ
+
+Only the dials you actually moved ride along, so a link made today still means
+the same thing after new dials ship. The short link stores a validated config
+rather than a URL, which means it cannot be turned into a redirect to anywhere
+else.
+
+For a wall display or a projector, **hermanosamini.com/demo** skips the entry
+gate and starts demo mode immediately.
 
 ### Galactic Battle
 
@@ -316,6 +359,14 @@ at the paths in `index.html`.
 Read [ART_DIRECTION.md](ART_DIRECTION.md) first. It's short and it's the whole
 deal. Then open an issue describing what you want to see, as a viewer, not as
 code. If it fits the piece and one of the brothers approves it, it gets built.
+
+You can also just ask from inside the art. The request box in the settings
+drawer, and the chat when you ask for something that does not exist yet, both
+file a real public issue. The piece asks you up to three follow-up questions
+first, generated from your own words, because "skeleton with hair" does not
+say where the hair goes or how it moves, and every gap is a decision somebody
+ends up making on the artists' behalf. Leave an email and you get exactly two
+messages: one when it lands on the board, one when it ships.
 
 ## Releases
 

@@ -224,13 +224,18 @@ def close_sweep(apply):
         elif not r["notified_open"]:
             backlog.append(r)
 
+    sent = failed = 0
     if backlog:
         print(f"{len(backlog)} open issue(s) never got a 'we got it' email:")
-        mail_rows(backlog, "open", apply)
+        s2, f2 = mail_rows(backlog, "open", apply)
+        sent += s2; failed += f2
     if due:
         print(f"{len(due)} closed issue(s) owe a 'it shipped' email:")
-        mail_rows(due, "closed", apply)
-    return due
+        s2, f2 = mail_rows(due, "closed", apply)
+        sent += s2; failed += f2
+    if not backlog and not due:
+        print("close-sweep: every filed request has been notified")
+    return sent, failed
 
 
 def issue_url(num):
@@ -334,9 +339,10 @@ def main():
                 "; ".join(f"#{f['issue']} {title_for(f['body'])}" for f in filed)])
         except (RuntimeError, OSError) as e:
             print(f"(toast failed, issues still filed: {e})")
+    swept = (0, 0)
     if a.close_sweep:
         print()
-        close_sweep(a.apply)
+        swept = close_sweep(a.apply)
 
     pending_mail = [{"id": f["id"], "email": f["email"], "body": f["body"],
                      "issue_number": f["issue"]}
@@ -347,7 +353,13 @@ def main():
         sent, _ = mail_rows(pending_mail, "open", apply)
 
     if a.apply:
-        log_run(f"filed={len(filed)} mail_sent={sent} mail_pending={len(pending_mail) - sent}")
+        # close_sweep's mail used to be INVISIBLE here: this line only counted
+        # what file_issues sent, so a run that mailed six people still logged
+        # "mail_sent=0". Worse than no log, because it reports the pipeline as
+        # idle while it is doing the most consequential thing it does, and it
+        # is the only record that survives the run.
+        log_run(f"filed={len(filed)} mail_sent={sent + swept[0]} "
+                f"mail_failed={swept[1]} mail_pending={len(pending_mail) - sent}")
     return 0
 
 
