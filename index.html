@@ -1468,10 +1468,19 @@ const IS_IOS = /iPad|iPhone|iPod|Android/.test(navigator.userAgent)
 const IS_TV = /smart-?tv|smarttv|tizen|webos|web0s|netcast|viera|bravia|googletv|appletv|roku|hbbtv/i.test(navigator.userAgent);
 let quality = IS_TV ? 3 : (IS_IOS || (IS_TOUCH && (navigator.hardwareConcurrency || 4) <= 6)) ? 2 : 0;
 let fpsAvg = 60, govLowT = -1, govHighT = -1, lastGovT = 0;
-const Q_DPR  = [2, 1.5, 1.2, 1.0, 1.0];
+/* Q4 renders BELOW device resolution and is upscaled. The old table ended
+   1.2 -> 1.0 -> 1.0, so the last rung of the ladder cost the governor a step
+   and bought it nothing: a machine that could not hold 32fps at Q3 dropped to
+   Q4 and rendered exactly the same number of pixels. That is the whole reason
+   an M5 could sit at "Q4 (survival)" and still report 26fps. 0.72 is 48%
+   fewer pixels on all three 2D canvases, which is a real rung. Survival mode
+   is allowed to look soft; that is what survival means. */
+const Q_DPR  = [2, 1.5, 1.2, 1.0, 0.72];
 const Q_NEB  = [0.5, 0.4, 0.35, 0.25, 0.2];
 const Q_NAME = ['full', 'high', 'lite', 'low', 'survival'];
 
+/* NOT clamped at 1: Q4 deliberately renders under-resolution. Taking
+   min(devicePixelRatio, rung) is what lets a 2x display drop to 0.72. */
 let DPR = Math.min(window.devicePixelRatio || 1, Q_DPR[quality]);
 let W = innerWidth, H = innerHeight;
 
@@ -3033,7 +3042,14 @@ function crownPluck(cx, cy) {
 function drawEyeAssembly(side) {
   const ex = side * 178, ey = -60, er = 128;
   const rot = face.ringRot * side * 2.2;             // left and right counter-rotate
-  const NP = Math.max(4, Math.round(CFG.petalCount));
+  /* THE HERO IS THE FLOOR OF THE QUALITY LADDER, and until now it shed
+     nothing: measured flat at 15-17ms from Q0 all the way to Q4, which meant
+     the governor could walk to the bottom rung and still be handed the same
+     bill. This function alone was 7.6ms of it, over half the hero.
+     Petals thin and the dot ring goes; both are decoration on a face whose
+     shape, sockets and gaze all survive. */
+  const q = qLevel();
+  const NP = Math.max(4, Math.round(CFG.petalCount / (q >= 4 ? 3 : q >= 3 ? 2 : 1)));
   for (let i = 0; i < NP; i++) {
     const a = (i / NP) * Math.PI * 2 + rot;
     hctx.save();
@@ -3045,8 +3061,11 @@ function drawEyeAssembly(side) {
     hctx.globalAlpha = 0.92; hctx.fill(); hctx.globalAlpha = 1;
     hctx.restore();
   }
-  for (let i = 0; i < 18; i++) {                     // dot ring counter-spins vs petals
-    const a = (i / 18) * Math.PI * 2 + 0.12 - rot * 0.55;
+  /* 18 arcs per eye, 36 per frame, for a ring of dots nobody can resolve on a
+     struggling display. First thing to go. */
+  const ND = q >= 4 ? 0 : q >= 3 ? 9 : 18;
+  for (let i = 0; i < ND; i++) {                     // dot ring counter-spins vs petals
+    const a = (i / ND) * Math.PI * 2 + 0.12 - rot * 0.55;
     hctx.beginPath();
     hctx.arc(ex + Math.cos(a) * (er + 74), ey + Math.sin(a) * (er + 74), 7, 0, Math.PI * 2);
     hctx.fillStyle = PAL.gold; hctx.fill();
@@ -3432,9 +3451,20 @@ function drawTunnel(dt) {
 
     const q3 = qLevel();
     if (q3 >= 3 && i % (q3 === 3 ? 2 : 3) !== 0 && !skullFx.has(i)) continue;  // thin the crowd
-    const lite = isLite();
-    const spr = (lite ? VARIANTS_STATIC : VARIANTS)[i % VARIANTS.length];
     const beatS = 1 + beatPulse * CFG.tunnelBreath;    // whole tunnel breathes on the beat
+    const px0 = VARIANTS[0].width * s * beatS;
+    /* DISTANCE LOD, which is separate from the quality ladder and was the
+       thing actually missing. The live face costs 2 ring drawImages plus a
+       roundRect, 6 strokes and 2 fills, PER SKULL, and it was painted on
+       every skull in the tunnel regardless of how big that skull was on
+       screen. Most of them are in the distance: at 110 screen pixels the
+       teeth are sub-pixel lines and the counter-rotating eye rings are a
+       smudge, so all of that work lands on detail no display can resolve.
+       Measured: this is most of the tunnel's cost at full quality.
+       The near skulls, which are the ones you actually look at, are
+       unaffected and still get the full live face. */
+    const lite = isLite() || px0 < 110;
+    const spr = (lite ? VARIANTS_STATIC : VARIANTS)[i % VARIANTS.length];
     const px = spr.width * s * beatS;
     skullPos[i] = { x: W / 2 + x, y: H / 2 + y, r: px * 0.34, d };
     tctx.save();
@@ -3661,6 +3691,7 @@ function drawHero(dt) {
   hctx.save();
   hctx.globalCompositeOperation = 'lighter';
   const flick = 0.75 + 0.25 * Math.sin(t * 3.1) * Math.sin(t * 1.3 + 2);
+  const qh = qLevel() >= 4;                    // survival: simplify the glow
   for (const so of sockets) {
     const gx = so.x * U, gy = (so.y + 24) * U, gr = so.r * U * (1.25 + bassSm * 0.8) * CFG.socketGlow;
     /* pupil offset toward the current look point */
@@ -3668,9 +3699,21 @@ function drawHero(dt) {
     const dl = Math.hypot(dx, dy) || 1;
     const off = Math.min(1, dl / (H * 0.3)) * so.r * U * 0.42 * Math.min(1.1, CFG.gazeRange);
     const px = gx + (dx / dl) * off, py = gy + (dy / dl) * off * 0.8;
+    /* Two overlapping radial gradients per socket, four per frame, each a
+       large `lighter` fill. Gradient fills are fill-rate bound, so their cost
+       scales with the square of the skull size: on a big display this is the
+       most expensive thing on the hero canvas after the petals. At Q4 the
+       outer halo collapses to a flat radial with one stop transition, which
+       is visually near-identical at that resolution and much cheaper. */
+    /* The inner radius stays 0. My first cut at this started the gradient at
+       55% of the radius, which makes everything inside that circle a SOLID
+       fill of the first stop: the sockets went milky lavender instead of dark
+       with a glow, which is a different face. Caught by comparing renders,
+       not by reading the code. Only the middle stop is dropped at Q4, which
+       costs one interpolation band and changes nothing visible. */
     const g = hctx.createRadialGradient(gx, gy, 0, gx, gy, gr);
     g.addColorStop(0,   `rgba(235,170,255,${0.95 * flick})`);
-    g.addColorStop(0.35,`rgba(145,70,255,${0.7 * flick * (0.6 + bassSm)})`);
+    if (!qh) g.addColorStop(0.35,`rgba(145,70,255,${0.7 * flick * (0.6 + bassSm)})`);
     g.addColorStop(1,   'rgba(145,70,255,0)');
     hctx.fillStyle = g;
     hctx.beginPath(); hctx.arc(gx, gy, gr, 0, Math.PI * 2); hctx.fill();
