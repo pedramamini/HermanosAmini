@@ -100,6 +100,8 @@ It runs silently without audio, see [Audio](#audio) below.
 | `Shift`+`I` | record a clip (20s max, with sound) | | | |
 | `Shift`+`C` | crown: off / corona / flores | | | |
 | `Shift`+`B` | skull breathing on / off | | | |
+| `Shift`+`S` | sombrero on / off | | | |
+| `Shift`+`G` | marigold garland on / off | | | |
 | `H` or `?` | this list, in the piece | | | |
 
 The full list lives on `?` in the piece itself, alphabetized, with a fuzzy
@@ -137,6 +139,16 @@ gathered marigold garland two rows deep.
 
 Both are pluckable. Click a bloom or a jewel and it pops off, tumbles down
 through the frame, and a new one grows back in its place a few seconds later.
+
+### Sombrero and Garland
+
+`Shift`+`S` puts a wide-brimmed sombrero on the calavera, tilted, with a
+marigold tucked into the hatband and pom-poms swinging off the brim. `Shift`+`G`
+strings a marigold garland where the collarbones would be, hanging on a real
+catenary so it sags like rope rather than arcing like a hoop.
+
+Together they are the mariachi. The hat quietly hides the flower crown while it
+is on, and gives it back untouched when you take it off.
 
 ### A Black Hole
 
