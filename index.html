@@ -147,10 +147,14 @@
   }
   /* the hammer tray is a mobile affordance; desktop shows all four buttons */
   #tools { display: none; }
-  #mute { right: 24px; }
-  #help { right: 80px; font-family: 'Space Grotesk', sans-serif; font-weight: 500; }
-  #mic { right: 136px; font-size: 14px; }
-  #settings { right: 192px; font-size: 17px; }
+  /* Bar order, left to right: mic, music, settings, help. `right` counts from
+     the edge, so the LAST item in that reading order gets the smallest value.
+     Help sits on the outside because it is the one you reach for once, and
+     the mic on the inside because it is the one you reach for mid-thought. */
+  #help { right: 24px; font-family: 'Space Grotesk', sans-serif; font-weight: 500; }
+  #settings { right: 80px; font-size: 17px; }
+  #mute { right: 136px; }
+  #mic { right: 192px; font-size: 14px; }
   #mic.listening {
     border-color: #ff2fa0;
     box-shadow: 0 0 14px rgba(255,47,160,.8);
@@ -780,10 +784,10 @@
                   border-color .3s;
     }
     body.tools-open .ctl { opacity: 1; pointer-events: auto; }
-    body.tools-open #mute     { transform: translateY(-62px)  scale(1); transition-delay: .00s; }
-    body.tools-open #help     { transform: translateY(-120px) scale(1); transition-delay: .04s; }
-    body.tools-open #mic      { transform: translateY(-178px) scale(1); transition-delay: .08s; }
-    body.tools-open #settings { transform: translateY(-236px) scale(1); transition-delay: .12s; }
+    body.tools-open #help     { transform: translateY(-62px)  scale(1); transition-delay: .00s; }
+    body.tools-open #settings { transform: translateY(-120px) scale(1); transition-delay: .04s; }
+    body.tools-open #mute     { transform: translateY(-178px) scale(1); transition-delay: .08s; }
+    body.tools-open #mic      { transform: translateY(-236px) scale(1); transition-delay: .12s; }
     /* the desktop right-offsets would scatter the stack sideways */
     #mute, #help, #mic, #settings { right: 22px; }
 
@@ -834,6 +838,35 @@
     animation: vmIn .2s cubic-bezier(.16,1,.3,1);
   }
   #voiceMenu.show { display: block; }
+  /* the sound popover: same glass, same motion, same rows as the voice menu,
+     because two popovers hanging off the same bar that look different read as
+     two different apps. It anchors over the music button rather than the
+     right edge, so it points at what opened it. */
+  #soundMenu {
+    position: fixed; right: 116px; bottom: 80px; z-index: 24; display: none;
+    width: 268px; padding: 9px; border-radius: 14px;
+    font-family: 'Space Grotesk', sans-serif; color: #f5eadf;
+    background: rgba(9,4,20,.72);
+    border: 1px solid rgba(245,234,223,.16);
+    backdrop-filter: blur(13px); -webkit-backdrop-filter: blur(13px);
+    box-shadow: 0 18px 50px rgba(0,0,0,.62);
+    animation: vmIn .2s cubic-bezier(.16,1,.3,1);
+  }
+  #soundMenu.show { display: block; }
+  .smscrub { padding: 2px 10px 10px; }
+  .smrow {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 6px;
+  }
+  .smlabel {
+    font-size: 10px; letter-spacing: .16em; text-transform: uppercase;
+    color: rgba(245,234,223,.55);
+  }
+  #smTime {
+    font-family: 'SF Mono', 'Menlo', monospace; font-size: 11px;
+    color: #2fe8d0; font-variant-numeric: tabular-nums;
+  }
+  #smBar { width: 100%; margin: 0; }
   @keyframes vmIn { from { opacity: 0; transform: translateY(8px); } }
   .vmhead {
     font-size: 9.5px; letter-spacing: .26em; text-transform: uppercase;
@@ -949,6 +982,7 @@
     #chatDock { right: 12px; left: 12px; width: auto; bottom: 76px; }
     #chatDock.min { width: auto; }
     #voiceMenu { right: 12px; left: 12px; width: auto; bottom: 76px; }
+    #soundMenu { right: 12px; left: 12px; width: auto; bottom: 76px; }
     #chatLog { max-height: 42vh; }
   }
 
@@ -1221,10 +1255,30 @@
 </div>
 <div id="credit" class="ui">music &middot; j. pool: latin &amp; world downtempo</div>
 <div id="tools" class="ui" title="tools">&#128296;</div>
-<div id="settings" class="ui ctl" title="settings &amp; presets">&#9881;</div>
 <div id="mic" class="ui ctl" title="voice control">&#127908;</div>
+<div id="mute" class="ui ctl" title="sound">&#9835;</div>
+<div id="settings" class="ui ctl" title="settings &amp; presets">&#9881;</div>
 <div id="help" class="ui ctl" title="controls">?</div>
-<div id="mute" class="ui ctl" title="mute all sound">&#9835;</div>
+
+<div id="soundMenu" class="ui">
+  <div class="vmhead">sound</div>
+  <div class="smscrub">
+    <div class="smrow">
+      <span class="smlabel">scrub the track</span>
+      <span id="smTime">0:00 / 0:00</span>
+    </div>
+    <input id="smBar" type="range" min="0" max="100" step="0.1" value="0"
+           aria-label="scrub through the track">
+  </div>
+  <div class="vmopt" id="smPlay">
+    <div class="vmicon" id="smPlayIcon">&#9208;&#65038;</div>
+    <div class="vmtext"><b id="smPlayLabel">pause the music</b><span>the art keeps going</span></div>
+  </div>
+  <div class="vmopt" id="smMute">
+    <div class="vmicon" id="smMuteIcon">&#128266;</div>
+    <div class="vmtext"><b id="smMuteLabel">mute all sound</b><span>music, gritos and effects</span></div>
+  </div>
+</div>
 
 <div id="voiceMenu" class="ui">
   <div class="vmhead">voice</div>
@@ -4848,10 +4902,11 @@ function toggleVoice() { setVoiceMode(voiceMode ? 0 : 1); }
 
 micBtn.addEventListener('click', e => {
   e.stopPropagation();
-  /* one surface at a time: opening the mic closes the gear/help panels,
-     exactly as opening them closes the mic's menu */
+  /* one surface at a time: opening the mic closes the gear/help panels and
+     the sound popover, exactly as opening them closes the mic's menu */
   document.querySelectorAll('.panel').forEach(x => { x.classList.remove('show'); x.style.transform = ''; });
   document.body.classList.remove('sheet-open');
+  soundMenu.classList.remove('show');
   if (chatOpen) { chatDock.classList.toggle('min'); return; }
   voiceMenu.classList.toggle('show');
 });
@@ -6225,7 +6280,64 @@ music.addEventListener('play', syncMuteIcon);
 music.addEventListener('pause', syncMuteIcon);
 music.addEventListener('volumechange', syncMuteIcon);
 
-muteBtn.addEventListener('click', toggleMute);
+/* ── the sound popover ──
+   The music button used to BE the mute toggle. It is now a door: scrub, pause
+   and mute all live behind it. The button keeps its slashed-note state, so
+   the bar still says at a glance whether the piece is silent, which was the
+   whole point of that indicator on a wall display.
+
+   Mute stays on M and space still plays/pauses, so nothing that worked from
+   the keyboard now requires opening a panel. */
+const soundMenu = document.getElementById('soundMenu');
+const smPlay = document.getElementById('smPlay');
+const smMute = document.getElementById('smMute');
+const smBar = document.getElementById('smBar');
+const smTime = document.getElementById('smTime');
+
+function syncSoundMenu() {
+  const playing = !music.paused;
+  document.getElementById('smPlayIcon').innerHTML = playing ? '&#9208;&#65038;' : '&#9654;&#65038;';
+  document.getElementById('smPlayLabel').textContent = playing ? 'pause the music' : 'play the music';
+  document.getElementById('smMuteIcon').innerHTML = muted ? '&#128263;' : '&#128266;';
+  document.getElementById('smMuteLabel').textContent = muted ? 'unmute' : 'mute all sound';
+  const d = music.duration, c = music.currentTime;
+  smTime.textContent = fmtTime(c) + ' / ' + (isFinite(d) ? fmtTime(d) : '--:--');
+  if (!smDragging && isFinite(d) && d > 0) smBar.value = (c / d * 100).toFixed(1);
+}
+
+let smDragging = false;
+smBar.addEventListener('pointerdown', () => { smDragging = true; });
+/* pointerup on the WINDOW: releasing outside the slider is normal at the ends
+   of a drag and would otherwise leave it stuck following nothing */
+addEventListener('pointerup', () => { if (smDragging) { smDragging = false; syncSoundMenu(); } });
+smBar.addEventListener('input', () => {
+  const pct = parseFloat(smBar.value);
+  CFG.musicSeek = +pct.toFixed(1);        // the shareable start position
+  applySeek(pct);
+  syncSlidersSafe();
+  const d = music.duration;
+  smTime.textContent = fmtTime(isFinite(d) ? pct / 100 * d : 0) + ' / ' +
+                       (isFinite(d) ? fmtTime(d) : '--:--');
+});
+smPlay.addEventListener('click', () => {
+  if (music.paused) { userPaused = false; music.play().catch(() => {}); }
+  else { userPaused = true; music.pause(); }
+  syncMuteIcon(); syncSoundMenu();
+});
+smMute.addEventListener('click', () => { toggleMute(); syncSoundMenu(); });
+
+muteBtn.addEventListener('click', e => {
+  e.stopPropagation();
+  const open = soundMenu.classList.toggle('show');
+  voiceMenu.classList.remove('show');     // one popover at a time
+  if (open) syncSoundMenu();
+});
+/* 4Hz while open, and ONLY while open: a clock that ticks behind a closed
+   panel is pure waste on a display nobody is touching. */
+setInterval(() => { if (soundMenu.classList.contains('show') && !music.paused) syncSoundMenu(); }, 250);
+music.addEventListener('play', syncSoundMenu);
+music.addEventListener('pause', syncSoundMenu);
+music.addEventListener('loadedmetadata', syncSoundMenu);
 function toggleMute() {
   /* If the track is paused, "unmute" would light the icon while producing no
      sound, so the button would read as broken. Whatever silenced it, this
@@ -6348,6 +6460,7 @@ function togglePanel(p) {
     x.style.transform = '';                 // drop any leftover drag offset
   });
   voiceMenu.classList.remove('show');       // gear/help also dismiss the mic popover
+  soundMenu.classList.remove('show');       // ...and the sound popover
   if (!was) p.classList.add('show');
   /* phones hide the floating controls behind an open sheet */
   document.body.classList.toggle('sheet-open', !!document.querySelector('.panel.show'));
@@ -7312,6 +7425,7 @@ addEventListener('keydown', e => {
     /* idea modal sits on top of everything and closes first */
     if (ideaModal.classList.contains('show')) { closeIdea(); return; }
     if (voiceMenu.classList.contains('show')) { voiceMenu.classList.remove('show'); return; }
+    if (soundMenu.classList.contains('show')) { soundMenu.classList.remove('show'); return; }
     /* first escape minimizes a live chat, second ends it */
     if (chatOpen) {
       if (chatDock.classList.contains('min')) { setVoiceMode(0); }
@@ -7704,6 +7818,10 @@ ideaSend.addEventListener('click', async () => {
     document.body.classList.toggle('tools-open');
   });
   document.querySelectorAll('.ctl').forEach(b => {
+    /* The mic and music buttons open POPOVERS anchored to the tray, so
+       collapsing the tray under them leaves a menu floating over nothing.
+       Every other button opens a full panel, where closing the tray is right. */
+    if (b.id === 'mic' || b.id === 'mute') return;
     b.addEventListener('click', () => setTimeout(closeTray, 60));
   });
   /* tapping the art dismisses the tray without doing anything else */
@@ -7713,6 +7831,18 @@ ideaSend.addEventListener('click', async () => {
     closeTray();
   }, true);
 })();
+
+/* Clicking the art dismisses either popover. Without this the only way out is
+   the button that opened it, which is not how a menu behaves anywhere else.
+   Capture phase, so it runs before the art's own pointerdown handlers decide
+   the click was a flick. */
+addEventListener('pointerdown', e => {
+  const inside = e.target.closest &&
+    e.target.closest('#voiceMenu, #soundMenu, #mic, #mute, .panel');
+  if (inside) return;
+  voiceMenu.classList.remove('show');
+  soundMenu.classList.remove('show');
+}, true);
 
 /* ── sensor bridge auto-connect ──
    A browser cannot read a Kinect (or any depth camera): there is no driver,
