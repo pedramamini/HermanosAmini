@@ -41,7 +41,7 @@ const LIMITS = {
   boneHue: [-180, 180, 'bone hue'], boneSat: [0, 2, 'bone saturation'],
   nebulaHue: [-180, 180, 'smoke hue shift'], nebulaSat: [0, 2, 'smoke saturation'], bgBright: [0.2, 2, 'smoke brightness'], vignette: [0, 1.2, 'vignette'],
   flickForce: [0.2, 3, 'flick strength'], socketGlow: [0, 2.5, 'eye socket glow'], auraSize: [0, 2.5, 'skull aura'], petalCount: [4, 20, 'eye petals'],
-  textOn: [0, 1, 'show text'], musicOn: [0, 1, 'sound on (music, gritos, sfx)'], autoEvents: [0, 1, 'random events'], voiceOn: [0, 1, 'voice control'], beatSync: [0, 1, 'sync to the beat'], hudOn: [0, 1, 'fps monitor'], skullOnTop: [0, 1, 'skull always on top'], skullBreathe: [0, 1, 'skull breathing'], flowerCrown: [0, 1, 'flower crown'], crownBlooms: [3, 22, 'flower crown blooms'],
+  textOn: [0, 1, 'show text'], musicOn: [0, 1, 'sound on (music, gritos, sfx)'], autoEvents: [0, 1, 'random events'], voiceOn: [0, 1, 'voice control'], beatSync: [0, 1, 'sync to the beat'], hudOn: [0, 1, 'fps monitor'], skullOnTop: [0, 1, 'skull always on top'], skullBreathe: [0, 1, 'skull breathing'], flowerCrown: [0, 1, 'flower crown'], crownBlooms: [3, 22, 'flower crown blooms'], garlandBlooms: [5, 24, 'garland marigolds'], sombrero: [0, 1, 'sombrero'], garland: [0, 1, 'marigold garland'],
 };
 
 /* Deliberately blunt list: slurs and profanity roots. Matching happens after
@@ -580,7 +580,8 @@ export default {
           `Knobs you may set, with their allowed ranges: ${knobs}`,
           'Effects you may fire: grito, comet, ufo, aurora, supernova, meteor, star,',
           'petals, alebrije, blackhole, rainbow, flick, teeth, stare, swarm, battle, everything,',
-          'restyle, random, rings, spirals, photo, clip, demo, clear, crown, flores, breathe.',
+          'restyle, random, rings, spirals, photo, clip, demo, clear, crown, flores, breathe,',
+          'sombrero, garland.',
           '("clear" removes the UFOs, the skull flood and the black hole: use it when',
           'they ask you to stop, undo, calm down or clean up. "photo" saves a still,',
           '"clip" starts or stops a 20 second recording, "demo" toggles a mode that',

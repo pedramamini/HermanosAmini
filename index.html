@@ -1606,6 +1606,7 @@ const CFG_SCHEMA = {
   auraSize:       [1.0,   0,     2.5,  0.1,   'skull aura'],
   petalCount:     [12,    4,     20,   1,     'eye petals'],
   crownBlooms:    [10,    3,     22,   1,     'flower crown blooms'],
+  garlandBlooms:  [11,    5,     24,   1,     'garland marigolds'],
   crownStyle:     [1,     0,     1,    1,     'crown: 0 flores 1 corona'],
   crownPeaks:     [4,     3,     7,    1,     'crown points'],
 };
@@ -1627,6 +1628,7 @@ const CFG_CATEGORY = {
          'beatSync'],
   skull: ['skullSize', 'socketGlow', 'auraSize', 'petalCount', 'rayLength',
           'rayCount', 'flickForce', 'skullOnTop', 'skullBreathe', 'floodRate', 'crownStyle', 'crownPeaks',
+          'sombrero', 'garland', 'garlandBlooms',
           'flowerCrown', 'crownBlooms'],
   sky: ['tunnelCount', 'starDensity', 'dustCount', 'smokeScale', 'smokeStir',
         'smokeDecay', 'eventMinGap', 'eventMaxGap', 'autoEvents'],
@@ -1657,6 +1659,8 @@ const CFG_TOGGLES = {
   skullOnTop:  [0, 0, 1, 1, 'skull always on top', 'toggle'],
   skullBreathe:[0, 0, 1, 1, 'skull breathing', 'toggle'],
   flowerCrown: [0, 0, 1, 1, 'flower crown', 'toggle'],
+  sombrero:    [0, 0, 1, 1, 'sombrero', 'toggle'],
+  garland:     [0, 0, 1, 1, 'marigold garland', 'toggle'],
   hudOn:       [0, 0, 1, 1, 'fps monitor', 'toggle'],
 };
 Object.assign(CFG_SCHEMA, CFG_TOGGLES);
@@ -3146,8 +3150,237 @@ function drawFlowerCrown() {
   }
 }
 
+/* One marigold, drawn at the origin. Factored out so the crown and the
+   garland cannot drift into looking like different flowers, which is exactly
+   what happens when the same 20 lines get copied and then tuned twice. */
+function drawBloom(r, idx, spin, petals, shade) {
+  const c1 = idx % 3 === 0 ? PAL.gold : idx % 3 === 1 ? PAL.magenta : PAL.violet;
+  const c2 = idx % 3 === 0 ? PAL.magenta : idx % 3 === 1 ? PAL.gold : PAL.teal;
+  if (shade !== false) {
+    /* seat it: a flat fill on a flat background has nothing separating it */
+    hctx.beginPath();
+    hctx.arc(0, r * 0.12, r * 1.06, 0, Math.PI * 2);
+    hctx.fillStyle = PAL.dark; hctx.globalAlpha = 0.34; hctx.fill();
+    hctx.globalAlpha = 1;
+  }
+  for (let p = 0; p < petals; p++) {
+    hctx.save();
+    hctx.rotate((p / petals) * Math.PI * 2 + spin);
+    hctx.beginPath();
+    hctx.ellipse(0, -r * 0.62, r * 0.30, r * 0.62, 0, 0, Math.PI * 2);
+    hctx.fillStyle = p % 2 ? c1 : c2;
+    hctx.globalAlpha = 0.96; hctx.fill();
+    hctx.restore();
+  }
+  if (qLevel() < 3) {                            // inner ring: density, sheds
+    for (let p = 0; p < petals; p++) {
+      hctx.save();
+      hctx.rotate((p / petals) * Math.PI * 2 - spin * 0.6 + Math.PI / petals);
+      hctx.beginPath();
+      hctx.ellipse(0, -r * 0.36, r * 0.20, r * 0.38, 0, 0, Math.PI * 2);
+      hctx.fillStyle = c1; hctx.globalAlpha = 0.85; hctx.fill();
+      hctx.restore();
+    }
+  }
+  hctx.beginPath(); hctx.arc(0, 0, r * 0.17, 0, Math.PI * 2);
+  hctx.fillStyle = PAL.bone1; hctx.globalAlpha = 1; hctx.fill();
+}
+
+/* ── the marigold garland (viewer request #5) ──
+   Cempasuchil strung in a catenary below the jaw, where a neck and shoulders
+   would be. The request was "skeleton with sombrero and marigold garland",
+   and this is the half of it that implies the BODY without drawing one:
+   ART_DIRECTION forbids replacing the core art, and the piece is a floating
+   calavera, so a garland hanging where the collarbones would be reads as an
+   ofrenda figure while the hero skull stays exactly what it is.
+
+   A real catenary, not an arc. A rope hung between two points sags fastest
+   at the ends and flattens in the middle; a circular arc does the opposite
+   and reads as a hoop someone is holding up. cosh gives it for free. */
+/* Numbers taken from the silhouette, not picked: skullOutlinePath runs y
+   -440 (crown) to 560 (chin) and narrows to about x +/-205 at the jaw. My
+   first values put GAR_TOP at 300, which is CHEEK height, so the garland hung
+   straight across the teeth and covered the mouth. It has to clear the chin
+   entirely or it stops being a garland worn at the collarbone and becomes a
+   gag over the face. */
+const GAR_SPAN = 395;        // ends just outside the jaw, not out in space
+const GAR_TOP  = 470;        // below the cheeks, level with the lower jaw
+const GAR_SAG  = 300;        // middle lands at 770: clear of the 560 chin
+
+function garlandAt(f) {
+  const u = (f * 2 - 1) * 1.65;                  // -1.65..1.65 across the span
+  const c = Math.cosh(u), c0 = Math.cosh(1.65);
+  /* normalise so f=0 and f=1 sit exactly at GAR_TOP and the middle at
+     GAR_TOP + GAR_SAG, whatever the shape constant */
+  return [u / 1.65 * GAR_SPAN, GAR_TOP + GAR_SAG * (c0 - c) / (c0 - 1)];
+}
+
+function drawGarland() {
+  if (!CFG.garland) return;
+  const q = qLevel();
+  const n = Math.max(5, Math.round(CFG.garlandBlooms));
+  const PET = q >= 4 ? 5 : q >= 3 ? 6 : 8;
+  const sway = Math.sin(t * 0.5) * 0.05 + beatPulse * 0.05;
+
+  /* the cord first, so the blooms sit ON it. Thin and dark: it is twine, not
+     the foliage rope that read as hair on the crown. */
+  hctx.save();
+  hctx.beginPath();
+  const STEP = q >= 3 ? 16 : 34;
+  for (let i = 0; i <= STEP; i++) {
+    const [x, y] = garlandAt(i / STEP);
+    if (i) hctx.lineTo(x, y * (1 + sway * 0.12)); else hctx.moveTo(x, y);
+  }
+  hctx.strokeStyle = PAL.bone3;
+  hctx.lineWidth = 9;
+  hctx.globalAlpha = 0.55;
+  hctx.stroke();
+  hctx.globalAlpha = 1;
+
+  for (let i = 0; i < n; i++) {
+    const f = (i + 0.5) / n;
+    const [x, y] = garlandAt(f);
+    const jit = 0.82 + 0.34 * ((i * 2654435761 % 89) / 89);
+    /* Same 1/sqrt(n) falloff as the crown: linear falloff makes a garland
+       THINNER as you add flowers, which is the opposite of the ask. */
+    const r = (GAR_SPAN * 0.40 / Math.sqrt(n)) * jit * (1 + sway);
+    hctx.save();
+    hctx.translate(x, y * (1 + sway * 0.12));
+    hctx.rotate(Math.sin(f * Math.PI * 2 + t * 0.4) * 0.15);
+    drawBloom(r, i, t * 0.09 * (i % 2 ? 1 : -1) + i * 1.9, PET);
+    hctx.restore();
+  }
+  hctx.restore();
+}
+
+/* ── the sombrero (viewer request #5) ──
+   Worn tilted, because a hat sitting dead level on a skull reads as a traffic
+   cone. The tilt is small and constant rather than animated: this is a hat,
+   not an effect, and anything that moves on a timer needs a tell.
+
+   Built from the head OUT, not from arbitrary coordinates. The brim's centre
+   is the crown of the skull, so the hat stays put if the silhouette is ever
+   retuned, the same discipline the crown band uses. */
+const SOM_TILT = -0.13;          // radians, brim dips to the viewer's right
+/* The crown of the skull is y = -440. Seating the brim at -400 left daylight
+   between hat and head: it read as a hat hovering, not worn. -330 pushes the
+   brim down ONTO the dome so the bone disappears behind it, which is what
+   wearing a hat looks like. */
+const SOM_SIT  = -368;
+
+function drawSombrero() {
+  if (!CFG.sombrero) return;
+  const q = qLevel();
+  const brimW = 700, brimH = 104;                 // wide: this is not a fedora
+  const crownW = 235, crownH = 300;
+  const bob = Math.sin(t * 0.6) * 4 + beatPulse * 5;
+
+  hctx.save();
+  hctx.translate(0, SOM_SIT + bob);
+  hctx.rotate(SOM_TILT);
+
+  /* Shadow ON the skull first, under the brim. Without it the hat floats and
+     the calavera looks like it is standing behind a hat rather than wearing
+     one. Same lesson the crown taught: flat fills on flat bone need a seam. */
+  hctx.save();
+  hctx.globalAlpha = 0.42;
+  hctx.beginPath();
+  hctx.ellipse(0, 34, brimW * 0.82, brimH * 0.80, 0, 0, Math.PI * 2);
+  hctx.fillStyle = PAL.dark; hctx.fill();
+  hctx.restore();
+
+  /* underside of the brim, darker, offset down: this is what gives the brim
+     thickness rather than making it a decal */
+  hctx.beginPath();
+  hctx.ellipse(0, 20, brimW, brimH, 0, 0, Math.PI * 2);
+  hctx.fillStyle = PAL.gold3; hctx.fill();
+
+  /* the brim proper, lit from above */
+  const bg = hctx.createLinearGradient(0, -brimH, 0, brimH);
+  bg.addColorStop(0, PAL.gold1);
+  bg.addColorStop(0.55, PAL.gold2);
+  bg.addColorStop(1, PAL.gold3);
+  hctx.beginPath();
+  hctx.ellipse(0, 0, brimW, brimH, 0, 0, Math.PI * 2);
+  hctx.fillStyle = bg; hctx.fill();
+  hctx.strokeStyle = PAL.gold3; hctx.lineWidth = 6; hctx.stroke();
+
+  /* embroidered rim, the trim every sombrero has */
+  if (q < 4) {
+    hctx.beginPath();
+    hctx.ellipse(0, 0, brimW * 0.90, brimH * 0.88, 0, 0, Math.PI * 2);
+    hctx.strokeStyle = PAL.magenta; hctx.lineWidth = 7;
+    hctx.globalAlpha = 0.85; hctx.stroke();
+    hctx.beginPath();
+    hctx.ellipse(0, 0, brimW * 0.80, brimH * 0.76, 0, 0, Math.PI * 2);
+    hctx.strokeStyle = PAL.teal; hctx.lineWidth = 4; hctx.stroke();
+    hctx.globalAlpha = 1;
+  }
+
+  /* the crown of the hat: a rounded cone. Drawn as a path rather than an
+     ellipse so the sides taper, which is what separates a sombrero from a
+     bowler. */
+  hctx.beginPath();
+  hctx.moveTo(-crownW, 6);
+  hctx.bezierCurveTo(-crownW * 0.96, -crownH * 0.62, -crownW * 0.58, -crownH, 0, -crownH);
+  hctx.bezierCurveTo(crownW * 0.58, -crownH, crownW * 0.96, -crownH * 0.62, crownW, 6);
+  hctx.closePath();
+  const cg = hctx.createLinearGradient(-crownW, 0, crownW, 0);
+  cg.addColorStop(0, PAL.gold3);
+  cg.addColorStop(0.38, PAL.gold1);
+  cg.addColorStop(1, PAL.gold2);
+  hctx.fillStyle = cg; hctx.fill();
+  hctx.strokeStyle = PAL.gold3; hctx.lineWidth = 6; hctx.stroke();
+
+  /* hat band, and a marigold tucked into it: the detail that ties the hat to
+     the garland instead of leaving two unrelated ornaments on one skull */
+  hctx.beginPath();
+  hctx.moveTo(-crownW * 0.99, -14);
+  hctx.bezierCurveTo(-crownW * 0.5, -34, crownW * 0.5, -34, crownW * 0.99, -14);
+  hctx.lineTo(crownW * 0.96, -58);
+  hctx.bezierCurveTo(crownW * 0.5, -78, -crownW * 0.5, -78, -crownW * 0.96, -58);
+  hctx.closePath();
+  hctx.fillStyle = PAL.violet; hctx.fill();
+  hctx.strokeStyle = PAL.dark; hctx.lineWidth = 3; hctx.globalAlpha = 0.5;
+  hctx.stroke(); hctx.globalAlpha = 1;
+
+  hctx.save();
+  hctx.translate(-crownW * 0.62, -46);
+  drawBloom(58, 0, t * 0.12, q >= 4 ? 5 : q >= 3 ? 6 : 8, false);
+  hctx.restore();
+
+  /* bolitas: the little pom-poms that hang off the brim. Q3 drops them. */
+  if (q < 3) {
+    for (let i = 0; i < 7; i++) {
+      const a = Math.PI * (0.10 + 0.80 * (i / 6));
+      const px = Math.cos(a) * -brimW * 0.94, py = Math.sin(a) * brimH * 0.94 + 8;
+      const drop = 44 + Math.sin(t * 1.6 + i) * 5;
+      hctx.beginPath();
+      hctx.moveTo(px, py); hctx.lineTo(px, py + drop);
+      hctx.strokeStyle = PAL.bone3; hctx.lineWidth = 3; hctx.stroke();
+      hctx.beginPath();
+      hctx.arc(px, py + drop + 9, 11, 0, Math.PI * 2);
+      hctx.fillStyle = i % 2 ? PAL.magenta : PAL.teal; hctx.fill();
+    }
+  }
+  hctx.restore();
+}
+
 function drawCrown() {
   crownPos.length = 0;                           // stale positions are worse
+  /* The GARLAND hangs below the jaw, so it is drawn first and is independent
+     of whatever is on the head. */
+  drawGarland();
+  /* A hat COVERS the head, so it suppresses the crown rather than stacking on
+     it. Mutual exclusion enforced here, in the drawing, rather than by having
+     the toggles fight each other: a viewer who turns on a sombrero while a
+     crown is set should get a sombrero, and should get the crown back when
+     the hat comes off. Nothing is destroyed, just hidden. */
+  /* The sombrero is NOT drawn here. A hat occludes the forehead, and the
+     third eye is drawn AFTER this function, so a hat painted here had a
+     glowing eye shining straight through its brim. It is drawn last instead,
+     from drawHero's tail. See drawSombrero's call site. */
+  if (CFG.sombrero) { crownOut.clear(); return; }
   if (!CFG.flowerCrown) { crownOut.clear(); return; }
   if (CFG.crownStyle >= 0.5) drawRoyalCrown(); else drawFlowerCrown();
 }
@@ -3155,7 +3388,7 @@ function drawCrown() {
 /* Pluck whatever is under the pointer. Returns true if it ate the click, so
    the caller can stop before flicking a skull behind the crown. */
 function crownPluck(cx, cy) {
-  if (!CFG.flowerCrown) return false;
+  if (!CFG.flowerCrown || CFG.sombrero) return false;   // hidden = not clickable
   let best = null, bestD = Infinity;
   for (const p of crownPos) {
     if (crownOut.has(p.id)) continue;            // already off; do not double-pop
@@ -3952,6 +4185,20 @@ function drawHero(dt) {
   hctx.stroke();
   hctx.restore();
 
+  /* THE HAT GOES LAST, over the third eye and the socket glow, because that
+     is where a hat is: in front of the forehead. Painted with the crown it
+     had the third eye glowing through the brim, which read as a rendering
+     fault rather than as mysticism. Re-enters skull-unit space exactly as
+     drawCrown does. */
+  if (CFG.sombrero) {
+    hctx.save();
+    hctx.scale(sY, sY);
+    hctx.translate(0, 32);
+    hctx.scale(4 / 3, 4 / 3);
+    drawSombrero();
+    hctx.restore();
+  }
+
   hctx.restore();
 }
 
@@ -4594,11 +4841,15 @@ function fxRestyle() {
   CFG.spiralSpeed  = R(0.1, 0.7);
   CFG.auraSize     = R(0.7, 1.4);
 
-  const flourish = (Math.random() * 4) | 0;
+  const flourish = (Math.random() * 6) | 0;
   CFG.flowerCrown  = flourish === 0 || flourish === 1 ? 1 : 0;
   CFG.crownStyle   = flourish === 0 ? 1 : 0;
   CFG.skullBreathe = flourish === 2 ? 1 : 0;
   CFG.skullOnTop   = flourish === 3 ? 1 : 0;
+  CFG.sombrero     = flourish === 4 ? 1 : 0;
+  /* the garland hangs below the jaw and the hat sits above it, so unlike the
+     head ornaments these two can coexist: the pair IS the request */
+  CFG.garland      = flourish === 4 || flourish === 5 ? 1 : 0;
 
   applyToggles({ skipVoice: true });
   applyPalette();
@@ -4876,6 +5127,8 @@ const VOICE_MAP = [
   [['alebrije', 'dragon'],                        fxAlebrije],
   [['black hole', 'blackhole', 'agujero'],        fxBlackHole],
   [['crown', 'corona'],                           () => CHAT_FX.crown()],
+  [['sombrero', 'hat', 'sombrero hat'],           () => CHAT_FX.sombrero()],
+  [['garland', 'guirnalda'],                      () => CHAT_FX.garland()],
   /* Wrapped in an arrow, NOT `CHAT_FX.clear`. This table is built at module
      level and CHAT_FX is a `const` declared ~140 lines further down, so the
      direct reference is a temporal dead zone error that kills the whole
@@ -5069,6 +5322,8 @@ const CHAT_FX = {
   /* the crown as a single verb, so "put a crown on" does not need the model
      to know that two dials cooperate */
   crown:   () => { CFG.flowerCrown = 1; CFG.crownStyle = 1; applyToggles({ skipVoice: true }); },
+  sombrero:() => { CFG.sombrero = 1; applyToggles({ skipVoice: true }); },
+  garland: () => { CFG.garland = 1; applyToggles({ skipVoice: true }); },
   flores:  () => { CFG.flowerCrown = 1; CFG.crownStyle = 0; applyToggles({ skipVoice: true }); },
   breathe: () => { CFG.skullBreathe = CFG.skullBreathe ? 0 : 1; applyToggles({ skipVoice: true }); },
 };
@@ -6784,6 +7039,8 @@ const HELP_ROWS = [
   [['O'], 'surprise me with a new look', '"restyle"', 'o'],
   [['\u21e7O'], 'demo mode: reroll everything every 3 min', '', '\u21e7o'],
   [['\u21e7C'], 'crown: off / corona / flores', '"crown"', '\u21e7c'],
+  [['\u21e7S'], 'sombrero on / off', '"sombrero"', '\u21e7s'],
+  [['\u21e7G'], 'marigold garland on / off', '"garland"', '\u21e7g'],
   [['\u21e7B'], 'skull breathing on / off', '', '\u21e7b'],
   [['!'], 'fiesta: new look + everything + grito', '', '!'],
   [['Q'], 'galactic battle (3 fleets)', '"battle"', 'q'],
@@ -7562,7 +7819,13 @@ addEventListener('keydown', e => {
     else { userPaused = true; music.pause(); }
     syncMuteIcon();          // belt and braces: the media events also fire
   }
-  else if (k === 'g') grito();
+  else if (k === 'g') {
+    if (e.shiftKey) {
+      CFG.garland = CFG.garland ? 0 : 1;
+      applyToggles({ skipVoice: true }); syncSlidersSafe();
+      cfgStatusSay('garland ' + (CFG.garland ? 'on' : 'off'));
+    } else grito();
+  }
   else if (k === 'm') toggleMute();
   else if (k === 'arrowup')   { e.preventDefault(); CFG.musicVolume = Math.min(1, CFG.musicVolume + 0.05); if (!muted) music.volume = CFG.musicVolume; }
   else if (k === 'arrowdown') { e.preventDefault(); CFG.musicVolume = Math.max(0, CFG.musicVolume - 0.05); if (!muted) music.volume = CFG.musicVolume; }
@@ -7579,7 +7842,13 @@ addEventListener('keydown', e => {
   else if (k === 'w') { const dir = Math.random() < 0.5 ? -1 : 1; face.spiralSpin += dir * 12; SFX.guiro(dir); }
   else if (k === 't') { face.chatterUntil = t + 1.6; SFX.teeth(); }
   else if (k === 'n') { face.noseBurst = t + 1.2; heartBurst(W / 2, H / 2); SFX.tom(); }
-  else if (k === 's') fxShootingStar();
+  else if (k === 's') {
+    if (e.shiftKey) {
+      CFG.sombrero = CFG.sombrero ? 0 : 1;
+      applyToggles({ skipVoice: true }); syncSlidersSafe();
+      cfgStatusSay('sombrero ' + (CFG.sombrero ? 'on' : 'off'));
+    } else fxShootingStar();
+  }
   else if (k === 'p') fxPetalBurst();
   else if (k === 'q') {
     if (e.shiftKey) { const had = ufos.length; ufos.length = 0; lasers.length = 0; battleLive = false; if (had) SFX.knock(); }
