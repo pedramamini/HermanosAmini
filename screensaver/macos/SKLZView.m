@@ -110,14 +110,30 @@ static const NSTimeInterval kRetry = 30.0;
 /* Ask the page whether it is actually drawing, not merely loaded. Anything
    other than "painting" here is the answer to why the screen is black. */
 - (void)pollPaint {
+  /* Report the CAUSE, not just the symptom. The old probe could only say
+     "canvas blank", which is true of a dead script, a stalled render loop and
+     a genuinely black frame alike. The three-monitor black-screen report cost
+     a full investigation to distinguish, so the probe now answers them apart:
+
+       script dead     -> the module threw; `t` never initialised
+       loop stalled    -> `t` exists but is not advancing
+       no webgl        -> context creation failed (three views, three contexts)
+
+     `t` is a `let`, so `typeof t` THROWS rather than returning "undefined"
+     inside its temporal dead zone. That is precisely the signal we want, so it
+     is caught deliberately rather than guarded against. */
   NSString *js =
       @"(function(){try{"
+       "var alive=true, tv=-1;"
+       "try{ tv=t; }catch(e){ alive=false; }"
+       "if(!alive) return 'SCRIPT DEAD (module threw before the render loop)';"
        "var c=document.getElementById('hero');"
        "if(!c) return 'no canvas yet';"
+       "var gl2=(typeof HAS_GL!=='undefined')?(HAS_GL?'':' NO-WEBGL'):'';"
        "var d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;"
        "var n=0,l=0;for(var i=3;i<d.length;i+=1600){n++;if(d[i]>20)l++;}"
        "return (l>0? 'painting ':'canvas blank ')+Math.round(l/n*100)+'% t='+"
-       "((typeof t!=='undefined')?t.toFixed(1):'?');"
+       "tv.toFixed(1)+gl2;"
        "}catch(e){return 'js error: '+e.message}})()";
   [self.web evaluateJavaScript:js completionHandler:^(id r, NSError *e) {
     NSString *s = e ? [@"probe failed: " stringByAppendingString:e.localizedDescription]

@@ -2141,7 +2141,38 @@ function sampleAudio() {
    LAYER 1, NEBULA (WebGL, rendered at half res)
    ───────────────────────────────────────────── */
 const nebCanvas = document.getElementById('nebula');
-const gl = nebCanvas.getContext('webgl', { antialias: false, depth: false });
+
+/* ── WebGL is OPTIONAL, and this is why ──
+   `getContext('webgl')` returns NULL, it does not throw: no GPU, a driver
+   reset, a sandbox that denies the GPU, or simply too many live contexts on a
+   machine already running several. The old line took the context and used it
+   43 lines later with no check, so a null `gl` threw at MODULE level, the
+   script aborted before `let t = 0` was ever reached, and the render loop
+   never started. Every one of the four layers went dark because ONE of them
+   could not have a GPU.
+
+   That is exactly the screensaver-black-on-three-monitors report: three
+   ScreenSaverViews mean three WKWebViews mean three WebGL contexts, and the
+   third one losing the race takes the whole piece down. Verified by forcing
+   getContext to return null: "Cannot access 't' before initialization",
+   status frozen at "page loaded, waiting for first frame", screen black.
+
+   A no-op stub rather than 42 guarded call sites. Guarding each one is 42
+   chances to miss one, and the miss would reintroduce exactly this bug for
+   whoever adds the 43rd. Every existing `gl.foo(...)` keeps working; it just
+   does nothing, and `paintNebula` paints a 2D fallback instead. */
+const glReal = nebCanvas.getContext('webgl', { antialias: false, depth: false });
+/* Set from the REAL context, never sniffed off `gl`. My first cut tested
+   `typeof gl.drawArrays === 'function'`, and the stub answered yes to that,
+   because a proxy that returns a function for every property passes every
+   duck-type check you can write against it. A stub good enough to fool the
+   call sites is good enough to fool the detector, so the detector cannot look
+   at the stub. */
+const HAS_GL = !!glReal;
+const gl = glReal || (() => {
+  const noop = function () { return noop; };
+  return new Proxy({}, { get: () => noop });
+})();
 
 const VSH = `attribute vec2 p; void main(){ gl_Position = vec4(p,0.,1.); }`;
 const FSH = `
@@ -4620,7 +4651,40 @@ qrImg.src = 'qr.png?v=' + BUILD_ID;
    why this had to stop being copy-pasted. There is no preserveDrawingBuffer,
    so the buffer is only readable inside the tick that painted it. */
 let nebulaFresh = false;
+/* Fallback sky for a machine with no WebGL. Not the marbled shader, but the
+   piece's own palette in a slow drifting gradient, so the calaveras have
+   something to float IN. Black behind them reads as broken; this reads as a
+   quieter version of the same artwork. Cheap on purpose: three radial fills
+   at the nebula's already-reduced resolution. */
+let neb2d = null;
+function paintNebulaFallback() {
+  if (!neb2d) neb2d = nebCanvas.getContext('2d');
+  if (!neb2d) return;
+  const w = nebCanvas.width, h = nebCanvas.height;
+  const dim = 0.55 + 0.45 * CFG.bgBright;
+  neb2d.globalCompositeOperation = 'source-over';
+  neb2d.fillStyle = PAL.dark || '#0a0414';
+  neb2d.fillRect(0, 0, w, h);
+  neb2d.globalCompositeOperation = 'lighter';
+  const blobs = [
+    [0.30 + Math.sin(t * 0.05) * 0.10, 0.35 + Math.cos(t * 0.04) * 0.08, PAL.violet],
+    [0.72 + Math.cos(t * 0.037) * 0.10, 0.60 + Math.sin(t * 0.045) * 0.08, PAL.magenta],
+    [0.50 + Math.sin(t * 0.028 + 2) * 0.14, 0.80 + Math.cos(t * 0.033) * 0.06, PAL.teal],
+  ];
+  for (const [bx, by, col] of blobs) {
+    const g = neb2d.createRadialGradient(bx * w, by * h, 0, bx * w, by * h, Math.max(w, h) * 0.55);
+    g.addColorStop(0, col || '#3a1a5a');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    neb2d.globalAlpha = 0.30 * dim * (1 + bassSm * 0.5);
+    neb2d.fillStyle = g;
+    neb2d.fillRect(0, 0, w, h);
+  }
+  neb2d.globalAlpha = 1;
+  neb2d.globalCompositeOperation = 'source-over';
+}
+
 function paintNebula() {
+  if (!HAS_GL) return paintNebulaFallback();
   gl.uniform2f(uRes, nebCanvas.width, nebCanvas.height);
   gl.uniform1f(uTime, t);
   gl.uniform1f(uBass, bassSm);
@@ -5954,7 +6018,7 @@ function resize() {
   }
   nebCanvas.width = Math.floor(W * DPR * Q_NEB[q]);
   nebCanvas.height = Math.floor(H * DPR * Q_NEB[q]);
-  gl.viewport(0, 0, nebCanvas.width, nebCanvas.height);
+  gl.viewport(0, 0, nebCanvas.width, nebCanvas.height);   // no-op without GL
 }
 addEventListener('resize', resize);
 resize();
