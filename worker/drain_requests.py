@@ -15,8 +15,10 @@ never double-mails:
     notified_open  = 0     -> requester has not been told it landed
     notified_closed = 0    -> requester has not been told it shipped
 
-Email is a separate concern and is still unwired (no Resend credential). Rows
-that need mail are reported, never silently marked sent. See --help.
+Email goes out through Resend (emails/send.py), which reads the key from
+worker/.env. A row is marked notified_* ONLY after the API confirms the send,
+so a failure is retried on the next run rather than being lost. Without a
+credential the rows are reported and left unmarked, exactly as before.
 
 Usage:
     python3 drain_requests.py              # dry run, shows what it would do
@@ -32,6 +34,9 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from emails import send as mailer, templates          # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 DB = "sklz-presets"
@@ -168,23 +173,87 @@ def file_issues(apply):
 
 
 def close_sweep(apply):
-    """Find filed requests whose issue is now closed and needs a ship mail."""
-    rows = d1("SELECT id, body, email, issue_number FROM requests "
-              "WHERE issue_number IS NOT NULL AND notified_closed = 0 "
-              "AND email IS NOT NULL;")
-    due = []
+    """Reconcile every filed row against its issue and send what it owes.
+
+    Two mails exist and they are mutually exclusive per state, which is the
+    subtlety worth spelling out. A backlog row that was filed before mail was
+    wired has notified_open = 0 forever, because the 'we got it' mail is only
+    ever offered to rows filed in the SAME run. If such a row's issue has
+    since closed, sending 'your request is on the board' and 'it shipped' back
+    to back would read as a broken system. So a closed issue gets the ship
+    mail and its notified_open is marked too: the received mail is moot once
+    the thing is already live."""
+    rows = d1("SELECT id, body, email, issue_number, notified_open, notified_closed "
+              "FROM requests WHERE issue_number IS NOT NULL "
+              "AND email IS NOT NULL AND email != '' "
+              "AND (notified_open = 0 OR notified_closed = 0);")
+    due, backlog = [], []
     for r in rows:
         state = json.loads(sh(["gh", "issue", "view", str(r["issue_number"]),
                                "--repo", REPO, "--json", "state"]))["state"]
         if state == "CLOSED":
-            due.append(r)
-    for r in due:
-        print(f"SHIP MAIL DUE  #{r['issue_number']}  -> {r['email']}")
-    if due and apply:
-        print(f"\n{len(due)} closed issue(s) owe a 'it shipped' email. Not sent: "
-              f"no Resend credential is configured. Rows left unmarked so they "
-              f"send once it is.")
+            if not r["notified_closed"]:
+                due.append(r)
+        elif not r["notified_open"]:
+            backlog.append(r)
+
+    if backlog:
+        print(f"{len(backlog)} open issue(s) never got a 'we got it' email:")
+        mail_rows(backlog, "open", apply)
+    if due:
+        print(f"{len(due)} closed issue(s) owe a 'it shipped' email:")
+        mail_rows(due, "closed", apply)
     return due
+
+
+def issue_url(num):
+    return f"https://github.com/{REPO}/issues/{num}"
+
+
+def mail_rows(rows, kind, apply):
+    """Send one mail per row and mark it, but only on a confirmed send.
+
+    The marking is the whole point of the ordering here: mark-then-send would
+    silently swallow a request the moment Resend has a bad minute, and the
+    requester would never learn their idea shipped. Send-then-mark costs at
+    worst a duplicate if the process dies between the two, which is the far
+    cheaper failure."""
+    if not rows:
+        return 0, 0
+    if not mailer.configured():
+        for r in rows:
+            print(f"  MAIL DUE ({kind})  {r['email']}  ->  #{r['issue_number']}")
+        print(f"Not sent: no RESEND_API_KEY in worker/.env. notified_{kind} stays 0 "
+              f"so these send once it exists, rather than being lost.")
+        return 0, len(rows)
+
+    col = "notified_open" if kind == "open" else "notified_closed"
+    sent = failed = 0
+    for r in rows:
+        num = r["issue_number"]
+        if kind == "open":
+            html = templates.received(r["body"], issue_url(num), num)
+            subject = "Your request is on the board"
+        else:
+            html = templates.shipped(r["body"], issue_url(num), num)
+            subject = "It shipped: your idea is in the art"
+
+        if not apply:
+            print(f"  WOULD MAIL ({kind})  {r['email']}  ->  #{num}")
+            continue
+
+        ok, info = mailer.email(r["email"], subject, html)
+        if ok:
+            # A ship mail supersedes the received mail: marking both stops a
+            # backlog row from being told "we got it" after it already shipped.
+            sets = f"{col} = 1" if kind == "open" else "notified_closed = 1, notified_open = 1"
+            d1(f"UPDATE requests SET {sets} WHERE id = '{q(r['id'])}';")
+            print(f"  MAILED ({kind})  {r['email']}  #{num}  [{info}]")
+            sent += 1
+        else:
+            print(f"  MAIL FAILED ({kind})  {r['email']}  #{num}: {info}")
+            failed += 1
+    return sent, failed
 
 
 def log_run(summary):
@@ -208,7 +277,19 @@ def main():
                     help="actually file issues and update D1 (default: dry run)")
     ap.add_argument("--close-sweep", action="store_true",
                     help="also check filed issues for closure / ship mail")
+    ap.add_argument("--mail-test", action="store_true",
+                    help="send one test mail to the account owner and exit")
     a = ap.parse_args()
+
+    if a.mail_test:
+        print("configured:", mailer.configured(), " from:", mailer.sender())
+        ok, info = mailer.email("pedram@hermanosamini.com",
+                                "SKLZ: drain mail self-test",
+                                templates.received("a test request, ignore me",
+                                                   issue_url(1), 1),
+                                frm=mailer.FALLBACK_FROM)
+        print(("OK  " if ok else "FAIL  ") + str(info))
+        return 0 if ok else 1
 
     if not a.apply:
         print("DRY RUN. Re-run with --apply to act.\n")
@@ -230,16 +311,16 @@ def main():
         print()
         close_sweep(a.apply)
 
-    pending_mail = [f for f in filed if f["email"]]
+    pending_mail = [{"id": f["id"], "email": f["email"], "body": f["body"],
+                     "issue_number": f["issue"]}
+                    for f in filed if f["email"]]
+    sent = 0
     if pending_mail:
         print(f"\n{len(pending_mail)} filed request(s) owe a 'we got it' email:")
-        for f in pending_mail:
-            print(f"  {f['email']}  ->  #{f['issue']}")
-        print("Not sent: no Resend credential. notified_open stays 0 so these "
-              "send once it exists, rather than being lost.")
+        sent, _ = mail_rows(pending_mail, "open", apply)
 
     if a.apply:
-        log_run(f"filed={len(filed)} mail_pending={len(pending_mail)}")
+        log_run(f"filed={len(filed)} mail_sent={sent} mail_pending={len(pending_mail) - sent}")
     return 0
 
 
