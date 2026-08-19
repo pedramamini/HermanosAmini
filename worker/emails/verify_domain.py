@@ -57,16 +57,32 @@ def main():
         print(BAD, f"no DKIM TXT at resend._domainkey.{SUB}")
         fails += 1
 
+    # Check CONTENT, not just presence. A typo'd record still "exists", and a
+    # verifier that only asks "is there a TXT record" passes it happily while
+    # mail quietly lands in spam.
     spf = [r for r in dig("TXT", SUB) if "spf1" in r]
-    if spf:
-        print(OK, f"SPF on {SUB}: {spf[0][:60]}")
-    else:
+    if not spf:
         print(BAD, f"no SPF TXT on {SUB}")
+        print(f"       add TXT  {SUB}  ->  v=spf1 include:amazonses.com ~all")
         fails += 1
+    elif "include:amazonses.com" not in spf[0]:
+        print(BAD, f"SPF present but does not include amazonses.com: {spf[0][:70]}")
+        fails += 1
+    else:
+        print(OK, "SPF includes amazonses.com")
 
     submx = dig("MX", SUB)
-    print(OK if submx else WARN,
-          f"{SUB} MX: {submx[0] if submx else 'none (Resend uses it for bounces)'}")
+    if not submx:
+        print(WARN, f"{SUB} has no MX: bounces and complaints are not routed back")
+        print(f"       add MX   {SUB}  ->  feedback-smtp.us-east-1.amazonses.com  (pri 10)")
+    elif "feedback-smtp" in submx[0] and "amazonses.com" in submx[0]:
+        # The REGION must match whatever the domain was created in. Every
+        # region's host resolves, so a wrong one fails silently rather than
+        # erroring: bounces go nowhere and nothing complains.
+        print(OK, f"bounce MX: {submx[0]}")
+    else:
+        print(BAD, f"MX is not a Resend bounce host: {submx[0]}")
+        fails += 1
 
     # The one that must NOT have changed.
     rootmx = dig("MX", ROOT)
