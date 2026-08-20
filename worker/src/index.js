@@ -41,7 +41,7 @@ const LIMITS = {
   boneHue: [-180, 180, 'bone hue'], boneSat: [0, 2, 'bone saturation'],
   nebulaHue: [-180, 180, 'smoke hue shift'], nebulaSat: [0, 2, 'smoke saturation'], bgBright: [0.2, 2, 'smoke brightness'], vignette: [0, 1.2, 'vignette'],
   flickForce: [0.2, 3, 'flick strength'], socketGlow: [0, 2.5, 'eye socket glow'], auraSize: [0, 2.5, 'skull aura'], petalCount: [4, 20, 'eye petals'],
-  textOn: [0, 1, 'show text'], musicOn: [0, 1, 'all sound on'], trackOn: [0, 1, 'music track on'], sfxOn: [0, 1, 'sound effects on'], autoEvents: [0, 1, 'random events'], voiceOn: [0, 1, 'voice control'], beatSync: [0, 1, 'sync to the beat'], hudOn: [0, 1, 'fps monitor'], skullOnTop: [0, 1, 'skull always on top'], skullBreathe: [0, 1, 'skull breathing'], flowerCrown: [0, 1, 'flower crown'], crownBlooms: [3, 12, 'crown flowers'], sombrero: [0, 1, 'sombrero'],
+  textOn: [0, 1, 'show text'], musicOn: [0, 1, 'all sound on'], trackOn: [0, 1, 'music track on'], sfxOn: [0, 1, 'sound effects on'], autoEvents: [0, 1, 'random events'], voiceOn: [0, 1, 'voice control'], beatSync: [0, 1, 'sync to the beat'], hudOn: [0, 1, 'fps monitor'], cursorStyle: [0, 8, 'mouse cursor style'], skullOnTop: [0, 1, 'skull always on top'], skullBreathe: [0, 1, 'skull breathing'], flowerCrown: [0, 1, 'flower crown'], crownBlooms: [3, 12, 'crown flowers'], sombrero: [0, 1, 'sombrero'],
 };
 
 /* Deliberately blunt list: slurs and profanity roots. Matching happens after
@@ -624,6 +624,16 @@ export default {
           '',
           'musicSeek is also where a SHARED LINK starts, so when someone asks to share',
           '"from this bit", set musicSeek and then use {"op":"share"}.',
+          '',
+          'THE CURSOR. "cursorStyle" is a NAMED INDEX, never a size or a colour:',
+          '  0 candle (the default flame)   1 system (the plain OS pointer)',
+          '  2 big arrow                    3 skull        4 knife',
+          '  5 sword                        6 marigold     7 bone   8 crosshair',
+          'Set the number, e.g. "give me a knife cursor" ->',
+          '{"op":"set","key":"cursorStyle","value":4}. If they say the pointer is',
+          'HARD TO SEE, pick 2 (big arrow): every drawn cursor is outlined for',
+          'contrast, but that one is also large. "Normal"/"default"/"give me my',
+          'mouse back" is 1, NOT 0: 0 is the candle, which is still a custom cursor.',
           '',
           'SILENCE. Three separate switches, and "mute" alone means all of them:',
           '  "mute", "silence", "quiet"      -> {"op":"set","key":"musicOn","value":0}',

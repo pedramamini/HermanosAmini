@@ -335,9 +335,23 @@
     100% { box-shadow: 0 0 0 16px rgba(255,47,160,0); }
   }
 
-  /* candle cursor: hide the OS pointer over the art, keep it on UI
-     (only where a real pointer exists; touch devices keep defaults) */
-  @media (pointer: fine) { body { cursor: none; } }
+  /* ── the cursor ──
+     `cursorStyle` picks one of nine. The stylesheet only ever reads a class and
+     one custom property; the shapes themselves are generated in JS (see
+     CURSORS). Three cases, and they are genuinely different:
+       cur-candle : hide the OS pointer, the art draws a flame where it was
+       cur-drawn  : an SVG cursor, applied to the art AND the panels so the
+                    pointer does not change identity halfway across the screen
+       neither(1) : hands the OS pointer back untouched, the accessible default
+                    for anyone whose system cursor is already set up how they
+                    need it
+     Only where a real pointer exists: touch devices keep their own behaviour. */
+  @media (pointer: fine) {
+    body.cur-candle { cursor: none; }
+    body.cur-drawn, body.cur-drawn .panel, body.cur-drawn .panel *,
+    body.cur-drawn .ctl, body.cur-drawn #gate, body.cur-drawn #palette,
+    body.cur-drawn #palette * { cursor: var(--sklzcur, auto); }
+  }
   .ctl, .panel, .panel * , #gate { cursor: pointer; }
   /* kiosk / screensaver: no pointer exists, so no chrome and no cursor */
   body.kiosk, body.kiosk * { cursor: none !important; }
@@ -357,6 +371,10 @@
   body.kiosk #demodot, body.kiosk #recdot { display: none !important; }
   .panel, .panel * { cursor: auto; }
   .panel input[type=range], .panel button, #gate { cursor: pointer; }
+  /* restated AFTER the two rules above, which are more specific than the
+     .cur-drawn block and would otherwise win on the controls inside a panel */
+  body.cur-drawn .panel input[type=range], body.cur-drawn .panel button,
+  body.cur-drawn .ctl, body.cur-drawn #gate { cursor: var(--sklzcur, pointer); }
 
 
   .panel {
@@ -1939,6 +1957,11 @@ const CFG_SCHEMA = {
   bigoteStyle:    [0,     0,     2,    1,     'mustache: 0 charro 1 handlebar 2 herradura'],
   bigoteColor:    [0,     0,     5,    1,     'mustache colour: black..palette'],
   crownPeaks:     [4,     3,     7,    1,     'crown points'],
+  /* ── the pointer ──
+     Nine cursors, indexed like every other named dial here (see bigoteStyle).
+     0 is the candle this piece has always had. 1 hands the OS pointer back.
+     2..8 are drawn shapes. See CURSORS for why they are SVG and not canvas. */
+  cursorStyle:    [0,     0,     8,    1,     'cursor: 0 candle 1 system 2 big 3 skull 4 knife 5 sword 6 marigold 7 bone 8 crosshair'],
 };
 /* ── categories ──
    Every dial belongs to exactly one, for the filter dropdown. Kept as a
@@ -1964,7 +1987,7 @@ const CFG_CATEGORY = {
         'smokeDecay', 'eventMinGap', 'eventMaxGap', 'autoEvents'],
   sound: ['musicVolume', 'musicSeek', 'gritoVolume', 'sfxVolume', 'musicOn',
          'trackOn', 'sfxOn'],
-  system: ['perfMode', 'hudOn', 'textOn', 'voiceOn'],
+  system: ['perfMode', 'hudOn', 'textOn', 'voiceOn', 'cursorStyle'],
 };
 /* key -> category, built once. Also the integrity check: a dial with no
    category, or in two, would silently vanish from or duplicate in the filter,
@@ -5473,6 +5496,14 @@ function fxRestyle() {
 
      `skullBreathe` and `skullOnTop` stay rollable: those are behaviours of the
      skull itself rather than items worn on it. */
+
+  /* THE CURSOR ROLLS, and it is not an accessory: it is not worn on the skull,
+     it belongs to the board's look the way the palette does, and Pedram asked
+     for it in the dice by name. `system` (1) is excluded from the roll only
+     because rolling it would look like the feature broke; anyone who wants the
+     OS pointer back picks it deliberately. */
+  CFG.cursorStyle = Math.random() < 0.35 ? 0 : 2 + ((Math.random() * 7) | 0);
+
   applyToggles({ skipVoice: true });
   applyPalette();
   schedulePaletteRebuild();
@@ -6792,10 +6823,122 @@ function drawDust(dt) {
   tctx.restore();                // balances the save() opened for behind-sparks
 }
 
+/* ─────────────────────────────────────────────
+   CURSORS
+   Pedram could not see the pointer on a yellow board, which is a REAL
+   legibility bug and not a taste one: this piece rolls its own background
+   through the whole hue wheel, so any cursor with a single colour is going to
+   vanish against some board it lands on.
+
+   THE FIX IS THE OUTLINE, NOT THE COLOUR. Every shape below is drawn as a
+   bright fill inside a thick near-black stroke, the way an OS pointer is. That
+   pair survives ANY backdrop: on a dark board the fill carries it, on a bright
+   yellow one the outline does. Picking "a nicer colour" would only move which
+   board it disappears on.
+
+   WHY CSS SVG CURSORS AND NOT CANVAS. The candle is drawn on the dust layer,
+   which means it (a) lags one frame behind the real pointer, (b) is shed
+   entirely at Q3+ by the quality governor, and (c) cannot appear over a panel,
+   because the panels are DOM on top of the canvas. A cursor is the one thing on
+   screen that must never lag or vanish, so these are handed to the compositor
+   as `cursor: url(...)`. It costs nothing per frame, tracks the pointer
+   exactly, and survives the quality ladder.
+
+   Hotspots are per shape: a pointer points with its tip, a crosshair with its
+   centre. Getting that wrong is invisible in a screenshot and infuriating in
+   use, which is why each entry states it rather than assuming 0,0. */
+const CURSOR_NAMES = ['candle', 'system', 'big arrow', 'skull', 'knife',
+                      'sword', 'marigold', 'bone', 'crosshair'];
+/* One SVG per style, as a factory taking the two ink colours so a future
+   palette-aware cursor is a one-line change. Sized 40x40 (48 for the big
+   arrow): browsers refuse cursor images past 128px and quietly fall back to
+   the default, so staying small is a correctness constraint, not a taste. */
+const CURSOR_SVG = {
+  2: (f, k) => `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+      <path d="M6 3 L6 39 L15 30 L21 43 L28 40 L22 27 L34 27 Z"
+            fill="${f}" stroke="${k}" stroke-width="3.2" stroke-linejoin="round"/></svg>`,
+  3: (f, k) => `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+      <path d="M20 4 C10 4 5 11 5 19 C5 24 8 27 11 29 L11 34 C11 35.6 12.4 37 14 37
+               L26 37 C27.6 37 29 35.6 29 34 L29 29 C32 27 35 24 35 19 C35 11 30 4 20 4 Z"
+            fill="${f}" stroke="${k}" stroke-width="3" stroke-linejoin="round"/>
+      <ellipse cx="14" cy="19" rx="4.2" ry="4.8" fill="${k}"/>
+      <ellipse cx="26" cy="19" rx="4.2" ry="4.8" fill="${k}"/>
+      <path d="M20 24 L17.6 28 L22.4 28 Z" fill="${k}"/>
+      <path d="M14 31 L26 31 M17 31 L17 36 M23 31 L23 36" stroke="${k}" stroke-width="2.2"/></svg>`,
+  4: (f, k) => `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+      <path d="M4 4 L21 21 L17 25 L4 4 Z" fill="${f}" stroke="${k}" stroke-width="2.6" stroke-linejoin="round"/>
+      <path d="M18 22 L26 30" stroke="${k}" stroke-width="7.6" stroke-linecap="round"/>
+      <path d="M18 22 L26 30" stroke="${f}" stroke-width="3.4" stroke-linecap="round"/>
+      <path d="M24 24 L31 31" stroke="${k}" stroke-width="6.4" stroke-linecap="round"/>
+      <path d="M27 31 L35 39" stroke="${k}" stroke-width="8.4" stroke-linecap="round"/>
+      <path d="M27 31 L35 39" stroke="${f}" stroke-width="4" stroke-linecap="round"/></svg>`,
+  5: (f, k) => `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+      <path d="M3 3 L24 24 L20 28 L3 3 Z" fill="${f}" stroke="${k}" stroke-width="2.6" stroke-linejoin="round"/>
+      <path d="M17 27 L27 17" stroke="${k}" stroke-width="8" stroke-linecap="round"/>
+      <path d="M17 27 L27 17" stroke="${f}" stroke-width="3.6" stroke-linecap="round"/>
+      <path d="M22 26 L31 35" stroke="${k}" stroke-width="8.6" stroke-linecap="round"/>
+      <path d="M22 26 L31 35" stroke="${f}" stroke-width="4.2" stroke-linecap="round"/>
+      <circle cx="34" cy="38" r="4" fill="${f}" stroke="${k}" stroke-width="2.6"/></svg>`,
+  6: (f, k) => `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+      <g stroke="${k}" stroke-width="2.4" stroke-linejoin="round">
+      ${Array.from({ length: 8 }, (_, i) => {
+        const a = i / 8 * Math.PI * 2;
+        const x = 20 + Math.cos(a) * 11, y = 20 + Math.sin(a) * 11;
+        return `<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="6.6" ry="4.2"
+                 transform="rotate(${(a * 180 / Math.PI).toFixed(0)} ${x.toFixed(1)} ${y.toFixed(1)})"
+                 fill="${f}"/>`;
+      }).join('')}
+      <circle cx="20" cy="20" r="6.2" fill="${f}"/></g>
+      <circle cx="20" cy="20" r="3" fill="${k}"/></svg>`,
+  7: (f, k) => `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+      <g fill="${f}" stroke="${k}" stroke-width="2.8" stroke-linejoin="round">
+      <path d="M11 8 L29 26" stroke-width="9.5" stroke-linecap="round"/>
+      <circle cx="9" cy="7" r="5"/><circle cx="7" cy="12" r="5"/>
+      <circle cx="31" cy="27" r="5"/><circle cx="33" cy="22" r="5"/></g>
+      <path d="M11 8 L29 26" stroke="${f}" stroke-width="5" stroke-linecap="round"/>
+      <circle cx="9" cy="7" r="3.2" fill="${f}"/><circle cx="7" cy="12" r="3.2" fill="${f}"/>
+      <circle cx="31" cy="27" r="3.2" fill="${f}"/><circle cx="33" cy="22" r="3.2" fill="${f}"/></svg>`,
+  8: (f, k) => `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+      <g stroke="${k}" stroke-width="6.5" stroke-linecap="round">
+      <path d="M20 3 L20 14 M20 26 L20 37 M3 20 L14 20 M26 20 L37 20"/></g>
+      <g stroke="${f}" stroke-width="2.6" stroke-linecap="round">
+      <path d="M20 3 L20 14 M20 26 L20 37 M3 20 L14 20 M26 20 L37 20"/></g>
+      <circle cx="20" cy="20" r="6.4" fill="none" stroke="${k}" stroke-width="5"/>
+      <circle cx="20" cy="20" r="6.4" fill="none" stroke="${f}" stroke-width="2"/>
+      <circle cx="20" cy="20" r="1.6" fill="${k}"/></svg>`,
+};
+/* x,y of the point that actually clicks */
+const CURSOR_HOT = { 2: [4, 3], 3: [20, 20], 4: [4, 4], 5: [3, 3],
+                     6: [20, 20], 7: [20, 20], 8: [20, 20] };
+
+function cursorCSS(style) {
+  const fn = CURSOR_SVG[style];
+  if (!fn) return '';
+  const svg = fn('#fbf4e8', '#120a1e').replace(/\s+/g, ' ').trim();
+  const [hx, hy] = CURSOR_HOT[style];
+  /* encodeURIComponent, not base64: it is shorter for SVG, and '#' MUST be
+     escaped or the browser reads the colour as a fragment and drops the rest
+     of the document, which renders as no cursor at all rather than an error. */
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}") ${hx} ${hy}, auto`;
+}
+
+/* One class on <body> per mode, because the CSS has to know whether to hide
+   the OS pointer (candle) or leave it alone (system), and a class is the only
+   thing the stylesheet can see. The drawn styles set an inline custom property
+   that the stylesheet applies to the art AND to the panels, so the cursor does
+   not change identity halfway across the screen. */
+function applyCursor() {
+  const st = Math.round(CFG.cursorStyle) | 0;
+  document.body.classList.toggle('cur-candle', st === 0);
+  document.body.classList.toggle('cur-drawn', st >= 2);
+  document.documentElement.style.setProperty('--sklzcur', st >= 2 ? cursorCSS(st) : 'auto');
+}
+
 /* ── the cursor is a candle; moths gather when you rest ── */
 const flameTrail = [];
 const moths = Array.from({ length: 4 }, (_, i) => ({ a: i * 1.7, r: 34 + i * 11, sp: 1.2 + i * 0.35, ph: i * 2.3 }));
 function drawCursorCandle(dt) {
+  if (Math.round(CFG.cursorStyle) !== 0) return;        // another cursor is live
   if (!gateGone || IS_TOUCH || qLevel() >= 3) return;   // shed at Q3+
   const cx = mouse.x * W, cy = mouse.y * H;
   flameTrail.push({ x: cx, y: cy, life: 0 });
@@ -7276,6 +7419,7 @@ function applyToggles(opts) {
   const o = opts || {};
   document.body.classList.toggle('notext', !CFG.textOn);
   syncZenDrawer();                      // zen hides the words; the drawer hides the buttons
+  applyCursor();                        // cursorStyle is restored/shared like any dial
   /* sound: the flag is still called `muted` and still lives on CFG.musicOn,
      but it now means ALL audio, not just the track */
   muted = !CFG.musicOn;
@@ -7866,6 +8010,7 @@ const HELP_ROWS = [
   [['\u21e7B'], 'skull breathing on / off', '', '\u21e7b'],
   [['\u21e7T'], 'mute / unmute the music only', '', '\u21e7t'],
   [['\u21e7X'], 'mute / unmute the sound effects', '', '\u21e7x'],
+  [['\u21e7Y'], 'cycle the cursor: candle, skull, knife, sword...', '"cursor"', '\u21e7y'],
   [['\u2039'], 'zen mode: pull the controls out of the drawer', '', ''],
   [['!'], 'fiesta: new look + everything + grito', '', '!'],
   [['Q'], 'galactic battle (3 fleets)', '"battle"', 'q'],
@@ -8635,7 +8780,10 @@ document.getElementById('cfgRestyle').addEventListener('click', () => {
   /* name what it landed on, so rolling again toward a look you like is a
      choice rather than a blind pull */
   const BG = ['smoke', 'galaxy', 'aurora', 'candlelight', 'the void'];
-  cfgStatusSay(`new look: palette ${CFG.palette}, ${BG[CFG.bgMode] || 'smoke'} background`);
+  /* the cursor is named too: it is the one rolled dial that changes something
+     you are holding, so a silent swap reads as a glitch rather than a roll */
+  cfgStatusSay(`new look: palette ${CFG.palette}, ${BG[CFG.bgMode] || 'smoke'} background, ` +
+               `${CURSOR_NAMES[Math.round(CFG.cursorStyle)]} cursor`);
 });
 
 /* ── dial filter ──
@@ -9029,7 +9177,15 @@ addEventListener('keydown', e => {
     const step = e.shiftKey ? 30 : 10;
     if (seekBy(k === '[' ? -step : step)) cfgStatusSay(fmtTime(music.currentTime));
   }
-  else if (k === 'y') { stare.until = t + 3.2; SFX.glare(); }
+  else if (k === 'y') {
+    if (e.shiftKey) {
+      /* cycles rather than toggling: nine styles behind one key, and a toggle
+         would strand you on whichever two you happened to be between */
+      CFG.cursorStyle = (Math.round(CFG.cursorStyle) + 1) % CURSOR_NAMES.length;
+      applyToggles({ skipVoice: true }); syncSlidersSafe();
+      cfgStatusSay('cursor: ' + CURSOR_NAMES[Math.round(CFG.cursorStyle)]);
+    } else { stare.until = t + 3.2; SFX.glare(); }
+  }
   else if (k === 'z') toggleText();
   else if (k === 'd') { CFG.hudOn = CFG.hudOn ? 0 : 1; applyToggles({ skipVoice: true }); }
   else if (k === 'l') {
