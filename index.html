@@ -125,8 +125,44 @@
     display: grid; place-items: center; cursor: pointer;
     border: 1px solid rgba(245,234,223,.25); border-radius: 50%;
     background: rgba(6,3,15,.4); font-size: 16px; user-select: none;
-    transition: border-color .3s;
+    transition: border-color .3s, opacity .25s,
+                transform .38s cubic-bezier(.16,1,.3,1);
   }
+
+  /* ── the zen drawer ──
+     Zen means "no furniture", but the controls still have to be REACHABLE, so
+     they slide off the right edge and leave a handle behind. `zendraw` is set
+     by JS rather than by a media query: the phone build already collapses
+     these four into the hammer tray, and two collapse mechanisms fighting over
+     the same transform is how you get a button stuck half off-screen. JS owns
+     the breakpoint so exactly one of them is ever live.
+     They travel a single distance rather than one each: every button's `right`
+     offset differs, so a uniform push clears the widest one and the rest exit
+     staggered, which reads as intentional. */
+  body.zendraw .ctl {
+    transform: translateX(260px); opacity: 0; pointer-events: none;
+  }
+  body.zendraw.drawer-open .ctl { transform: none; opacity: 1; pointer-events: auto; }
+  #zenTab {
+    position: fixed; right: 0; bottom: 29px; z-index: 18;
+    width: 21px; height: 54px;
+    display: none; place-items: center;
+    cursor: pointer; user-select: none;
+    font-size: 12px; color: rgba(245,234,223,.5);
+    background: rgba(6,3,15,.42);
+    border: 1px solid rgba(245,234,223,.22); border-right: 0;
+    border-radius: 9px 0 0 9px;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    transition: color .25s, background .25s, border-color .25s,
+                transform .38s cubic-bezier(.16,1,.3,1);
+  }
+  body.zendraw #zenTab { display: grid; }
+  #zenTab:hover {
+    color: #f5eadf; background: rgba(18,9,36,.62);
+    border-color: rgba(245,234,223,.5);
+  }
+  /* rides out to the head of the revealed bar, so the same target closes it */
+  body.zendraw.drawer-open #zenTab { transform: translateX(-242px); }
   .ctl:hover { border-color: rgba(245,234,223,.7); }
   /* off state: dim and desaturated, so silence is legible at a glance and not
      only in a tooltip nobody hovers on a wall display */
@@ -172,7 +208,7 @@
   /* kiosk / screensaver: no pointer exists, so no chrome and no cursor */
   body.kiosk, body.kiosk * { cursor: none !important; }
   body.kiosk .ctl, body.kiosk #tools, body.kiosk #chatDock,
-  body.kiosk #voiceMenu, body.kiosk .panel { display: none !important; }
+  body.kiosk #voiceMenu, body.kiosk #zenTab, body.kiosk .panel { display: none !important; }
   /* The gate is removed from the layout entirely, not just faded. Hiding it by
      class alone was not enough: autoResume() puts the gate BACK if autoplay is
      refused, and a screensaver has no one to click it. CSS wins over any class
@@ -465,12 +501,12 @@
     text-align: right; color: #2fe8d0; font-size: 12px;
     font-family: 'SF Mono', 'Menlo', monospace;
   }
-  #cfgPanel input[type=range] {
+  #cfgPanel input[type=range], #smBar {
     -webkit-appearance: none; appearance: none; width: 100%; height: 3px;
     background: linear-gradient(90deg, rgba(145,70,255,.8), rgba(47,232,208,.5));
     border-radius: 2px; outline: none;
   }
-  #cfgPanel input[type=range]::-webkit-slider-thumb {
+  #cfgPanel input[type=range]::-webkit-slider-thumb, #smBar::-webkit-slider-thumb {
     -webkit-appearance: none; appearance: none;
     width: 15px; height: 15px; border-radius: 50%;
     background: radial-gradient(circle at 35% 30%, #fff, #c9a0ff 40%, #9146FF);
@@ -925,20 +961,62 @@
     animation: vmIn .2s cubic-bezier(.16,1,.3,1);
   }
   #soundMenu.show { display: block; }
-  .smscrub { padding: 2px 10px 10px; }
-  .smrow {
+  /* The popover grew from two rows to a transport, a scrubber, two actions and
+     three mute rows. On a short landscape phone that is taller than the space
+     above the bar, and a menu whose bottom half is off-screen is a menu with
+     invisible options, so it scrolls rather than clips. */
+  #soundMenu { max-height: calc(100vh - 96px); overflow-y: auto; }
+  .smscrub { padding: 2px 10px 8px; }
+  /* transport: three equal targets, the middle one emphasised because it is
+     the one anybody reaches for without reading the row */
+  .smtrans {
+    display: flex; gap: 6px; align-items: center;
+    padding: 0 10px 9px;
+  }
+  .smbtn {
+    flex: 1 1 0; min-width: 0; height: 32px;
+    display: grid; place-items: center; cursor: pointer; user-select: none;
+    font-size: 13px; color: #f5eadf;
+    background: rgba(245,234,223,.07);
+    border: 1px solid rgba(245,234,223,.18); border-radius: 9px;
+    transition: background .16s, border-color .16s;
+  }
+  .smbtn:hover { background: rgba(245,234,223,.14); border-color: rgba(245,234,223,.4); }
+  .smbtn:active { background: rgba(145,70,255,.34); }
+  #smPlayBtn { flex: 1.5 1 0; font-size: 15px; }
+  #smBar { width: 100%; margin: 0; display: block; }
+  /* elapsed / remaining / total. Monospaced and tabular so the digits do not
+     jitter the row four times a second. */
+  .smclock {
     display: flex; justify-content: space-between; align-items: baseline;
-    margin-bottom: 6px;
+    padding: 6px 2px 0;
+    font-family: 'SF Mono', 'Menlo', monospace; font-size: 10.5px;
+    font-variant-numeric: tabular-nums;
   }
-  .smlabel {
-    font-size: 10px; letter-spacing: .16em; text-transform: uppercase;
-    color: rgba(245,234,223,.55);
+  #smNow  { color: #2fe8d0; }
+  #smLeft { color: rgba(245,234,223,.45); }
+  #smDur  { color: rgba(245,234,223,.62); }
+  .smacts { display: flex; gap: 6px; padding: 8px 10px 2px; }
+  .smact {
+    flex: 1 1 0; min-width: 0; min-height: 32px; padding: 5px 6px;
+    display: grid; place-items: center; cursor: pointer; user-select: none;
+    text-align: center; font-size: 10.5px; line-height: 1.15;
+    color: rgba(245,234,223,.82);
+    background: rgba(245,234,223,.05);
+    border: 1px dashed rgba(245,234,223,.24); border-radius: 8px;
+    transition: background .16s, border-color .16s, color .16s;
   }
-  #smTime {
-    font-family: 'SF Mono', 'Menlo', monospace; font-size: 11px;
-    color: #2fe8d0; font-variant-numeric: tabular-nums;
+  .smact:hover { color: #f5eadf; border-color: rgba(255,179,71,.6); background: rgba(255,179,71,.1); }
+  /* the pinned start position, shown so "start here" has visible consequence */
+  #smPinNote {
+    padding: 6px 12px 2px; font-size: 10px;
+    color: rgba(245,234,223,.42); font-variant-numeric: tabular-nums;
   }
-  #smBar { width: 100%; margin: 0; }
+  #smPinNote b { color: #ffb347; font-weight: 500; }
+  .smsep {
+    height: 1px; margin: 9px 8px 6px;
+    background: rgba(245,234,223,.12);
+  }
   @keyframes vmIn { from { opacity: 0; transform: translateY(8px); } }
   .vmhead {
     font-size: 9.5px; letter-spacing: .26em; text-transform: uppercase;
@@ -1331,24 +1409,45 @@
 <div id="mute" class="ui ctl" title="sound">&#9835;</div>
 <div id="settings" class="ui ctl" title="settings &amp; presets">&#9881;</div>
 <div id="help" class="ui ctl" title="controls">?</div>
+<div id="zenTab" class="ui" title="show the controls" role="button" tabindex="0" aria-label="show the controls">&#8249;</div>
 
 <div id="soundMenu" class="ui">
   <div class="vmhead">sound</div>
+  <div class="smtrans">
+    <div class="smbtn" id="smBack" title="back 10 seconds" role="button" tabindex="0">&#9198;&#65038;</div>
+    <div class="smbtn" id="smPlayBtn" title="play / pause" role="button" tabindex="0">&#9208;&#65038;</div>
+    <div class="smbtn" id="smFwd" title="forward 10 seconds" role="button" tabindex="0">&#9197;&#65038;</div>
+  </div>
   <div class="smscrub">
-    <div class="smrow">
-      <span class="smlabel">scrub the track</span>
-      <span id="smTime">0:00 / 0:00</span>
-    </div>
     <input id="smBar" type="range" min="0" max="100" step="0.1" value="0"
            aria-label="scrub through the track">
+    <div class="smclock">
+      <span id="smNow">0:00</span>
+      <span id="smLeft">-0:00</span>
+      <span id="smDur">0:00</span>
+    </div>
   </div>
-  <div class="vmopt" id="smPlay">
-    <div class="vmicon" id="smPlayIcon">&#9208;&#65038;</div>
-    <div class="vmtext"><b id="smPlayLabel">pause the music</b><span>the art keeps going</span></div>
+  <div class="smacts">
+    <div class="smact" id="smCopy" role="button" tabindex="0">copy this time</div>
+    <div class="smact" id="smPin" role="button" tabindex="0">start here when shared</div>
+  </div>
+  <div id="smPinNote"></div>
+  <div class="smsep"></div>
+  <div class="vmhead" style="padding-top:0">silence</div>
+  <div class="vmopt" id="smMuteTrack">
+    <div class="vmicon">&#9835;</div>
+    <div class="vmtext"><b id="smTrackLabel">mute the music</b><span>the track only</span></div>
+    <div class="vmdot"></div>
+  </div>
+  <div class="vmopt" id="smMuteSfx">
+    <div class="vmicon">&#128165;</div>
+    <div class="vmtext"><b id="smSfxLabel">mute the effects</b><span>gritos, shaker, clave</span></div>
+    <div class="vmdot"></div>
   </div>
   <div class="vmopt" id="smMute">
     <div class="vmicon" id="smMuteIcon">&#128266;</div>
-    <div class="vmtext"><b id="smMuteLabel">mute all sound</b><span>music, gritos and effects</span></div>
+    <div class="vmtext"><b id="smMuteLabel">mute everything</b><span>music and effects together</span></div>
+    <div class="vmdot"></div>
   </div>
 </div>
 
@@ -1712,7 +1811,8 @@ const CFG_CATEGORY = {
           'flowerCrown', 'crownBlooms'],
   sky: ['tunnelCount', 'starDensity', 'dustCount', 'smokeScale', 'smokeStir',
         'smokeDecay', 'eventMinGap', 'eventMaxGap', 'autoEvents'],
-  sound: ['musicVolume', 'musicSeek', 'gritoVolume', 'sfxVolume', 'musicOn'],
+  sound: ['musicVolume', 'musicSeek', 'gritoVolume', 'sfxVolume', 'musicOn',
+         'trackOn', 'sfxOn'],
   system: ['perfMode', 'hudOn', 'textOn', 'voiceOn'],
 };
 /* key -> category, built once. Also the integrity check: a dial with no
@@ -1732,7 +1832,14 @@ const CAT_OF = {};
    [default, 0, 1, 1, label, 'toggle'] renders a switch instead of a slider. */
 const CFG_TOGGLES = {
   textOn:      [1, 0, 1, 1, 'show text', 'toggle'],
-  musicOn:     [1, 0, 1, 1, 'sound on (music, gritos, sfx)', 'toggle'],
+  musicOn:     [1, 0, 1, 1, 'all sound on', 'toggle'],
+  /* Two independent axes UNDER the master, because "mute the music" and "mute
+     the effects" are different asks and one flag cannot answer both.
+     `musicOn` deliberately keeps its old meaning (everything), so a share link
+     or gallery preset minted before these existed still silences the whole
+     piece rather than quietly starting to yell gritos at someone. */
+  trackOn:     [1, 0, 1, 1, 'music track on', 'toggle'],
+  sfxOn:       [1, 0, 1, 1, 'sound effects on', 'toggle'],
   autoEvents:  [1, 0, 1, 1, 'random events', 'toggle'],
   voiceOn:     [0, 0, 1, 1, 'voice control', 'toggle'],
   beatSync:    [1, 0, 1, 1, 'sync to the beat', 'toggle'],
@@ -2028,6 +2135,14 @@ function applyMuteGain() {
   masterBus.gain.value = muted ? 0 : 1;
 }
 
+/* Under the master there are two independent switches, so audibility is a
+   QUESTION, not a flag anyone can read directly. Every place that used to test
+   `muted` before making noise now asks one of these, which is what stops the
+   next sound added to this file from honouring the master and forgetting the
+   sub-switch. */
+function trackOn()  { return !muted && !!CFG.trackOn; }
+function effectsOn(){ return !muted && !!CFG.sfxOn; }
+
 function initAudio() {
   if (actx) return;
   actx = new (window.AudioContext || window.webkitAudioContext)();
@@ -2061,7 +2176,7 @@ const sfxLast = Object.create(null);
 
 function sfxReady() {
   if (kioskSilent) return null;          // no synthesized percussion either
-  if (!CFG.sfxVolume || muted) return null;
+  if (!CFG.sfxVolume || !effectsOn()) return null;
   if (!actx) return null;                       // no gesture has started audio yet
   if (actx.state === 'suspended') actx.resume();
   if (!sfxBus) {
@@ -5728,7 +5843,7 @@ function applyActions(actions) {
         CFG.bigote = 1;
         done.push('mustache on');
       }
-      if (a.key === 'musicVolume' && !muted) music.volume = CFG.musicVolume;
+      if (a.key === 'musicVolume' && trackOn()) music.volume = CFG.musicVolume;
       done.push(`${CFG_SCHEMA[a.key][4]} \u2192 ${CFG[a.key]}`);
 
     } else if (a.op === 'fx' && Object.prototype.hasOwnProperty.call(CHAT_FX, a.name)) {
@@ -6791,7 +6906,7 @@ function startMusic() {
   const t0 = performance.now();
   (function ramp() {
     const p = Math.min((performance.now() - t0) / 4000, 1);
-    music.volume = muted ? 0 : p * CFG.musicVolume;
+    music.volume = trackOn() ? p * CFG.musicVolume : 0;
     if (p < 1) requestAnimationFrame(ramp);
   })();
   if (!musicStarted) { musicStarted = true; loadGritos(); }
@@ -6892,7 +7007,7 @@ gate.addEventListener('click', enterGate);
        net, the first keydown), so not-calling-them is a promise that will be
        broken by the next feature. Forbid it once, here. */
     kioskSilent = true;
-    CFG.musicOn = 0;
+    CFG.musicOn = 0; CFG.trackOn = 0; CFG.sfxOn = 0;
     muted = true;
     applyMuteGain();                     // masterBus to zero: music, gritos, sfx
     music.muted = true;                  // and the element itself, belt and braces
@@ -6978,10 +7093,11 @@ window.SKLZ = {
 function applyToggles(opts) {
   const o = opts || {};
   document.body.classList.toggle('notext', !CFG.textOn);
+  syncZenDrawer();                      // zen hides the words; the drawer hides the buttons
   /* sound: the flag is still called `muted` and still lives on CFG.musicOn,
      but it now means ALL audio, not just the track */
   muted = !CFG.musicOn;
-  music.volume = muted ? 0 : CFG.musicVolume;
+  music.volume = trackOn() ? CFG.musicVolume : 0;
   applyMuteGain();
   syncMuteIcon();
   /* fps monitor */
@@ -7006,7 +7122,7 @@ function syncToggleUI() {
    bug waiting to happen the next time someone adds a path. Derive the icon from
    the real state, and subscribe to the audio element's own play/pause events so
    ANY path updates it, including ones nobody remembered to wire. */
-function musicAudible() { return !muted && !music.paused; }
+function musicAudible() { return trackOn() && !music.paused; }
 let muteIconState = null;
 function syncMuteIcon() {
   const on = musicAudible();
@@ -7035,20 +7151,43 @@ music.addEventListener('volumechange', syncMuteIcon);
    Mute stays on M and space still plays/pauses, so nothing that worked from
    the keyboard now requires opening a panel. */
 const soundMenu = document.getElementById('soundMenu');
-const smPlay = document.getElementById('smPlay');
 const smMute = document.getElementById('smMute');
 const smBar = document.getElementById('smBar');
-const smTime = document.getElementById('smTime');
+const smPlayBtn = document.getElementById('smPlayBtn');
 
 function syncSoundMenu() {
   const playing = !music.paused;
-  document.getElementById('smPlayIcon').innerHTML = playing ? '&#9208;&#65038;' : '&#9654;&#65038;';
-  document.getElementById('smPlayLabel').textContent = playing ? 'pause the music' : 'play the music';
+  smPlayBtn.innerHTML = playing ? '&#9208;&#65038;' : '&#9654;&#65038;';
+  smPlayBtn.title = playing ? 'pause' : 'play';
+  /* Each row is labelled with the ACTION it performs and its dot shows the
+     CURRENT state, the same contract the voice menu uses. Two rows that looked
+     alike but meant opposite things would be worse than no dot at all. */
+  const tr = trackOn(), fx = effectsOn();
+  document.getElementById('smTrackLabel').textContent = tr ? 'mute the music' : 'unmute the music';
+  document.getElementById('smSfxLabel').textContent = fx ? 'mute the effects' : 'unmute the effects';
   document.getElementById('smMuteIcon').innerHTML = muted ? '&#128263;' : '&#128266;';
-  document.getElementById('smMuteLabel').textContent = muted ? 'unmute' : 'mute all sound';
+  document.getElementById('smMuteLabel').textContent = muted ? 'unmute everything' : 'mute everything';
+  document.getElementById('smMuteTrack').classList.toggle('on', tr);
+  document.getElementById('smMuteSfx').classList.toggle('on', fx);
+  smMute.classList.toggle('on', !muted);
+
   const d = music.duration, c = music.currentTime;
-  smTime.textContent = fmtTime(c) + ' / ' + (isFinite(d) ? fmtTime(d) : '--:--');
-  if (!smDragging && isFinite(d) && d > 0) smBar.value = (c / d * 100).toFixed(1);
+  const known = isFinite(d) && d > 0;
+  document.getElementById('smNow').textContent = fmtTime(c);
+  document.getElementById('smLeft').textContent = known ? '-' + fmtTime(d - c) : '-:--';
+  document.getElementById('smDur').textContent = known ? fmtTime(d) : '--:--';
+  if (!smDragging && known) smBar.value = (c / d * 100).toFixed(1);
+  syncPinNote();
+}
+/* The pinned start position is the one value here with consequences OUTSIDE
+   this session, so it is shown rather than left to be inferred from a slider
+   somewhere else in the settings panel. */
+function syncPinNote() {
+  const d = music.duration, pct = CFG.musicSeek || 0;
+  const at = isFinite(d) && d > 0 ? fmtTime(pct / 100 * d) : Math.round(pct) + '%';
+  document.getElementById('smPinNote').innerHTML = pct > 0
+    ? 'shared links and gallery saves start at <b>' + at + '</b>'
+    : 'shared links start at the <b>top of the track</b>';
 }
 
 let smDragging = false;
@@ -7061,15 +7200,55 @@ smBar.addEventListener('input', () => {
   CFG.musicSeek = +pct.toFixed(1);        // the shareable start position
   applySeek(pct);
   syncSlidersSafe();
-  const d = music.duration;
-  smTime.textContent = fmtTime(isFinite(d) ? pct / 100 * d : 0) + ' / ' +
-                       (isFinite(d) ? fmtTime(d) : '--:--');
+  const d = music.duration, known = isFinite(d) && d > 0;
+  const c = known ? pct / 100 * d : 0;
+  document.getElementById('smNow').textContent = fmtTime(c);
+  document.getElementById('smLeft').textContent = known ? '-' + fmtTime(d - c) : '-:--';
+  syncPinNote();
 });
-smPlay.addEventListener('click', () => {
+smPlayBtn.addEventListener('click', () => {
   if (music.paused) { userPaused = false; music.play().catch(() => {}); }
   else { userPaused = true; music.pause(); }
   syncMuteIcon(); syncSoundMenu();
 });
+/* Nudge the PLAYHEAD, and nothing else. seekBy() also writes musicSeek, which
+   is right for the bracket keys (a nudge you want to share) and wrong here,
+   where "start here when shared" is a button of its own two rows down. */
+function smNudge(sec) {
+  const d = music.duration;
+  if (!isFinite(d) || d <= 0) return;
+  try { music.currentTime = Math.max(0, Math.min(d - 0.25, music.currentTime + sec)); } catch (_) {}
+  syncSoundMenu();
+}
+document.getElementById('smBack').addEventListener('click', () => smNudge(-10));
+document.getElementById('smFwd').addEventListener('click', () => smNudge(10));
+
+document.getElementById('smCopy').addEventListener('click', async e => {
+  const el = e.currentTarget, was = el.textContent;
+  const stamp = fmtTime(music.currentTime);
+  let ok = false;
+  try { await navigator.clipboard.writeText(stamp); ok = true; } catch (_) {}
+  /* Never claim "copied" without proof: the clipboard refuses in some embedded
+     webviews, and a lie here is worse than showing the value to select. */
+  el.textContent = ok ? 'copied ' + stamp : stamp;
+  setTimeout(() => { el.textContent = was; }, 1600);
+});
+/* Pins the LIVE playhead, which is the whole point of this button: the scrub
+   bar sets musicSeek when you drag it, then playback moves on and the two
+   drift apart. This is how you say "the bit I am hearing right now". */
+document.getElementById('smPin').addEventListener('click', e => {
+  const d = music.duration;
+  if (!isFinite(d) || d <= 0) { cfgStatusSay('the track is still loading'); return; }
+  CFG.musicSeek = +Math.max(0, Math.min(100, music.currentTime / d * 100)).toFixed(1);
+  syncSlidersSafe(); syncPinNote();
+  const el = e.currentTarget, was = el.textContent;
+  el.textContent = 'pinned ' + fmtTime(music.currentTime);
+  setTimeout(() => { el.textContent = was; }, 1800);
+  cfgStatusSay('shared links now start at ' + fmtTime(music.currentTime));
+});
+
+document.getElementById('smMuteTrack').addEventListener('click', () => setAudioSwitch('trackOn', !trackOn()));
+document.getElementById('smMuteSfx').addEventListener('click', () => setAudioSwitch('sfxOn', !effectsOn()));
 smMute.addEventListener('click', () => { toggleMute(); syncSoundMenu(); });
 
 muteBtn.addEventListener('click', e => {
@@ -7085,25 +7264,87 @@ music.addEventListener('play', syncSoundMenu);
 music.addEventListener('pause', syncSoundMenu);
 music.addEventListener('loadedmetadata', syncSoundMenu);
 function toggleMute() {
-  /* If the track is paused, "unmute" would light the icon while producing no
-     sound, so the button would read as broken. Whatever silenced it, this
-     button's job is to bring it back. */
-  if (!muted && music.paused) {
+  /* Unmuting a track that is also PAUSED has to start it, or the icon lights
+     up and nothing makes a sound, which reads as a broken button.
+     This used to run whenever the track was paused, in EITHER direction, so a
+     paused-but-unmuted piece answered "mute everything" by starting to play.
+     Harmless while this was only a bar icon; wrong the moment a menu row says
+     the word "mute" on it. Only the unmute direction rescues. */
+  if (muted && music.paused) {
     userPaused = false;
     music.play().catch(() => {});
-    syncMuteIcon();
-    return;
   }
   CFG.musicOn = muted ? 1 : 0;          // flip, then let applyToggles do the work
+  /* Turning the master back on must produce sound. If a sub-switch was left
+     off, an "unmute" that stays silent reads as a broken button, which is the
+     same reasoning as the paused case above. Muting leaves the sub-switches
+     alone, so the pair you had comes back with you. */
+  if (CFG.musicOn) { CFG.trackOn = 1; CFG.sfxOn = 1; }
   applyToggles({ skipVoice: true });
   /* unmuting a track that was also paused should actually make noise */
   if (!muted && music.paused) { userPaused = false; music.play().catch(() => {}); }
   syncMuteIcon();
+  syncSlidersSafe();
+}
+/* The two sub-switches. Silencing one while the master is off would look like
+   nothing happened, so they raise the master with them. */
+function setAudioSwitch(key, on) {
+  CFG[key] = on ? 1 : 0;
+  if (on && !CFG.musicOn) CFG.musicOn = 1;
+  if (!CFG.trackOn && !CFG.sfxOn) CFG.musicOn = 0;   // both off IS muted
+  applyToggles({ skipVoice: true });
+  if (on && key === 'trackOn' && music.paused) { userPaused = false; music.play().catch(() => {}); }
+  syncMuteIcon(); syncSlidersSafe(); syncSoundMenu();
 }
 function toggleText() {
   CFG.textOn = CFG.textOn ? 0 : 1;
   applyToggles({ skipVoice: true });
 }
+
+/* ── the zen drawer ──
+   Zen hides every word, but the four controls are not words, they are the way
+   back out, so hiding them outright would strand anyone who pressed Z. They
+   slide off the right edge instead and leave a handle.
+
+   The phone build already collapses the same four buttons into the hammer
+   tray, and two mechanisms transforming the same elements is how a button ends
+   up stuck half off-screen. So the breakpoint lives HERE, in one query that
+   matches the mobile stylesheet exactly, and the CSS only reacts to the class
+   this sets. Exactly one collapse is ever live. */
+/* Lazy, not a module-level const. applyToggles() calls this and is itself
+   reachable from a dozen places; a const evaluated later in the file would be
+   in the temporal dead zone for any caller that runs first. Same trap as
+   invariant 3, which cost this project a wall display's auto-update. */
+let PHONE_MQ = null;
+function phoneLayout() {
+  if (!PHONE_MQ) {
+    PHONE_MQ = matchMedia('(max-width: 760px), (max-height: 460px) and (pointer: coarse)');
+    PHONE_MQ.addEventListener('change', syncZenDrawer);
+  }
+  return PHONE_MQ.matches;
+}
+function syncZenDrawer() {
+  const on = !CFG.textOn && !phoneLayout() && !document.body.classList.contains('kiosk');
+  document.body.classList.toggle('zendraw', on);
+  if (!on) document.body.classList.remove('drawer-open');
+  const tab = document.getElementById('zenTab');
+  if (tab) {
+    const open = document.body.classList.contains('drawer-open');
+    tab.innerHTML = open ? '&#8250;' : '&#8249;';
+    tab.title = open ? 'hide the controls' : 'show the controls';
+  }
+}
+function toggleDrawer() {
+  const open = document.body.classList.toggle('drawer-open');
+  /* A popover anchored to a button that just left the screen would hang in
+     empty space, so the drawer closing takes them with it. */
+  if (!open) { soundMenu.classList.remove('show'); voiceMenu.classList.remove('show'); }
+  syncZenDrawer();
+}
+document.getElementById('zenTab').addEventListener('click', e => { e.stopPropagation(); toggleDrawer(); });
+document.getElementById('zenTab').addEventListener('keydown', e => {
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleDrawer(); }
+});
 
 /* ─────────────────────────────────────────────
    GRITOS, 13 yells, loaded sequentially once
@@ -7168,7 +7409,7 @@ function grito() {
   /* the bus already handles this, but tapGrito can fail (one
      createMediaElementSource per element, ever) and an untapped element plays
      straight to the speakers, around the bus */
-  a.volume = muted ? 0 : CFG.gritoVolume;
+  a.volume = effectsOn() ? CFG.gritoVolume : 0;
   a.play().catch(() => {});
   /* the skull throws the yell: jaw drops for as long as the clip runs */
   const dur = (isFinite(a.duration) && a.duration > 0) ? a.duration : 3;
@@ -7441,6 +7682,9 @@ const HELP_ROWS = [
   [['\u21e7S'], 'sombrero on / off', '"sombrero"', '\u21e7s'],
   [['\u21e7M'], 'mustache: charro / handlebar / herradura', '"mustache"', '\u21e7m'],
   [['\u21e7B'], 'skull breathing on / off', '', '\u21e7b'],
+  [['\u21e7T'], 'mute / unmute the music only', '', '\u21e7t'],
+  [['\u21e7X'], 'mute / unmute the sound effects', '', '\u21e7x'],
+  [['\u2039'], 'zen mode: pull the controls out of the drawer', '', ''],
   [['!'], 'fiesta: new look + everything + grito', '', '!'],
   [['Q'], 'galactic battle (3 fleets)', '"battle"', 'q'],
   [['J'], 'spawn more skulls (hold to flood)', '"skulls"', 'j'],
@@ -7793,7 +8037,7 @@ const DEMO_EVERY_MS = 180000;                 // three minutes
    piece on the wall it is supposed to be showing off. */
 const DEMO_KEEP = new Set([
   'textOn',                                   // zen: demo owns this, see below
-  'musicOn',                                  // MUTE: the viewer's call, never ours
+  'musicOn', 'trackOn', 'sfxOn',              // MUTE: the viewer's call, never ours
   'musicVolume', 'gritoVolume', 'sfxVolume',  // the rest of "mute/unmute"
   'voiceOn',                                  // microphone: never turn one on
   'hudOn',                                    // debug overlay is not art
@@ -8087,7 +8331,7 @@ let syncSliders = () => {};   // real one is assigned inside buildCfg below
     r.addEventListener('input', () => {
       CFG[k] = parseFloat(r.value);
       v.textContent = r.value;
-      if (k === 'musicVolume' && !muted) music.volume = CFG.musicVolume;
+      if (k === 'musicVolume' && trackOn()) music.volume = CFG.musicVolume;
       if (k === 'musicSeek') { applySeek(CFG.musicSeek); seekReadout(); }
       if (k === 'perfMode') resize();
       if (PALETTE_KEYS.includes(k)) schedulePaletteRebuild();
@@ -8307,8 +8551,8 @@ addEventListener('keydown', e => {
       cfgStatusSay(CFG.bigote ? 'bigote: ' + NM[Math.round(CFG.bigoteStyle)] : 'bigote off');
     } else toggleMute();
   }
-  else if (k === 'arrowup')   { e.preventDefault(); CFG.musicVolume = Math.min(1, CFG.musicVolume + 0.05); if (!muted) music.volume = CFG.musicVolume; }
-  else if (k === 'arrowdown') { e.preventDefault(); CFG.musicVolume = Math.max(0, CFG.musicVolume - 0.05); if (!muted) music.volume = CFG.musicVolume; }
+  else if (k === 'arrowup')   { e.preventDefault(); CFG.musicVolume = Math.min(1, CFG.musicVolume + 0.05); if (trackOn()) music.volume = CFG.musicVolume; }
+  else if (k === 'arrowdown') { e.preventDefault(); CFG.musicVolume = Math.max(0, CFG.musicVolume - 0.05); if (trackOn()) music.volume = CFG.musicVolume; }
   else if (k === 'arrowleft' || k === 'arrowright') {
     e.preventDefault();                            // keep the page from scrolling
     const [, min, max, step] = CFG_SCHEMA.skullSize;
@@ -8320,7 +8564,12 @@ addEventListener('keydown', e => {
   else if (k === 'e') { rainbowEyeUntil = t + 5; SFX.bell(); }
   else if (k === 'r') { face.ringSpin += 10; SFX.shaker(); }
   else if (k === 'w') { const dir = Math.random() < 0.5 ? -1 : 1; face.spiralSpin += dir * 12; SFX.guiro(dir); }
-  else if (k === 't') { face.chatterUntil = t + 1.6; SFX.teeth(); }
+  else if (k === 't') {
+    if (e.shiftKey) {
+      setAudioSwitch('trackOn', !trackOn());
+      cfgStatusSay('music ' + (trackOn() ? 'on' : 'muted'));
+    } else { face.chatterUntil = t + 1.6; SFX.teeth(); }
+  }
   else if (k === 'n') { face.noseBurst = t + 1.2; heartBurst(W / 2, H / 2); SFX.tom(); }
   else if (k === 's') {
     if (e.shiftKey) {
@@ -8341,7 +8590,12 @@ addEventListener('keydown', e => {
   }
   else if (k === 'f') { fxFlickRandom(); SFX.knock(); }
   else if (k === 'k') fxComet();
-  else if (k === 'x') fxMeteorShower();
+  else if (k === 'x') {
+    if (e.shiftKey) {
+      setAudioSwitch('sfxOn', !effectsOn());
+      cfgStatusSay('effects ' + (effectsOn() ? 'on' : 'muted'));
+    } else fxMeteorShower();
+  }
   else if (k === 'v') fxSupernova();
   else if (k === 'a') fxAurora();
   else if (k === 'u') fxUfo();

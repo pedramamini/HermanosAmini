@@ -41,7 +41,7 @@ const LIMITS = {
   boneHue: [-180, 180, 'bone hue'], boneSat: [0, 2, 'bone saturation'],
   nebulaHue: [-180, 180, 'smoke hue shift'], nebulaSat: [0, 2, 'smoke saturation'], bgBright: [0.2, 2, 'smoke brightness'], vignette: [0, 1.2, 'vignette'],
   flickForce: [0.2, 3, 'flick strength'], socketGlow: [0, 2.5, 'eye socket glow'], auraSize: [0, 2.5, 'skull aura'], petalCount: [4, 20, 'eye petals'],
-  textOn: [0, 1, 'show text'], musicOn: [0, 1, 'sound on (music, gritos, sfx)'], autoEvents: [0, 1, 'random events'], voiceOn: [0, 1, 'voice control'], beatSync: [0, 1, 'sync to the beat'], hudOn: [0, 1, 'fps monitor'], skullOnTop: [0, 1, 'skull always on top'], skullBreathe: [0, 1, 'skull breathing'], flowerCrown: [0, 1, 'flower crown'], crownBlooms: [3, 12, 'crown flowers'], sombrero: [0, 1, 'sombrero'],
+  textOn: [0, 1, 'show text'], musicOn: [0, 1, 'all sound on'], trackOn: [0, 1, 'music track on'], sfxOn: [0, 1, 'sound effects on'], autoEvents: [0, 1, 'random events'], voiceOn: [0, 1, 'voice control'], beatSync: [0, 1, 'sync to the beat'], hudOn: [0, 1, 'fps monitor'], skullOnTop: [0, 1, 'skull always on top'], skullBreathe: [0, 1, 'skull breathing'], flowerCrown: [0, 1, 'flower crown'], crownBlooms: [3, 12, 'crown flowers'], sombrero: [0, 1, 'sombrero'],
 };
 
 /* Deliberately blunt list: slurs and profanity roots. Matching happens after
@@ -624,6 +624,15 @@ export default {
           '',
           'musicSeek is also where a SHARED LINK starts, so when someone asks to share',
           '"from this bit", set musicSeek and then use {"op":"share"}.',
+          '',
+          'SILENCE. Three separate switches, and "mute" alone means all of them:',
+          '  "mute", "silence", "quiet"      -> {"op":"set","key":"musicOn","value":0}',
+          '  "mute the music/song/track"     -> {"op":"set","key":"trackOn","value":0}',
+          '  "mute the effects/sfx/gritos"   -> {"op":"set","key":"sfxOn","value":0}',
+          'Unmute is the same key with value 1. musicOn is the MASTER: setting it to 0',
+          'silences everything regardless of the other two, so never use it for a',
+          'request that names only one kind of sound. Do not touch musicVolume to mute;',
+          'that destroys a level the viewer chose and they cannot get it back.',
           '',
           'DESIGN CHANGES vs EVENTS, the distinction that matters most:',
           'If they ask to change the LOOK, DESIGN, STYLE, COLORS, THEME or BACKGROUND',
