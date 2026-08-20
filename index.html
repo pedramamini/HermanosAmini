@@ -274,26 +274,55 @@
      a child would be laid into one of the columns. Sticky so it stays reachable
      while scrolling 59 rows. */
   #cfgFilter {
-    display: flex; gap: 8px; align-items: center;
+    display: flex; gap: 8px; align-items: center; min-width: 0;
     position: sticky; top: -18px; z-index: 3;
-    margin-top: 12px; padding: 8px 0 8px;
-    background: linear-gradient(180deg, rgba(10,5,22,.96) 78%, rgba(10,5,22,0));
+    margin: 12px 0 2px; padding: 9px 0 10px;
+    /* Frosted, not a solid slab: the same recipe as the panel it lives in, one
+       step stronger, so the 69 rows sliding under it stay masked while the art
+       still reads through. A flat fill here looked like a pasted-in toolbar. */
+    background: rgba(12,6,26,.6);
+    backdrop-filter: blur(18px) saturate(1.25);
+    -webkit-backdrop-filter: blur(18px) saturate(1.25);
+    border-bottom: 1px solid rgba(245,234,223,.1);
   }
   #cfgFilter.collapsed { display: none; }
-  #cfgSearch, #cfgCat {
-    font-family: 'Space Grotesk', sans-serif; font-size: 12px;
-    color: #f5eadf; background: rgba(245,234,223,.07);
+  /* One control per job: a search FIELD (magnifier inside it), a category
+     select, a count. The input used to be a bare bordered box that read as the
+     same object as the select next to it. */
+  .ffield {
+    flex: 1 1 auto; min-width: 0;
+    display: flex; align-items: center; gap: 7px;
+    background: rgba(245,234,223,.06);
     border: 1px solid rgba(245,234,223,.2); border-radius: 8px;
-    padding: 6px 10px; outline: none;
+    padding: 5px 10px; transition: border-color .18s, background .18s;
   }
-  #cfgSearch { flex: 1; min-width: 0; }
-  #cfgSearch:focus, #cfgCat:focus { border-color: rgba(145,70,255,.75); }
+  .ffield:focus-within {
+    border-color: rgba(145,70,255,.75); background: rgba(245,234,223,.1);
+  }
+  #cfgSearch {
+    flex: 1 1 auto; min-width: 0;
+    font-family: 'Space Grotesk', sans-serif; font-size: 12px;
+    color: #f5eadf; background: none; border: 0; outline: none; padding: 0;
+  }
   #cfgSearch::placeholder { color: rgba(245,234,223,.35); }
-  #cfgCat { cursor: pointer; }
+  #cfgSearch::-webkit-search-cancel-button { -webkit-appearance: none; }
+  /* THE SELECT MUST BE CAPPED. Its intrinsic width is its longest option
+     label, and a select cannot shrink below that on its own, which is exactly
+     what shoved the count off the right edge of the panel. */
+  #cfgCat {
+    flex: 0 1 118px; min-width: 0; cursor: pointer;
+    font-family: 'Space Grotesk', sans-serif; font-size: 12px;
+    color: #f5eadf; background: rgba(245,234,223,.06);
+    border: 1px solid rgba(245,234,223,.2); border-radius: 8px;
+    padding: 6px 8px; outline: none;
+  }
+  #cfgCat:focus { border-color: rgba(145,70,255,.75); }
   #cfgCat option { background: #150a26; color: #f5eadf; }   /* Chrome needs this */
   #cfgShown {
-    flex: 0 0 auto; font-size: 10px; letter-spacing: .14em;
-    text-transform: uppercase; color: rgba(245,234,223,.4);
+    flex: 0 0 auto; white-space: nowrap;
+    font-size: 10px; letter-spacing: .1em;
+    text-transform: uppercase; color: rgba(245,234,223,.42);
+    font-variant-numeric: tabular-nums;
   }
 
   /* ── controls filter ──
@@ -302,31 +331,42 @@
      That costs contrast, so the bar carries its own blur rather than a solid
      fill. Sticky, because the list is 40 rows and a filter you have to scroll
      back up to reach is a filter nobody uses twice. */
+  /* TWO FIELDS, NOT ONE. They filter on different axes (a key vs a word) and
+     a single bordered box around both read as one merged control, so people
+     typed words into the keycap. The bar itself is now just the pinned
+     surface they sit on; each field carries its own border.
+     Column order mirrors the table below it: the keycap sits above the key
+     column, the keyword box above the action column. */
   #helpFilter {
-    display: flex; gap: 9px; align-items: center;
+    display: flex; gap: 10px; align-items: center; min-width: 0;
     position: sticky; top: -18px; z-index: 3;
-    margin: 0 0 10px; padding: 9px 12px;
-    border: 1px solid rgba(245,234,223,.16); border-radius: 10px;
+    margin: 0 0 10px; padding: 10px 0 11px;
     /* Same frosted recipe as the panel itself (blur + a dark translucent
        tint), one step stronger. A LIGHT tint looked better standing still and
        failed the moment you scrolled: 39 rows slide under this bar, and a 5%
        wash does not stop them ghosting through the placeholder. Dark glass
        keeps the art visible and the text legible at the same time, which is
        the only version of "transparent" that actually works here. */
-    background: rgba(12,6,26,.55);
-    backdrop-filter: blur(16px) saturate(1.3);
-    -webkit-backdrop-filter: blur(16px) saturate(1.3);
-    transition: border-color .18s, background .18s;
+    background: rgba(12,6,26,.6);
+    backdrop-filter: blur(18px) saturate(1.28);
+    -webkit-backdrop-filter: blur(18px) saturate(1.28);
+    border-bottom: 1px solid rgba(245,234,223,.12);
   }
-  #helpFilter:focus-within {
-    border-color: rgba(145,70,255,.7);
-    background: rgba(20,10,38,.62);
+  .hfsearch {
+    flex: 1 1 auto; min-width: 0;
+    display: flex; align-items: center; gap: 9px;
+    background: rgba(245,234,223,.06);
+    border: 1px solid rgba(245,234,223,.2); border-radius: 8px;
+    padding: 7px 12px; transition: border-color .18s, background .18s;
+  }
+  .hfsearch:focus-within {
+    border-color: rgba(145,70,255,.7); background: rgba(245,234,223,.1);
   }
   .hfglass {
     flex: 0 0 auto; font-size: 14px; line-height: 1;
     color: rgba(245,234,223,.42); transform: rotate(-45deg);
   }
-  #helpFilter:focus-within .hfglass { color: #ffb347; }
+  .hfsearch:focus-within .hfglass { color: #ffb347; }
   #helpSearch {
     flex: 1 1 auto; min-width: 0;
     font-family: 'Space Grotesk', sans-serif; font-size: 13px;
@@ -334,20 +374,28 @@
   }
   #helpSearch::placeholder { color: rgba(245,234,223,.34); }
   /* the key box: press a key while it is focused and see what that key does.
-     Rendered AS a keycap so its function is legible from its shape. */
+     Rendered AS a keycap so its function is legible from its shape, and sized
+     to the key column it sits over. */
+  /* min-width:0 is LOAD-BEARING. A flex item's automatic minimum size is its
+     intrinsic content width, and an <input>'s intrinsic width is its `size`
+     attribute (20 characters by default), so the flex-basis below was being
+     ignored and the keycap rendered ~200px wide, nowhere near the column it
+     is supposed to sit over. The basis matches #helpPanel td:first-child. */
   #helpKey {
-    flex: 0 0 74px; text-align: center;
+    flex: 0 0 122px; min-width: 0; text-align: center;
     font-family: 'SF Mono', 'Menlo', monospace; font-size: 15px; font-weight: 600;
     color: #efe8f5; background: rgba(245,234,223,.08);
     border: 1px solid rgba(245,234,223,.28); border-radius: 8px;
-    padding: 6px 4px; outline: none; caret-color: transparent;
+    padding: 7px 4px; outline: none; caret-color: transparent;
+    box-shadow: 0 2px 0 rgba(0,0,0,.32);
   }
   #helpKey:focus { border-color: rgba(255,179,71,.75); background: rgba(245,234,223,.12); }
-  #helpKey::placeholder { color: rgba(245,234,223,.34); font-weight: 300; }
+  #helpKey::placeholder { color: rgba(245,234,223,.34); font-weight: 300; letter-spacing: .04em; }
   /* the browser's own clear affordance is a light X on a light field here */
   #helpSearch::-webkit-search-cancel-button { -webkit-appearance: none; }
   #helpShown {
-    flex: 0 0 auto; font-size: 10px; letter-spacing: .14em;
+    flex: 0 0 auto; white-space: nowrap;
+    font-size: 10px; letter-spacing: .12em;
     text-transform: uppercase; color: rgba(245,234,223,.38);
     font-variant-numeric: tabular-nums;
   }
@@ -712,7 +760,8 @@
 
     /* the filter sticks to the sheet body's own padding, not the desktop
        panel's, or it floats 4px adrift of the top edge while scrolling */
-    #helpFilter { top: -14px; }
+    #helpFilter { top: -14px; gap: 8px; }
+    #helpKey { flex: 0 0 84px; min-width: 0; font-size: 14px; }
 
     /* CONTROLS: the 3-column table wraps into a key + two stacked lines */
     #helpPanel table { border-spacing: 0; }
@@ -1368,18 +1417,20 @@
 <div id="helpPanel" class="panel">
   <h2>CONTROLS</h2>
   <div id="helpFilter">
-    <span class="hfglass" aria-hidden="true">&#9906;</span>
-    <input id="helpSearch" type="search" placeholder="filter by keyword&hellip;"
-           autocomplete="off" spellcheck="false" aria-label="filter the controls by keyword">
-    <input id="helpKey" type="text" placeholder="key?" maxlength="2"
+    <input id="helpKey" type="text" placeholder="key?" maxlength="2" size="3"
            autocomplete="off" spellcheck="false" aria-label="filter by pressing a key">
+    <span class="hfsearch">
+      <span class="hfglass" aria-hidden="true">&#9906;</span>
+      <input id="helpSearch" type="search" placeholder="filter by keyword&hellip;"
+             autocomplete="off" spellcheck="false" aria-label="filter the controls by keyword">
+    </span>
     <span id="helpShown"></span>
   </div>
   <table id="helpTable">
     <thead><tr><th></th><th>action</th><th>&#127908; say</th></tr></thead>
     <tbody></tbody>
   </table>
-  <p style="margin-top:10px;color:rgba(245,234,223,.4)">click a key to try it &middot; eyes follow clicks &middot; face parts react &middot; skulls flick &middot; pick a bloom off the crown &middot; C &rarr; copy a link to your board</p>
+  <p style="margin-top:10px;color:rgba(245,234,223,.4)">the keyword box has the caret, press esc to hand the keyboard back to the art &middot; click a key to try it &middot; eyes follow clicks &middot; face parts react &middot; skulls flick &middot; pick a bloom off the crown &middot; C &rarr; copy a link to your board</p>
 </div>
 
 <div id="cfgPanel" class="panel">
@@ -1397,7 +1448,10 @@
     <span class="db-chev" aria-hidden="true">&#9662;</span>
   </button>
   <div id="cfgFilter" class="collapsed">
-  <input id="cfgSearch" type="search" placeholder="filter dials, try &quot;smoke&quot; or &quot;beat&quot;" autocomplete="off" spellcheck="false">
+  <span class="ffield">
+    <span class="hfglass" aria-hidden="true">&#9906;</span>
+    <input id="cfgSearch" type="search" placeholder="try &quot;smoke&quot; or &quot;beat&quot;&hellip;" autocomplete="off" spellcheck="false" aria-label="filter the dials">
+  </span>
   <select id="cfgCat" aria-label="filter by category"></select>
   <span id="cfgShown"></span>
 </div>
@@ -7154,6 +7208,18 @@ function togglePanel(p) {
   voiceMenu.classList.remove('show');       // gear/help also dismiss the mic popover
   soundMenu.classList.remove('show');       // ...and the sound popover
   if (!was) p.classList.add('show');
+  /* The controls sheet opens READY TO TYPE, so cmd+/ then a word is the whole
+     interaction. Skipped on phones, where focusing an input throws the
+     software keyboard over the sheet you just opened, and skipped when the
+     panel is being dismissed. */
+  if (!was && p === helpPanel && window.innerWidth > 760) {
+    const s = document.getElementById('helpSearch');
+    /* Synchronous, NOT requestAnimationFrame. rAF does not fire in a
+       backgrounded tab, and a screensaver host is not the only place that
+       bites: the focus simply never happened. The class flip above is enough
+       for the field to be focusable by the time this line runs. */
+    if (s) { s.focus(); s.select(); }
+  }
   /* phones hide the floating controls behind an open sheet */
   document.body.classList.toggle('sheet-open', !!document.querySelector('.panel.show'));
 }
@@ -7387,6 +7453,7 @@ const HELP_ROWS = [
   [['D'], 'fps / quality monitor', '', 'd'],
   [['C'], 'settings + presets', '', 'c'],
   [['H', '?'], 'this menu', '', 'h'],
+  [['\u2318/'], 'this menu, cursor in the search box', '', ''],
 ];
 (function buildHelp() {
   const tb = document.querySelector('#helpTable tbody');
@@ -8154,6 +8221,18 @@ let syncSliders = () => {};   // real one is assigned inside buildCfg below
    KEYBOARD
    ───────────────────────────────────────────── */
 addEventListener('keydown', e => {
+  /* cmd+/ (ctrl+/ off a Mac) is the one chord that reaches the controls sheet
+     from ANYWHERE, including out of a text field, and lands the caret in the
+     keyword box. It is checked before the typing guard below for that reason:
+     a chord is never text entry. */
+  if ((e.metaKey || e.ctrlKey) && e.key === '/' && gate.classList.contains('gone')) {
+    e.preventDefault();
+    if (helpPanel.classList.contains('show')) {
+      const hs = document.getElementById('helpSearch');
+      if (hs) { hs.focus(); hs.select(); }
+    } else togglePanel(helpPanel);
+    return;
+  }
   /* Typing in a field must never fire art shortcuts. Without this, naming a
      preset "grito" launches a yell, an "s" spawns a star, "z" hides the text. */
   const el = e.target;
