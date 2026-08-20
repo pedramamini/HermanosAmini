@@ -2968,12 +2968,14 @@ function crownPath(pts) {
 }
 
 function crownBeads(pts, r, col, every) {
-  hctx.fillStyle = col;
+  /* one path, one fill: a rim used to be ~32 separate fills */
+  hctx.beginPath();
   for (let i = 0; i < pts.length; i += every) {
-    hctx.beginPath();
+    hctx.moveTo(pts[i][0] + r, pts[i][1]);
     hctx.arc(pts[i][0], pts[i][1], r, 0, Math.PI * 2);
-    hctx.fill();
   }
+  hctx.fillStyle = col;
+  hctx.fill();
 }
 
 function crownJewel(x, y, r, col, facets) {
@@ -3326,6 +3328,7 @@ function drawSombrero() {
 
     /* beaded rim: the row of silver studs along the very edge */
     const N = q >= 3 ? 13 : 23;
+    hctx.beginPath();                    // one path for the whole double row
     for (let i = 0; i <= N; i++) {
       const u = i / N;
       /* walk the brim's own top edge so the beads follow the sweep exactly */
@@ -3335,11 +3338,24 @@ function drawSombrero() {
       const x = mt*mt*mt*(-BW) + 3*mt*mt*u*(-BW*0.75) + 3*mt*u*u*(-BW*0.36) + u*u*u*0;
       const y = mt*mt*mt*TIPT + 3*mt*mt*u*(TIPT*0.68) + 3*mt*u*u*(-14) + u*u*u*0;
       for (const sd of [-1, 1]) {
-        hctx.beginPath();
+        hctx.moveTo(sd * x + 5.5, y + 9);
         hctx.arc(sd * x, y + 9, 5.5, 0, Math.PI * 2);
-        hctx.fillStyle = PAL.gold1; hctx.fill();
       }
     }
+    hctx.fillStyle = PAL.gold1; hctx.fill();
+  }
+
+  /* felt sheen: one soft highlight high on the left peak, so the crown reads
+     as a rounded volume under a single light instead of a flat gradient */
+  if (q < 4) {
+    hctx.save();
+    hctx.beginPath();
+    hctx.ellipse(-PX * 1.6, -CH * 0.74, CW * 0.34, CH * 0.22, -0.35, 0, Math.PI * 2);
+    const sh = hctx.createRadialGradient(-PX * 1.6, -CH * 0.74, 4, -PX * 1.6, -CH * 0.74, CW * 0.34);
+    sh.addColorStop(0, 'rgba(255,255,255,.30)');
+    sh.addColorStop(1, 'rgba(255,255,255,0)');
+    hctx.fillStyle = sh; hctx.fill();
+    hctx.restore();
   }
 
   /* hatband, sitting where the crown meets the brim */
@@ -3361,20 +3377,6 @@ function drawSombrero() {
   drawBloom(62, 0, t * 0.12, q >= 4 ? 5 : q >= 3 ? 6 : 8, false);
   hctx.restore();
 
-  /* barbiquejo: the chin cord every charro hat has, hanging off the brim */
-  if (q < 3) {
-    for (const sd of [-1, 1]) {
-      hctx.beginPath();
-      hctx.moveTo(sd * BW * 0.55, BOT * 0.62);
-      hctx.quadraticCurveTo(sd * BW * 0.64, BOT + 92, sd * BW * 0.50, BOT + 150);
-      hctx.strokeStyle = PAL.bone3; hctx.lineWidth = 4;
-      hctx.globalAlpha = 0.85; hctx.stroke();
-      hctx.globalAlpha = 1;
-      hctx.beginPath();
-      hctx.arc(sd * BW * 0.50, BOT + 158 + Math.sin(t * 1.7 + sd) * 4, 12, 0, Math.PI * 2);
-      hctx.fillStyle = sd < 0 ? PAL.magenta : PAL.teal; hctx.fill();
-    }
-  }
   hctx.restore();
 }
 
@@ -3451,24 +3453,33 @@ function drawEyeAssembly(side) {
      shape, sockets and gaze all survive. */
   const q = qLevel();
   const NP = Math.max(4, Math.round(CFG.petalCount / (q >= 4 ? 3 : q >= 3 ? 2 : 1)));
-  for (let i = 0; i < NP; i++) {
-    const a = (i / NP) * Math.PI * 2 + rot;
-    hctx.save();
-    hctx.translate(ex + Math.cos(a) * (er + 26), ey + Math.sin(a) * (er + 26));
-    hctx.rotate(a + Math.PI / 2);
+  /* ONE path per colour, not one save/rotate/fill per petal. ellipse() takes
+     a rotation argument, so the per-petal transform stack was pure overhead:
+     24 petals were 24 fills and 48 state changes, now they are 2 fills. */
+  hctx.globalAlpha = 0.92;
+  for (const parity of [0, 1]) {
     hctx.beginPath();
-    hctx.ellipse(0, 0, 22, 44, 0, 0, Math.PI * 2);
-    hctx.fillStyle = i % 2 ? PAL.magenta : PAL.teal;
-    hctx.globalAlpha = 0.92; hctx.fill(); hctx.globalAlpha = 1;
-    hctx.restore();
+    for (let i = parity; i < NP; i += 2) {
+      const a = (i / NP) * Math.PI * 2 + rot;
+      const px = ex + Math.cos(a) * (er + 26), py = ey + Math.sin(a) * (er + 26);
+      hctx.moveTo(px, py);
+      hctx.ellipse(px, py, 22, 44, a + Math.PI / 2, 0, Math.PI * 2);
+    }
+    hctx.fillStyle = parity ? PAL.magenta : PAL.teal;
+    hctx.fill();
   }
+  hctx.globalAlpha = 1;
   /* 18 arcs per eye, 36 per frame, for a ring of dots nobody can resolve on a
      struggling display. First thing to go. */
   const ND = q >= 4 ? 0 : q >= 3 ? 9 : 18;
-  for (let i = 0; i < ND; i++) {                     // dot ring counter-spins vs petals
-    const a = (i / ND) * Math.PI * 2 + 0.12 - rot * 0.55;
+  if (ND) {                                          // dot ring: one fill, not 18
     hctx.beginPath();
-    hctx.arc(ex + Math.cos(a) * (er + 74), ey + Math.sin(a) * (er + 74), 7, 0, Math.PI * 2);
+    for (let i = 0; i < ND; i++) {
+      const a = (i / ND) * Math.PI * 2 + 0.12 - rot * 0.55;
+      const px = ex + Math.cos(a) * (er + 74), py = ey + Math.sin(a) * (er + 74);
+      hctx.moveTo(px + 7, py);
+      hctx.arc(px, py, 7, 0, Math.PI * 2);
+    }
     hctx.fillStyle = PAL.gold; hctx.fill();
   }
   const sg = hctx.createRadialGradient(ex, ey, 20, ex, ey, er);
@@ -3576,10 +3587,14 @@ function drawBigote() {
          handlebar: the eye follows the mass, not the tip. The body now runs
          level and the whole outer third sweeps up, so the shape itself rises
          and the curl is its conclusion instead of a decoration on a frown. */
-      hctx.bezierCurveTo(sd * 80, -50, sd * 150, -66, sd * 206, -96);
-      hctx.bezierCurveTo(sd * 250, -118, sd * 262, -78, sd * 236, -66);
-      hctx.bezierCurveTo(sd * 214, -56, sd * 208, -74, sd * 196, -62);
-      hctx.bezierCurveTo(sd * 150, -32, sd * 78, 4, 0, 16);
+      /* The body is a LEVEL slab, full stop. Three attempts curved it toward
+         the tips and every one read as a mouth, because ANY smooth arc from
+         the philtrum to a raised tip is a smile. What actually says
+         "handlebar" is a separate circular CURL, drawn as a ring after the
+         strands (see below), so the eye parses bar + loop, not arc. */
+      hctx.bezierCurveTo(sd * 70, -42, sd * 148, -42, sd * 190, -34);
+      hctx.quadraticCurveTo(sd * 202, -30, sd * 200, -18);
+      hctx.bezierCurveTo(sd * 150, -4, sd * 80, 8, 0, 12);
     } else {
       /* HERRADURA. The arms frame the mouth, they do not cover it: the teeth
          start at y=300 and this is drawn from y=250, so anything past +50
@@ -3593,56 +3608,113 @@ function drawBigote() {
     hctx.closePath();
   };
 
+  /* ── strand rendering ──
+     The first version filled the silhouette and dragged nine parallel strokes
+     across it, which rendered as PINSTRIPES: hair does not run in evenly
+     spaced straight lines. What reads as groomed hair is tapered CLUMPS:
+     ribbons thick at the root near the philtrum, curving along the grain,
+     thinning to nothing at the tip, in three tones so depth comes from value
+     rather than outlines. All of it clipped to the style's silhouette, so the
+     strands articulate the shape without changing it. */
+  const tip = st === 0 ? [214, -4] : st === 1 ? [196, -26] : [196, 26];
+  const pepper = Math.round(CFG.bigoteColor) === 3;
+  const mid = Math.round(CFG.bigoteColor) === 4 ? '#a19aa6' : dark;
+
   for (const sd of [-1, 1]) {
     /* STARE: each half angles DOWN toward the centre, the same slam the angry
-       brows do over the sockets. A frown is a rotation about the philtrum,
-       not a translation, so it is per-side around x=0, and it uses stare.k so
-       it eases in and out exactly when the brows do. */
+       brows do over the sockets, eased by the same stare.k envelope. */
     hctx.save();
     hctx.rotate(sd * 0.11 * stare.k);
     draw(sd);
-    /* Vertical gradient, dark at the bottom: hair catches light on top. Flat
-       fill made it read as a sticker, the same failure the crown taught. */
-    const g = hctx.createLinearGradient(0, -60, 0, 60);
+    /* base fill: lighter along the top where light lands, dark below */
+    const g = hctx.createLinearGradient(0, -56, 0, 52);
     g.addColorStop(0, light);
-    g.addColorStop(0.55, dark);
+    g.addColorStop(0.34, dark);
     g.addColorStop(1, dark);
     hctx.fillStyle = g;
     hctx.fill();
 
-    /* salt and pepper: flecks, seeded per side so they do not shimmer */
-    if (Math.round(CFG.bigoteColor) === 3 && q < 3) {
-      hctx.save();
-      hctx.clip();
-      hctx.fillStyle = 'rgba(226,222,228,.62)';
-      for (let i = 0; i < 34; i++) {
-        const h = (i * 2654435761 % 991) / 991, v = (i * 40503 % 887) / 887;
-        hctx.beginPath();
-        hctx.ellipse(sd * (10 + h * 200), -34 + v * 74, 4.5, 2.2, sd * 0.3, 0, Math.PI * 2);
-        hctx.fill();
-      }
-      hctx.restore();
-    }
-
-    /* hair strokes along the grain, so it is hair and not a shape */
     if (q < 4) {
       hctx.save();
+      draw(sd);
       hctx.clip();
-      hctx.strokeStyle = 'rgba(255,255,255,.13)';
-      hctx.lineWidth = 2.5;
-      for (let i = 0; i < 9; i++) {
-        const u = i / 8;
+      /* tapered ribbons along the grain, each with its own seeded droop,
+         width and length so no two are parallel: parallel is exactly what
+         made the stripes */
+      /* Strands batch into ONE path per tone: 20 ribbons were 20 fills with
+         20 alpha changes, now they are 3 fills. Tone: mostly base and mid,
+         a few light on the upper rows; in salt-and-pepper the light strands
+         ARE the pepper, scattered white hairs through a dark brush. */
+      const NS = q >= 3 ? 10 : 20;
+      const toneOf = (i) => {
+        const r3 = (i * 69069 % 101) / 101;
+        return pepper ? (r3 < 0.32 ? light : r3 < 0.58 ? mid : dark)
+                      : (i % 4 === 3 ? light : i % 2 ? mid : dark);
+      };
+      hctx.globalAlpha = 0.88;
+      for (const tone of [dark, mid, light]) {
         hctx.beginPath();
-        hctx.moveTo(sd * 14, -30 + u * 56);
-        hctx.quadraticCurveTo(sd * 110, -40 + u * 62, sd * 200, -26 + u * 50);
-        hctx.stroke();
+        let any = false;
+        for (let i = 0; i < NS; i++) {
+          if (toneOf(i) !== tone) continue;
+          any = true;
+          const u = i / (NS - 1);
+          const r1 = (i * 2654435761 % 991) / 991;
+          const r2 = (i * 40503 % 887) / 887;
+          const rootY = -30 + u * 62 + (r1 - 0.5) * 8;
+          const tipX = sd * tip[0] * (0.80 + 0.22 * r2);
+          const tipY = tip[1] * (0.5 + 0.6 * r1) + rootY * 0.42 + 6;
+          const w0 = 4.5 + 6 * r2;
+          hctx.moveTo(sd * 4, rootY - w0 / 2);
+          hctx.bezierCurveTo(sd * 74, rootY - w0 * 0.4 - 6 * r1,
+                             tipX * 0.72, tipY - w0 * 0.2, tipX, tipY);
+          hctx.bezierCurveTo(tipX * 0.72, tipY + w0 * 0.25,
+                             sd * 74, rootY + w0 * 0.6 + 4 * r2, sd * 4, rootY + w0 / 2);
+          hctx.closePath();
+        }
+        if (any && tone !== dark) { hctx.fillStyle = tone; hctx.fill(); }
+        else if (any) { hctx.fillStyle = dark; hctx.fill(); }
       }
+      hctx.globalAlpha = 1;
+      /* weight: a soft shadow along the underside of the brush */
+      const us = hctx.createLinearGradient(0, 6, 0, 52);
+      us.addColorStop(0, 'rgba(0,0,0,0)');
+      us.addColorStop(1, 'rgba(0,0,0,.4)');
+      hctx.fillStyle = us;
+      hctx.fillRect(sd > 0 ? 0 : -250, -60, 250, 120);
       hctx.restore();
+    }
+    /* the handlebar's CURL: a genuine ring with a transparent centre
+       (opposite winding, so the bone shows through the loop). Attached at
+       the bar's outer end, distinctly circular, which is what breaks the
+       smile reading no matter what the bar is doing. */
+    if (st === 1) {
+      hctx.beginPath();
+      hctx.arc(sd * 212, -46, 36, 0, Math.PI * 2, false);
+      hctx.arc(sd * 212, -46, 16, 0, Math.PI * 2, true);
+      hctx.fillStyle = dark;
+      hctx.fill();
+      /* light catches the top of the loop */
+      hctx.beginPath();
+      hctx.arc(sd * 212, -46, 26, Math.PI * 1.05, Math.PI * 1.85, false);
+      hctx.strokeStyle = light; hctx.lineWidth = 4;
+      hctx.globalAlpha = 0.5; hctx.stroke(); hctx.globalAlpha = 1;
     }
     hctx.restore();                       // closes the per-side stare rotation
   }
+
+  /* the centre part: hair grows AWAY from the philtrum, and this small dark
+     notch is what makes two halves read as parted hair, not one moulded piece */
+  hctx.beginPath();
+  hctx.moveTo(0, -30);
+  hctx.quadraticCurveTo(4, -6, 0, 26);
+  hctx.quadraticCurveTo(-4, -6, 0, -30);
+  hctx.fillStyle = 'rgba(0,0,0,.5)';
+  hctx.fill();
+
   hctx.restore();
 }
+
 
 function drawTeethLive() {
   const tw = 260, th = 96, ty = 348;
@@ -3719,7 +3791,10 @@ function drawSpiralLive(side) {
   hctx.translate(side * 275, 165);
   hctx.rotate(face.spiralRot * side * 3);
   hctx.beginPath();
-  for (let a = 0; a < Math.PI * 3.6; a += 0.12) {
+  /* 0.12 rad steps = 95 round-joined segments per spiral per frame, and the
+     join tessellation at DPR 2 made two decorative swirls cost 6.7ms. At a
+     9px stroke width 0.22 steps are indistinguishable, and half the cost. */
+  for (let a = 0; a < Math.PI * 3.6; a += 0.22) {
     const rr = 6 + a * 12;
     const x = Math.cos(a * side) * rr, y = Math.sin(a * side) * rr;
     a === 0 ? hctx.moveTo(x, y) : hctx.lineTo(x, y);
@@ -5827,6 +5902,24 @@ function spawnEvent() {
   nextEventT = t + CFG.eventMinGap + Math.random() * Math.max(1, CFG.eventMaxGap - CFG.eventMinGap);
 }
 
+/* ── mote glow sprites ──
+   Every ember mote built a radial gradient PER FRAME: ~130 gradients and 130
+   arc fills a frame, which is why the dust layer billed 15ms at Q0. The glow
+   never changes shape, only position, size and alpha, and all three of those
+   are free on drawImage. Baked once per colour at 64px; scaling a small
+   sprite up is invisible for a soft radial blob. */
+const MOTE_GLOWS = ['255,179,71', '255,47,160', '47,232,208'].map(col => {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g2 = c.getContext('2d');
+  const rg = g2.createRadialGradient(32, 32, 0, 32, 32, 32);
+  rg.addColorStop(0, `rgba(${col},0.5)`);
+  rg.addColorStop(1, `rgba(${col},0)`);
+  g2.fillStyle = rg;
+  g2.fillRect(0, 0, 64, 64);
+  return c;
+});
+
 function drawDust(dt) {
   dctx = DUST_CTX;
   dctx.clearRect(0, 0, W * DPR, H * DPR);
@@ -6315,12 +6408,11 @@ function drawDust(dt) {
     const tw = 0.5 + 0.5 * Math.sin(t * 2 + m.ph);
     const sz = m.r * (m.z ? 1.7 : 1);
     if (m.kind === 'ember') {
-      const col = m.hue < 0.4 ? '255,179,71' : m.hue < 0.7 ? '255,47,160' : '47,232,208';
-      const g = dctx.createRadialGradient(px, py, 0, px, py, sz * 4);
-      g.addColorStop(0, `rgba(${col},${0.5 * tw})`);
-      g.addColorStop(1, `rgba(${col},0)`);
-      dctx.fillStyle = g;
-      dctx.beginPath(); dctx.arc(px, py, sz * 4, 0, Math.PI * 2); dctx.fill();
+      const spr = MOTE_GLOWS[m.hue < 0.4 ? 0 : m.hue < 0.7 ? 1 : 2];
+      const R = sz * 4;
+      dctx.globalAlpha = tw;                 // the twinkle rides drawImage alpha
+      dctx.drawImage(spr, px - R, py - R, R * 2, R * 2);
+      dctx.globalAlpha = 1;
     } else { // marigold petal
       dctx.save();
       dctx.translate(px, py);
