@@ -17,8 +17,47 @@
 #import <ScreenSaver/ScreenSaver.h>
 #import <WebKit/WebKit.h>
 
-static NSString *const kSaverURL = @"https://hermanosamini.com/?kiosk=1";
+static NSString *const kModule = @"com.hermanosamini.SKLZ";
 static const NSTimeInterval kRetry = 30.0;
+
+/* ── configuration ──
+   Three modes, stored in ScreenSaverDefaults (the sanctioned per-saver
+   defaults domain, shared across the per-display instances):
+     mode 0  live art, the piece's default look
+     mode 1  demo: the whole look rerolls every 3 minutes
+     mode 2  a specific shared board, by short code (hermanosamini.com/AbC123)
+             or a full share URL pasted straight in
+   The URL is BUILT here rather than stored, so kiosk=1 can never be lost by
+   an edited default: losing it strands the saver on the enter gate. */
+static NSURL *saverURL(void) {
+  ScreenSaverDefaults *d = [ScreenSaverDefaults defaultsForModuleWithName:kModule];
+  NSInteger mode = [d integerForKey:@"mode"];
+  NSString *code = [d stringForKey:@"board"] ?: @"";
+  code = [code stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+
+  NSString *base = @"https://hermanosamini.com/";
+  NSString *query = @"?kiosk=1";
+  if (mode == 1) query = @"?kiosk=1&demo=1";
+  if (mode == 2 && code.length) {
+    if ([code hasPrefix:@"http"]) {
+      /* a pasted share link: keep its path AND its ?c= payload, add kiosk */
+      NSURLComponents *u = [NSURLComponents componentsWithString:code];
+      if (u) {
+        NSMutableArray *items = [u.queryItems mutableCopy] ?: [NSMutableArray new];
+        [items addObject:[NSURLQueryItem queryItemWithName:@"kiosk" value:@"1"]];
+        u.queryItems = items;
+        u.scheme = @"https"; u.host = @"hermanosamini.com";  // never elsewhere
+        return u.URL;
+      }
+    } else {
+      /* a bare short code: the site's own /AbC123 path resolves it */
+      base = [base stringByAppendingString:
+        [code stringByAddingPercentEncodingWithAllowedCharacters:
+          NSCharacterSet.alphanumericCharacterSet]];
+    }
+  }
+  return [NSURL URLWithString:[base stringByAppendingString:query]];
+}
 
 /* Stamped by build.sh. It is in the status line for one specific reason:
    macOS keeps legacyScreenSaver.appex RESIDENT, and an Objective-C bundle
@@ -36,13 +75,24 @@ static const NSTimeInterval kRetry = 30.0;
 @property (nonatomic, strong) NSTimer *retryTimer;
 @property (nonatomic, copy)   NSString *loadError;        // survives the paint poll
 @property (nonatomic, assign) BOOL painted;
+@property (nonatomic, strong) NSWindow *sheet;
+@property (nonatomic, strong) NSPopUpButton *modePop;
+@property (nonatomic, strong) NSTextField *boardField;
 @end
 
 @implementation SKLZView
 
 - (instancetype)initWithFrame:(NSRect)frame isPreview:(BOOL)isPreview {
   if (!(self = [super initWithFrame:frame isPreview:isPreview])) return nil;
-  self.animationTimeInterval = 1.0;          // the page animates itself
+  /* 30Hz, because THIS is the page's clock inside the screensaver host.
+     legacyScreenSaver's WKWebView reports itself occluded, so the page's own
+     requestAnimationFrame NEVER fires there: the page loads, boots, and then
+     freezes on a black first frame forever. That was the entire
+     "works in preview.sh, black in real Preview" mystery: preview.sh is a
+     normal visible window where rAF runs. animateOneFrame now drives the
+     page's SKLZ_TICK, which defers to rAF when rAF is alive and steps the
+     frame itself when it is not. */
+  self.animationTimeInterval = 1.0 / 30.0;
   self.wantsLayer = YES;
   self.layer.backgroundColor = NSColor.blackColor.CGColor;
 
@@ -104,7 +154,7 @@ static const NSTimeInterval kRetry = 30.0;
 
 - (void)load {
   [self say:@"connecting to hermanosamini.com"];
-  [self.web loadRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:kSaverURL]]];
+  [self.web loadRequest:[NSURLRequest requestWithURL:saverURL()]];
 }
 
 /* Ask the page whether it is actually drawing, not merely loaded. Anything
@@ -189,7 +239,10 @@ static const NSTimeInterval kRetry = 30.0;
    the only job here is to keep asking whether it really is. */
 - (void)animateOneFrame {
   static int tick = 0;
-  if ((tick++ % 2) == 0) [self pollPaint];
+  /* drive the page's clock every tick; ask whether it is painting every ~2s */
+  [self.web evaluateJavaScript:@"window.SKLZ_TICK && SKLZ_TICK()"
+             completionHandler:nil];
+  if ((tick++ % 60) == 0) [self pollPaint];
 }
 
 - (void)stopAnimation {
@@ -203,7 +256,83 @@ static const NSTimeInterval kRetry = 30.0;
   NSRectFill(rect);
 }
 
-- (BOOL)hasConfigureSheet { return NO; }
-- (NSWindow *)configureSheet { return nil; }
+/* ── the configure sheet ──
+   Built in code because this project has no Xcode project and no xib on
+   purpose. Three choices and a text field; everything else stays the page's
+   business. */
+- (BOOL)hasConfigureSheet { return YES; }
+
+- (NSWindow *)configureSheet {
+  if (self.sheet) return self.sheet;
+
+  NSWindow *w = [[NSWindow alloc]
+      initWithContentRect:NSMakeRect(0, 0, 440, 190)
+                styleMask:NSWindowStyleMaskTitled
+                  backing:NSBackingStoreBuffered
+                    defer:YES];
+  w.title = @"SKLZ";
+  NSView *v = w.contentView;
+
+  NSTextField *label = [NSTextField labelWithString:@"What should the screensaver show?"];
+  label.frame = NSMakeRect(20, 148, 400, 20);
+  [v addSubview:label];
+
+  self.modePop = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(20, 114, 400, 26) pullsDown:NO];
+  [self.modePop addItemsWithTitles:@[
+      @"The living art (its current look)",
+      @"Demo mode: a whole new look every 3 minutes",
+      @"A specific board (short code or share link)"]];
+  [self.modePop setTarget:self];
+  [self.modePop setAction:@selector(modeChanged:)];
+  [v addSubview:self.modePop];
+
+  self.boardField = [[NSTextField alloc] initWithFrame:NSMakeRect(20, 78, 400, 24)];
+  self.boardField.placeholderString = @"FdqPpZ  or  https://hermanosamini.com/FdqPpZ";
+  [v addSubview:self.boardField];
+
+  NSTextField *hint = [NSTextField labelWithString:
+      @"Boards come from the piece: dress the skull, hit \u201ccopy a link\u201d, paste it here."];
+  hint.frame = NSMakeRect(20, 54, 400, 18);
+  hint.font = [NSFont systemFontOfSize:11];
+  hint.textColor = NSColor.secondaryLabelColor;
+  [v addSubview:hint];
+
+  NSButton *ok = [NSButton buttonWithTitle:@"Save" target:self action:@selector(sheetSave:)];
+  ok.frame = NSMakeRect(340, 14, 80, 30);
+  ok.keyEquivalent = @"\r";
+  [v addSubview:ok];
+  NSButton *cancel = [NSButton buttonWithTitle:@"Cancel" target:self action:@selector(sheetCancel:)];
+  cancel.frame = NSMakeRect(252, 14, 84, 30);
+  [v addSubview:cancel];
+
+  ScreenSaverDefaults *d = [ScreenSaverDefaults defaultsForModuleWithName:kModule];
+  [self.modePop selectItemAtIndex:MIN(2, MAX(0, [d integerForKey:@"mode"]))];
+  self.boardField.stringValue = [d stringForKey:@"board"] ?: @"";
+  [self modeChanged:nil];
+
+  self.sheet = w;
+  return w;
+}
+
+- (void)modeChanged:(id)sender {
+  BOOL board = self.modePop.indexOfSelectedItem == 2;
+  self.boardField.enabled = board;
+  self.boardField.textColor = board ? NSColor.labelColor : NSColor.disabledControlTextColor;
+}
+
+- (void)sheetSave:(id)sender {
+  ScreenSaverDefaults *d = [ScreenSaverDefaults defaultsForModuleWithName:kModule];
+  [d setInteger:self.modePop.indexOfSelectedItem forKey:@"mode"];
+  [d setObject:self.boardField.stringValue forKey:@"board"];
+  [d synchronize];
+  [NSApp endSheet:self.sheet];
+  [self.sheet orderOut:nil];
+  [self load];                       // apply immediately, not on next launch
+}
+
+- (void)sheetCancel:(id)sender {
+  [NSApp endSheet:self.sheet];
+  [self.sheet orderOut:nil];
+}
 
 @end

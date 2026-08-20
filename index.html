@@ -6645,10 +6645,38 @@ function frame(now) {
   drawDust(dt);
   recTick();                 // last: the clip must see the finished frame
   liquidUpdate();
-
-  requestAnimationFrame(frame);
 }
-requestAnimationFrame(frame);
+
+/* ── the clock, and who is allowed to drive it ──
+   frame() deliberately does NOT schedule itself. Two drivers exist:
+
+   1. rafLoop, the normal one, driven by requestAnimationFrame.
+   2. SKLZ_TICK, called by the native macOS screensaver shell.
+
+   The second exists because of where this page actually runs as a
+   screensaver: inside legacyScreenSaver.appex, whose WKWebView reports
+   itself OCCLUDED, so requestAnimationFrame never fires. The page loads,
+   the gate flashes, the kiosk boot runs, and then nothing ever animates:
+   a permanently black screen with "waiting for first frame". It worked in
+   every normal window and failed in the one environment it was built for,
+   because rAF is not a clock, it is a VISIBILITY-GATED clock.
+
+   SKLZ_TICK defers to rAF whenever rAF is alive (a real vsync clock beats a
+   30Hz timer), so in a browser it is a no-op. Only when rAF has been silent
+   for 400ms does the external tick actually drive a frame. */
+let lastRafT = -1e9;
+function rafLoop(now) {
+  lastRafT = performance.now();
+  frame(now);
+  requestAnimationFrame(rafLoop);
+}
+requestAnimationFrame(rafLoop);
+
+window.SKLZ_TICK = () => {
+  if (performance.now() - lastRafT < 400) return 'raf';
+  frame(performance.now());
+  return 'ext';
+};
 
 /* ─────────────────────────────────────────────
    GATE + AUDIO CONTROLS
@@ -6798,6 +6826,10 @@ gate.addEventListener('click', enterGate);
   /* a screensaver is zen by definition: no wordmark, no tagline, no credit */
   CFG.textOn = 0;
   document.body.classList.add('notext');
+  /* &demo=1 on top of kiosk: the screensaver's "surprise me" configuration.
+     Demo rerolls the whole look every 3 minutes; kiosk stays zen and silent.
+     Deferred a tick so the CFG restore cannot overwrite the first roll. */
+  if (q.has('demo') || window.SKLZ_KIOSK_DEMO) setTimeout(() => setDemo(true), 0);
   if (q.has('sound') || window.SKLZ_KIOSK_SOUND) { enterGate(); }
   else {
     /* A screensaver is silent, and "silent" has to mean IMPOSSIBLE, not
