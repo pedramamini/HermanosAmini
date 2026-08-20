@@ -131,11 +131,11 @@
 
   /* ── the zen drawer ──
      Zen means "no furniture", but the controls still have to be REACHABLE, so
-     they park in a tray on the right edge behind a handle. `zendraw` is set by
-     JS rather than by a media query: the phone build already collapses these
-     four into the hammer tray, and two collapse mechanisms fighting over the
-     same transform is how you get a button stuck half off-screen. JS owns the
-     breakpoint so exactly one of them is ever live.
+     the bar slides off the right edge into a tray behind a handle. `zendraw`
+     is set by JS rather than by a media query: the phone build already
+     collapses these four into the hammer tray, and two collapse mechanisms
+     fighting over the same transform is how you get a button stuck half
+     off-screen. JS owns the breakpoint so exactly one of them is ever live.
 
      THE TRAY IS MORE OPAQUE THAN THE BUTTONS ON IT (.58 against .40). That is
      backwards from the usual container-lighter-than-content instinct and it is
@@ -143,48 +143,44 @@
      makes them read as objects SITTING on a surface. A tray lighter than its
      buttons reads as a hole cut in the screen.
 
-     GEOMETRY. The tray is 64 wide (44px button + 10 either side) and 232 tall
-     (four buttons, 12px gaps, 10px padding), centred vertically. The buttons
-     are `position: fixed` in the bottom bar and keep that layout box; they are
-     moved into the tray with a TRANSFORM, never by rewriting top/bottom.
-     That matters: `bottom: 24px` -> `top: <something>` is not an animatable
-     pair, so a position rewrite teleports the buttons the instant zen turns on
-     and then fades the leftovers. A transform is already in `.ctl`'s
-     transition list, so they glide from the bar into the tray instead.
-     Each --dx/--dy pair is measured from that bar position: dx is the button's
-     own `right` offset minus the tray's 10, dy is `calc(-50vh + n)` because the
-     travel depends on viewport height. */
-  #mic      { --dx: 182px; --dy: calc(-50vh - 38px); }
-  #mute     { --dx: 126px; --dy: calc(-50vh + 18px); }
-  #settings { --dx:  70px; --dy: calc(-50vh + 74px); }
-  #help     { --dx:  14px; --dy: calc(-50vh + 130px); }
+     HORIZONTAL, AT THE BOTTOM RIGHT, because that is exactly where the bar
+     already lives outside zen. An earlier cut stood the tray up on the right
+     edge and stacked the buttons vertically; it looked fine on its own and was
+     wrong in context, since leaving demo mode then moved four controls from the
+     middle of the right edge to the bottom of the screen. The drawer should
+     change whether the bar is visible, never where it is.
+
+     That also makes the geometry trivial: the tray is drawn AROUND the buttons
+     where they already sit (10px of padding on every side of the 44px row), so
+     nothing has to move to be inside it. The whole assembly, tray and buttons
+     and handle, travels the same distance on one axis. No per-button offsets,
+     and no popover overrides either, because the popovers still hang off the
+     same buttons in the same place they always did. */
   body.zendraw .ctl {
     z-index: 18;                       /* above the tray they sit on */
-    transform: translate(calc(var(--dx) + 96px), var(--dy));
-    opacity: 0; pointer-events: none;
+    transform: translateX(260px); opacity: 0; pointer-events: none;
   }
-  body.zendraw.drawer-open .ctl {
-    transform: translate(var(--dx), var(--dy));
-    opacity: 1; pointer-events: auto;
-  }
+  body.zendraw.drawer-open .ctl { transform: none; opacity: 1; pointer-events: auto; }
+  /* right/bottom 14 = the buttons' own 24 minus 10 of padding; 232 x 64 wraps
+     the four-button row with that padding on every side. */
   #zenDrawer {
-    position: fixed; right: 0; top: 50%; z-index: 16;
-    width: 64px; height: 232px; display: none;
+    position: fixed; right: 14px; bottom: 14px; z-index: 16;
+    width: 232px; height: 64px; display: none;
     background: rgba(9,4,20,.58);
     border: 1px solid rgba(245,234,223,.2); border-right: 0;
     border-radius: 15px 0 0 15px;
     backdrop-filter: blur(14px) saturate(1.2);
     -webkit-backdrop-filter: blur(14px) saturate(1.2);
-    box-shadow: -10px 0 30px rgba(0,0,0,.45);
-    transform: translate(70px, -50%);
+    box-shadow: -10px 4px 30px rgba(0,0,0,.45);
+    transform: translateX(260px);
     transition: transform .38s cubic-bezier(.16,1,.3,1);
     pointer-events: none;
   }
   body.zendraw #zenDrawer { display: block; }
-  body.zendraw.drawer-open #zenDrawer { transform: translate(0, -50%); pointer-events: auto; }
+  body.zendraw.drawer-open #zenDrawer { transform: none; pointer-events: auto; }
   #zenTab {
-    position: fixed; right: 0; top: 50%; z-index: 19;
-    width: 22px; height: 78px;
+    position: fixed; right: 0; bottom: 19px; z-index: 19;
+    width: 22px; height: 54px;
     display: none; place-items: center;
     cursor: pointer; user-select: none;
     font-size: 12px; color: rgba(245,234,223,.5);
@@ -192,7 +188,6 @@
     border: 1px solid rgba(245,234,223,.2); border-right: 0;
     border-radius: 10px 0 0 10px;
     backdrop-filter: blur(14px) saturate(1.2); -webkit-backdrop-filter: blur(14px) saturate(1.2);
-    transform: translateY(-50%);
     transition: color .25s, background .25s, border-color .25s,
                 transform .38s cubic-bezier(.16,1,.3,1);
   }
@@ -202,17 +197,7 @@
     border-color: rgba(245,234,223,.5);
   }
   /* rides out to the tray's leading edge, so the same target closes it */
-  body.zendraw.drawer-open #zenTab { transform: translate(-64px, -50%); }
-  /* The popovers anchor to buttons that just moved from the bottom bar to the
-     middle of the right edge; left alone they would hang in the corner
-     pointing at nothing. The entry animation is dropped with them because its
-     keyframe writes `transform`, which is what holds the centring here. */
-  body.zendraw.drawer-open #soundMenu,
-  body.zendraw.drawer-open #voiceMenu {
-    right: 74px; top: 50%; bottom: auto;
-    transform: translateY(-50%); animation: none;
-    max-height: calc(100vh - 40px); overflow-y: auto;
-  }
+  body.zendraw.drawer-open #zenTab { transform: translateX(-246px); }
   .ctl:hover { border-color: rgba(245,234,223,.7); }
   /* off state: dim and desaturated, so silence is legible at a glance and not
      only in a tooltip nobody hovers on a wall display */
