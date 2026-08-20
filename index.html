@@ -3310,6 +3310,17 @@ function drawSombrero() {
   hctx.fillStyle = bg; hctx.fill();
   hctx.strokeStyle = PAL.gold3; hctx.lineWidth = 6; hctx.stroke();
 
+  /* the crown CASTS onto the brim: this one ellipse of shade is most of what
+     separates "two shapes stacked" from "one object under a light". */
+  hctx.save();
+  hctx.beginPath();
+  hctx.ellipse(0, 6, CW * 1.28, BW * 0.085, 0, 0, Math.PI * 2);
+  const cs2 = hctx.createRadialGradient(0, 6, CW * 0.4, 0, 6, CW * 1.28);
+  cs2.addColorStop(0, 'rgba(0,0,0,.38)');
+  cs2.addColorStop(1, 'rgba(0,0,0,0)');
+  hctx.fillStyle = cs2; hctx.fill();
+  hctx.restore();
+
   /* ── the flare, and it is the reason this is a CHARRO hat ──
      Bare, a western hat is a cowboy hat. What makes it Dia de los Muertos is
      the silverwork every charro hat carries: a galon of embroidered braid
