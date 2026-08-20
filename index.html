@@ -3578,135 +3578,166 @@ function drawSombrero() {
   hctx.bezierCurveTo(PX * 0.33, -CH + NOTCH * 0.98, PX * 0.64, -CH * 1.02, PX, -CH);
   hctx.bezierCurveTo(CW * 0.68, -CH * 0.98, CW * 1.02, -CH * 0.44, CW, 20);
   hctx.closePath();
+  /* ── MATERIAL: DARK FELT, FIXED, NOT PALETTE-DERIVED ──
+     The previous hat took its colour from the crown's metal dial, so it came
+     out gold straw with a pink ribbon, a pastel flower and a row of pearls,
+     and Pedram's verdict was that it was not a cowboy hat. He is right. A
+     cowboy hat is a slab of dark felt. It does not recolour with the board,
+     because a black hat is the whole point of a black hat: the only thing a
+     cattleman crease and a downturned brim are FOR is to read as tough, and
+     tough is not a hue you can slide.
+     Three values of one warm near-black, nothing brighter than 24% lightness. */
+  const F1 = 'hsl(24,18%,24%)', F2 = 'hsl(24,22%,14%)', F3 = 'hsl(24,26%,6%)';
   const cg = hctx.createLinearGradient(-CW, 0, CW, 0);
-  cg.addColorStop(0, PAL.gold3);
-  cg.addColorStop(0.34, PAL.gold1);
-  cg.addColorStop(0.72, PAL.gold2);
-  cg.addColorStop(1, PAL.gold3);
+  cg.addColorStop(0, F3);
+  cg.addColorStop(0.30, F1);
+  cg.addColorStop(0.62, F2);
+  cg.addColorStop(1, F3);
   hctx.fillStyle = cg; hctx.fill();
-  hctx.strokeStyle = PAL.gold3; hctx.lineWidth = 6; hctx.stroke();
+  hctx.strokeStyle = F3; hctx.lineWidth = 6; hctx.stroke();
 
-  /* the crease itself, shaded down the centre so the notch reads as a fold
-     rather than as a gap between two lumps */
+  /* the crease: a hard fold down the centre, shaded deep, because the pinch
+     is the feature and on dark felt only shadow can draw it */
   if (q < 4) {
     hctx.save();
-    hctx.globalAlpha = 0.30;
+    hctx.globalAlpha = 0.55;
     hctx.beginPath();
     hctx.moveTo(0, -CH + NOTCH);
-    hctx.quadraticCurveTo(CW * 0.20, -CH * 0.42, CW * 0.13, 16);
-    hctx.lineTo(-CW * 0.13, 16);
-    hctx.quadraticCurveTo(-CW * 0.20, -CH * 0.42, 0, -CH + NOTCH);
+    hctx.quadraticCurveTo(CW * 0.22, -CH * 0.42, CW * 0.15, 16);
+    hctx.lineTo(-CW * 0.15, 16);
+    hctx.quadraticCurveTo(-CW * 0.22, -CH * 0.42, 0, -CH + NOTCH);
     hctx.closePath();
-    hctx.fillStyle = PAL.dark; hctx.fill();
+    hctx.fillStyle = '#000'; hctx.fill();
+    /* and the two SIDE DENTS of a cattleman, pinched in with the thumbs */
+    for (const sd of [-1, 1]) {
+      hctx.beginPath();
+      hctx.ellipse(sd * CW * 0.62, -CH * 0.52, CW * 0.16, CH * 0.30, sd * 0.25, 0, Math.PI * 2);
+      hctx.globalAlpha = 0.28; hctx.fill();
+    }
     hctx.restore();
   }
 
-  /* ── the brim: TIPS SWEEP UP ──
-     A cowboy brim is not an ellipse. The outer tips ride ABOVE the point
-     where the brim meets the crown, and the front centre sags below it. An
-     ellipse gives neither, which is the other half of why the first one
-     looked like Ascot. */
-  /* Both edges traced from the measured profile. Top edge rises 0.12 of the
-     half-width from the crown junction to the tip; the bottom edge rises far
-     more (0.31), which is what opens the brim into a thick wing in the middle
-     and closes it to a blunt end. Thickness at 0.6 out lands near 0.21, which
-     is the number the first two attempts missed by 4x. */
-  const TIPT = -BW * 0.12;              // top edge at the tip
-  const TIPB = -BW * 0.10;              // bottom edge at the tip: nearly closed
-  const BOT  = BW * 0.31;               // bottom edge at the centre
+  /* ── the brim ──
+     Same measured silhouette as before (tips sweep up, centre sags), but the
+     FRONT now turns DOWN harder: the bottom edge at centre drops from 0.31 to
+     0.36 of the half-width, so the brim shades the eyes rather than framing
+     them. A hat worn low is what "tough" looks like in a silhouette. */
+  const TIPT = -BW * 0.12;
+  const TIPB = -BW * 0.10;
+  const BOT  = BW * 0.36;
   hctx.beginPath();
   hctx.moveTo(-BW, TIPT);
   hctx.bezierCurveTo(-BW * 0.75, TIPT * 0.68, -BW * 0.36, -14, 0, 0);
   hctx.bezierCurveTo(BW * 0.36, -14, BW * 0.75, TIPT * 0.68, BW, TIPT);
   hctx.quadraticCurveTo(BW + 14, (TIPT + TIPB) / 2, BW, TIPB);
-  hctx.bezierCurveTo(BW * 0.77, BOT * 0.34, BW * 0.39, BOT * 0.90, 0, BOT);
-  hctx.bezierCurveTo(-BW * 0.39, BOT * 0.90, -BW * 0.77, BOT * 0.34, -BW, TIPB);
+  hctx.bezierCurveTo(BW * 0.77, BOT * 0.34, BW * 0.39, BOT * 0.92, 0, BOT);
+  hctx.bezierCurveTo(-BW * 0.39, BOT * 0.92, -BW * 0.77, BOT * 0.34, -BW, TIPB);
   hctx.quadraticCurveTo(-BW - 14, (TIPT + TIPB) / 2, -BW, TIPT);
   hctx.closePath();
   const bg = hctx.createLinearGradient(0, TIPT, 0, BOT);
-  bg.addColorStop(0, PAL.gold1);
-  bg.addColorStop(0.48, PAL.gold2);
-  bg.addColorStop(1, PAL.gold3);
+  bg.addColorStop(0, F1);
+  bg.addColorStop(0.45, F2);
+  bg.addColorStop(1, F3);
   hctx.fillStyle = bg; hctx.fill();
-  hctx.strokeStyle = PAL.gold3; hctx.lineWidth = 6; hctx.stroke();
+  hctx.strokeStyle = F3; hctx.lineWidth = 6; hctx.stroke();
 
-  /* the crown CASTS onto the brim: this one ellipse of shade is most of what
-     separates "two shapes stacked" from "one object under a light". */
+  /* the crown casts onto the brim: one ellipse of shade is most of what
+     separates "two shapes stacked" from "one object under a light" */
   hctx.save();
   hctx.beginPath();
   hctx.ellipse(0, 6, CW * 1.28, BW * 0.085, 0, 0, Math.PI * 2);
   const cs2 = hctx.createRadialGradient(0, 6, CW * 0.4, 0, 6, CW * 1.28);
-  cs2.addColorStop(0, 'rgba(0,0,0,.38)');
+  cs2.addColorStop(0, 'rgba(0,0,0,.55)');
   cs2.addColorStop(1, 'rgba(0,0,0,0)');
   hctx.fillStyle = cs2; hctx.fill();
   hctx.restore();
 
-  /* ── the flare, and it is the reason this is a CHARRO hat ──
-     Bare, a western hat is a cowboy hat. What makes it Dia de los Muertos is
-     the silverwork every charro hat carries: a galon of embroidered braid
-     round the brim, a beaded rim, and marigolds in the band. */
+  /* the brim's rolled edge: a thin catch of light along the top lip is the
+     one highlight a dark hat gets, and it is what stops the whole thing from
+     reading as a flat black cut-out against a bright sky */
   if (q < 4) {
     hctx.save();
     hctx.beginPath();
-    hctx.moveTo(-BW * 0.90, TIPT * 0.72 + 26);
-    hctx.bezierCurveTo(-BW * 0.62, 8, -BW * 0.30, BOT * 0.30, 0, BOT * 0.36);
-    hctx.bezierCurveTo(BW * 0.30, BOT * 0.30, BW * 0.62, 8, BW * 0.90, TIPT * 0.72 + 26);
-    hctx.strokeStyle = PAL.magenta; hctx.lineWidth = 8;
-    hctx.globalAlpha = 0.9; hctx.stroke();
-    hctx.strokeStyle = PAL.teal; hctx.lineWidth = 3.5;
-    hctx.globalAlpha = 1; hctx.stroke();
+    hctx.moveTo(-BW * 0.98, TIPT + 4);
+    hctx.bezierCurveTo(-BW * 0.75, TIPT * 0.68 + 4, -BW * 0.36, -10, 0, 4);
+    hctx.bezierCurveTo(BW * 0.36, -10, BW * 0.75, TIPT * 0.68 + 4, BW * 0.98, TIPT + 4);
+    hctx.strokeStyle = 'rgba(255,240,220,.22)'; hctx.lineWidth = 3;
+    hctx.stroke();
     hctx.restore();
-
-    /* beaded rim: the row of silver studs along the very edge */
-    const N = q >= 3 ? 13 : 23;
-    hctx.beginPath();                    // one path for the whole double row
-    for (let i = 0; i <= N; i++) {
-      const u = i / N;
-      /* walk the brim's own top edge so the beads follow the sweep exactly */
-      const mt = 1 - u;
-      /* walk the brim's OWN top edge, so the studs follow the sweep exactly
-         rather than a second curve that drifts away from it */
-      const x = mt*mt*mt*(-BW) + 3*mt*mt*u*(-BW*0.75) + 3*mt*u*u*(-BW*0.36) + u*u*u*0;
-      const y = mt*mt*mt*TIPT + 3*mt*mt*u*(TIPT*0.68) + 3*mt*u*u*(-14) + u*u*u*0;
-      for (const sd of [-1, 1]) {
-        hctx.moveTo(sd * x + 5.5, y + 9);
-        hctx.arc(sd * x, y + 9, 5.5, 0, Math.PI * 2);
-      }
-    }
-    hctx.fillStyle = PAL.gold1; hctx.fill();
   }
 
-  /* felt sheen: one soft highlight high on the left peak, so the crown reads
-     as a rounded volume under a single light instead of a flat gradient */
+  /* felt sheen: ONE soft highlight high on the left peak. Dark felt takes
+     light in a single broad smear, never a sparkle. */
   if (q < 4) {
     hctx.save();
     hctx.beginPath();
-    hctx.ellipse(-PX * 1.6, -CH * 0.74, CW * 0.34, CH * 0.22, -0.35, 0, Math.PI * 2);
-    const sh = hctx.createRadialGradient(-PX * 1.6, -CH * 0.74, 4, -PX * 1.6, -CH * 0.74, CW * 0.34);
-    sh.addColorStop(0, 'rgba(255,255,255,.30)');
-    sh.addColorStop(1, 'rgba(255,255,255,0)');
+    hctx.ellipse(-PX * 1.6, -CH * 0.74, CW * 0.36, CH * 0.24, -0.35, 0, Math.PI * 2);
+    const sh = hctx.createRadialGradient(-PX * 1.6, -CH * 0.74, 4, -PX * 1.6, -CH * 0.74, CW * 0.36);
+    sh.addColorStop(0, 'rgba(255,235,210,.16)');
+    sh.addColorStop(1, 'rgba(255,235,210,0)');
     hctx.fillStyle = sh; hctx.fill();
     hctx.restore();
   }
 
-  /* hatband, sitting where the crown meets the brim */
+  /* ── the band: PLAIN LEATHER, with silver conchos ──
+     No ribbon, no flower, no braid, no pearls. What a working hat carries is
+     a strip of leather and a few pieces of silver, and that is exactly enough
+     Dia de los Muertos: the silverwork is the calavera's, the restraint is
+     the cowboy's. Band is narrower than before (it was a sash). */
+  const LB1 = 'hsl(22,42%,22%)', LB2 = 'hsl(22,48%,11%)';
   hctx.beginPath();
   hctx.moveTo(-CW * 1.00, -26);
-  hctx.bezierCurveTo(-CW * 0.5, -46, CW * 0.5, -46, CW * 1.00, -26);
-  hctx.lineTo(CW * 0.97, -104);
-  hctx.bezierCurveTo(CW * 0.5, -124, -CW * 0.5, -124, -CW * 0.97, -104);
+  hctx.bezierCurveTo(-CW * 0.5, -44, CW * 0.5, -44, CW * 1.00, -26);
+  hctx.lineTo(CW * 0.98, -78);
+  hctx.bezierCurveTo(CW * 0.5, -96, -CW * 0.5, -96, -CW * 0.98, -78);
   hctx.closePath();
-  hctx.fillStyle = PAL.violet; hctx.fill();
+  const lg = hctx.createLinearGradient(0, -96, 0, -26);
+  lg.addColorStop(0, LB1); lg.addColorStop(1, LB2);
+  hctx.fillStyle = lg; hctx.fill();
   hctx.save();
-  hctx.globalAlpha = 0.5; hctx.strokeStyle = PAL.dark; hctx.lineWidth = 3;
+  hctx.globalAlpha = 0.7; hctx.strokeStyle = '#000'; hctx.lineWidth = 2.5;
   hctx.stroke(); hctx.restore();
+  /* stitching along the band's edges, at the higher tiers */
+  if (q < 3) {
+    hctx.save();
+    hctx.setLineDash([6, 7]);
+    hctx.strokeStyle = 'rgba(230,200,160,.30)'; hctx.lineWidth = 1.5;
+    hctx.beginPath();
+    hctx.moveTo(-CW * 0.96, -34);
+    hctx.bezierCurveTo(-CW * 0.5, -50, CW * 0.5, -50, CW * 0.96, -34);
+    hctx.moveTo(-CW * 0.94, -72);
+    hctx.bezierCurveTo(-CW * 0.5, -89, CW * 0.5, -89, CW * 0.94, -72);
+    hctx.stroke();
+    hctx.restore();
+  }
 
-  /* a marigold tucked into the band: the detail that ties the hat to the
-     crown's flowers rather than leaving two unrelated ornaments on one skull */
-  hctx.save();
-  hctx.translate(-CW * 0.64, -74);
-  drawBloom(62, 0, t * 0.12, q >= 4 ? 5 : q >= 3 ? 6 : 8, false);
-  hctx.restore();
+  /* conchos: one big, two small, in aged silver. Drawn with a rim, a dished
+     face and a dark centre so they read as stamped metal rather than dots. */
+  const concho = (x, y, r) => {
+    hctx.beginPath(); hctx.arc(x, y, r, 0, Math.PI * 2);
+    const mg = hctx.createRadialGradient(x - r * 0.35, y - r * 0.35, r * 0.1, x, y, r);
+    mg.addColorStop(0, 'hsl(220,8%,88%)');
+    mg.addColorStop(0.55, 'hsl(220,6%,62%)');
+    mg.addColorStop(1, 'hsl(220,8%,34%)');
+    hctx.fillStyle = mg; hctx.fill();
+    hctx.strokeStyle = 'hsl(220,8%,22%)'; hctx.lineWidth = 2; hctx.stroke();
+    if (q < 4) {
+      hctx.beginPath(); hctx.arc(x, y, r * 0.62, 0, Math.PI * 2);
+      hctx.strokeStyle = 'rgba(0,0,0,.45)'; hctx.lineWidth = 1.5; hctx.stroke();
+      hctx.beginPath(); hctx.arc(x, y, r * 0.22, 0, Math.PI * 2);
+      hctx.fillStyle = 'hsl(220,10%,18%)'; hctx.fill();
+      /* a scalloped edge: eight notches, the tell of a stamped concho */
+      hctx.beginPath();
+      for (let i = 0; i < 8; i++) {
+        const a0 = i / 8 * Math.PI * 2;
+        hctx.moveTo(x + Math.cos(a0) * r * 0.86, y + Math.sin(a0) * r * 0.86);
+        hctx.arc(x + Math.cos(a0) * r * 0.86, y + Math.sin(a0) * r * 0.86, r * 0.09, 0, Math.PI * 2);
+      }
+      hctx.fillStyle = 'rgba(0,0,0,.5)'; hctx.fill();
+    }
+  };
+  concho(-CW * 0.60, -58, 24);
+  if (q < 4) { concho(-CW * 0.18, -62, 11); concho(CW * 0.22, -62, 11); }
 
   hctx.restore();
 }
