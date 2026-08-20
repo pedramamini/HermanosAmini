@@ -129,6 +129,105 @@
                 transform .38s cubic-bezier(.16,1,.3,1);
   }
 
+  /* ── the command palette (cmd-K) ──
+     Every hotkey, every dial and every panel in one searchable list, for
+     people who would rather type than hunt. It is the ONLY surface here that
+     covers the art on purpose: it is modal by nature, you are looking at it
+     and not at the skull, so it gets a scrim.
+
+     Deliberately a fixed height, not a growing one. A list that resizes as
+     you type moves the row under your finger between the keystroke and the
+     Enter, which is how you fire the wrong command. */
+  #palette {
+    position: fixed; inset: 0; z-index: 40; display: none;
+    background: rgba(4,2,10,.55);
+    backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+  }
+  #palette.show { display: block; }
+  #palBox {
+    position: absolute; left: 50%; top: 15vh; transform: translateX(-50%);
+    width: min(620px, calc(100vw - 32px));
+    display: flex; flex-direction: column;
+    background: rgba(11,5,24,.9);
+    border: 1px solid rgba(245,234,223,.2); border-radius: 16px;
+    box-shadow: 0 30px 90px rgba(0,0,0,.7);
+    backdrop-filter: blur(22px) saturate(1.3);
+    -webkit-backdrop-filter: blur(22px) saturate(1.3);
+    overflow: hidden;
+    animation: palIn .17s cubic-bezier(.16,1,.3,1);
+  }
+  @keyframes palIn { from { opacity: 0; transform: translateX(-50%) translateY(-10px); } }
+  #palTop {
+    display: flex; align-items: center; gap: 11px;
+    padding: 14px 16px;
+    border-bottom: 1px solid rgba(245,234,223,.12);
+  }
+  .palglass {
+    flex: 0 0 auto; font-size: 15px; color: #ffb347; transform: rotate(-45deg);
+  }
+  #palInput {
+    flex: 1 1 auto; min-width: 0;
+    font-family: 'Space Grotesk', sans-serif; font-size: 16px;
+    color: #f5eadf; background: none; border: 0; outline: none; padding: 0;
+  }
+  #palInput::placeholder { color: rgba(245,234,223,.32); }
+  .palesc {
+    flex: 0 0 auto; font-family: 'SF Mono', 'Menlo', monospace; font-size: 10px;
+    color: rgba(245,234,223,.4); padding: 3px 6px; border-radius: 5px;
+    background: rgba(245,234,223,.07); border: 1px solid rgba(245,234,223,.16);
+  }
+  #palList { height: 340px; overflow-y: auto; padding: 6px; }
+  .palrow {
+    display: flex; align-items: center; gap: 11px;
+    padding: 9px 11px; border-radius: 9px; cursor: pointer;
+  }
+  /* Highlight is a CLASS, not :hover. The keyboard owns the selection here,
+     and a mouse resting anywhere over the list while you arrow through it
+     would otherwise light a second row and make the Enter target ambiguous. */
+  .palrow.sel { background: rgba(145,70,255,.3); }
+  .palicon { flex: 0 0 20px; font-size: 14px; text-align: center; opacity: .85; }
+  .paltext { flex: 1 1 auto; min-width: 0; }
+  .paltitle {
+    font-size: 13.5px; color: #f5eadf;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .paltitle b { color: #ffb347; font-weight: 600; }
+  .palsub {
+    font-size: 10.5px; color: rgba(245,234,223,.42); margin-top: 2px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .palkeys { flex: 0 0 auto; display: flex; gap: 4px; }
+  .palkeys kbd {
+    font-family: 'SF Mono', 'Menlo', monospace; font-size: 10.5px;
+    color: #efe8f5; padding: 3px 6px; border-radius: 5px;
+    background: rgba(245,234,223,.09); border: 1px solid rgba(245,234,223,.22);
+  }
+  .palval {
+    flex: 0 0 auto; font-family: 'SF Mono', 'Menlo', monospace;
+    font-size: 11px; color: #2fe8d0; font-variant-numeric: tabular-nums;
+  }
+  #palNone {
+    padding: 26px 0; text-align: center;
+    font-size: 12.5px; color: rgba(245,234,223,.42);
+  }
+  #palFoot {
+    display: flex; gap: 16px; align-items: center;
+    padding: 9px 14px; font-size: 10px; letter-spacing: .06em;
+    color: rgba(245,234,223,.38);
+    border-top: 1px solid rgba(245,234,223,.12);
+  }
+  #palFoot kbd {
+    font-family: 'SF Mono', 'Menlo', monospace; font-size: 10px;
+    padding: 1px 4px; border-radius: 4px; margin-right: 3px;
+    background: rgba(245,234,223,.08); border: 1px solid rgba(245,234,223,.16);
+  }
+  #palCount { margin-left: auto; font-variant-numeric: tabular-nums; }
+  @media (max-width: 760px) {
+    #palBox { top: 8vh; }
+    #palList { height: 52vh; }
+    #palFoot span:not(#palCount) { display: none; }
+  }
+
   /* ── the zen drawer ──
      Zen means "no furniture", but the controls still have to be REACHABLE, so
      the bar slides off the right edge into a tray behind a handle. `zendraw`
@@ -244,7 +343,7 @@
   body.kiosk, body.kiosk * { cursor: none !important; }
   body.kiosk .ctl, body.kiosk #tools, body.kiosk #chatDock,
   body.kiosk #voiceMenu, body.kiosk #zenTab, body.kiosk #zenDrawer,
-  body.kiosk .panel { display: none !important; }
+  body.kiosk #palette, body.kiosk .panel { display: none !important; }
   /* The gate is removed from the layout entirely, not just faded. Hiding it by
      class alone was not enough: autoResume() puts the gate BACK if autoplay is
      refused, and a screensaver has no one to click it. CSS wins over any class
@@ -269,6 +368,26 @@
     backdrop-filter: blur(10px); display: none;
   }
   .panel.show { display: block; }
+  /* CENTRED, not corner-anchored. The gear and the controls list are modal
+     reading surfaces: you stop looking at the art to use them, and a 600px
+     sheet pinned to the bottom-right corner spends half its width over the
+     skull it is describing. The sound and voice popovers deliberately do NOT
+     move: they are one-glance controls that must point at the button that
+     opened them, and centring those would break the pointing.
+     Corner-anchoring is dropped explicitly (right/bottom auto) or the fixed
+     box keeps its old edge and the translate just slides it off-screen. */
+  #cfgPanel, #helpPanel, #galPanel {
+    right: auto; bottom: auto;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    max-height: 86vh;
+  }
+  /* The one panel whose entire job is being READ, so it is sized to the table
+     rather than to the viewport. It used to inherit `width: auto`, which on a
+     wide display stretched the three columns until "48 KEYS" sat against the
+     far edge and the eye had to travel the whole screen from a key to its
+     action. */
+  #helpPanel { width: min(680px, calc(100vw - 48px)); }
   .panel h2 {
     font-family: 'Anton', Impact, sans-serif; font-size: 16px;
     letter-spacing: .18em; margin-bottom: 12px; color: #ffb347;
@@ -412,7 +531,12 @@
   #helpFilter {
     display: flex; gap: 10px; align-items: center; min-width: 0;
     position: sticky; top: -18px; z-index: 3;
-    margin: 0 0 10px; padding: 10px 0 11px;
+    /* A rounded shell with its own inner padding, so the bar reads as one
+       control rather than as a full-bleed strip whose contents happen to stop
+       near the edges. The count used to sit flush against the panel border
+       with nothing between it and the outside world. */
+    margin: 0 0 12px; padding: 9px 12px;
+    border: 1px solid rgba(245,234,223,.14); border-radius: 12px;
     /* Same frosted recipe as the panel itself (blur + a dark translucent
        tint), one step stronger. A LIGHT tint looked better standing still and
        failed the moment you scrolled: 39 rows slide under this bar, and a 5%
@@ -422,10 +546,12 @@
     background: rgba(12,6,26,.6);
     backdrop-filter: blur(18px) saturate(1.28);
     -webkit-backdrop-filter: blur(18px) saturate(1.28);
-    border-bottom: 1px solid rgba(245,234,223,.12);
   }
+  /* CAPPED, not greedy. `flex: 1 1 auto` let the keyword field eat every pixel
+     the panel grew by, which is how a search box ends up 1500px wide holding a
+     six-character word. It takes what it needs and the row stays a row. */
   .hfsearch {
-    flex: 1 1 auto; min-width: 0;
+    flex: 0 1 340px; min-width: 0; margin-right: auto;
     display: flex; align-items: center; gap: 9px;
     background: rgba(245,234,223,.06);
     border: 1px solid rgba(245,234,223,.2); border-radius: 8px;
@@ -489,32 +615,12 @@
   /* the minted link, shown so it can be read and hand-copied when the
      clipboard API is unavailable (it needs a secure context, and this page is
      opened from file:// often enough to matter) */
-  /* ── scrub bar ──
-     A real transport, not a generic dial row: it needs a live playhead and a
-     time readout, and the dial `musicSeek` only ever describes where playback
-     STARTS. Both exist on purpose and they are not the same control. */
-  #cfgScrub {
-    margin: 10px 0 4px; padding: 10px 12px;
-    background: rgba(245,234,223,.05);
-    border: 1px solid rgba(245,234,223,.14); border-radius: 10px;
-  }
-  .scrubhead {
-    display: flex; justify-content: space-between; align-items: baseline;
-    margin-bottom: 7px;
-  }
-  .scrublabel {
-    font-size: 11px; letter-spacing: .16em; text-transform: uppercase;
-    color: rgba(245,234,223,.6);
-  }
-  #scrubTime {
-    font-family: 'SF Mono', 'Menlo', monospace; font-size: 11px;
-    color: #2fe8d0; font-variant-numeric: tabular-nums;
-  }
-  #scrubBar { width: 100%; margin: 0; }
-  .scrubnote {
-    margin-top: 6px; font-size: 10px; letter-spacing: .06em;
-    color: rgba(245,234,223,.38);
-  }
+  /* The scrub bar that used to live here was REMOVED (v1.59.0): the sound
+     popover now carries a full transport (skip, play/pause, scrub, elapsed /
+     remaining / total, and the pin), so a second scrubber in the gear panel
+     was a duplicate control that could disagree with it. The `musicSeek` dial
+     is still in the dial list, because that one is a share setting rather than
+     a playhead. */
   kbd.mini {
     display: inline-block; padding: 0 4px; border-radius: 4px;
     background: rgba(245,234,223,.12); border: 1px solid rgba(245,234,223,.2);
@@ -1445,6 +1551,23 @@
 <div id="mute" class="ui ctl" title="sound">&#9835;</div>
 <div id="settings" class="ui ctl" title="settings &amp; presets">&#9881;</div>
 <div id="help" class="ui ctl" title="controls">?</div>
+<div id="palette" class="ui" role="dialog" aria-label="command palette" aria-modal="true">
+  <div id="palBox">
+    <div id="palTop">
+      <span class="palglass" aria-hidden="true">&#9906;</span>
+      <input id="palInput" type="text" autocomplete="off" spellcheck="false"
+             placeholder="what do you want to do?" aria-label="search every command">
+      <kbd class="palesc">esc</kbd>
+    </div>
+    <div id="palList" role="listbox" aria-label="commands"></div>
+    <div id="palFoot">
+      <span><kbd>&#8593;</kbd><kbd>&#8595;</kbd> move</span>
+      <span><kbd>&#8629;</kbd> run</span>
+      <span><kbd>&#8677;</kbd> complete</span>
+      <span id="palCount"></span>
+    </div>
+  </div>
+</div>
 <div id="zenDrawer" class="ui" aria-hidden="true"></div>
 <div id="zenTab" class="ui" title="show the controls" role="button" tabindex="0" aria-label="show the controls">&#8249;</div>
 
@@ -1566,7 +1689,7 @@
     <thead><tr><th></th><th>action</th><th>&#127908; say</th></tr></thead>
     <tbody></tbody>
   </table>
-  <p style="margin-top:10px;color:rgba(245,234,223,.4)">the keyword box has the caret, press esc to hand the keyboard back to the art &middot; click a key to try it &middot; eyes follow clicks &middot; face parts react &middot; skulls flick &middot; pick a bloom off the crown &middot; C &rarr; copy a link to your board</p>
+  <p style="margin-top:10px;color:rgba(245,234,223,.4)">&#8984;K opens the command palette &middot; the keyword box has the caret, press esc to hand the keyboard back to the art &middot; click a key to try it &middot; eyes follow clicks &middot; face parts react &middot; skulls flick &middot; pick a bloom off the crown &middot; C &rarr; copy a link to your board</p>
 </div>
 
 <div id="cfgPanel" class="panel">
@@ -1592,15 +1715,6 @@
   <span id="cfgShown"></span>
 </div>
 <div id="cfgSliders" class="collapsed"></div>
-  <div id="cfgScrub">
-    <div class="scrubhead">
-      <span class="scrublabel">&#9835;&nbsp; scrub the track</span>
-      <span id="scrubTime">0:00 / 0:00</span>
-    </div>
-    <input id="scrubBar" type="range" min="0" max="100" step="0.1" value="0"
-           aria-label="scrub through the track">
-    <div class="scrubnote">shared links start here &middot; <kbd class="mini">[</kbd> <kbd class="mini">]</kbd> jump 10s</div>
-  </div>
   <button id="cfgRestyle" class="reset">&#127922;&nbsp; surprise me with a new look</button>
   <div class="cfgsec">3 &middot; save it</div>
   <div class="galrow">
@@ -6963,7 +7077,7 @@ function startMusic() {
    that says 42% can be honoured the moment duration exists. Seconds would
    need the same wait plus a clamp against a length nobody knows yet. */
 let seekPending = false;
-let seekReadout = () => {};            // real one assigned in scrubTransport
+let seekReadout = () => {};            // real one assigned further down
 function applySeek(pct) {
   const p = Math.max(0, Math.min(100, pct)) / 100;
   const d = music.duration;
@@ -7734,6 +7848,7 @@ const HELP_ROWS = [
   [['D'], 'fps / quality monitor', '', 'd'],
   [['C'], 'settings + presets', '', 'c'],
   [['H', '?'], 'this menu', '', 'h'],
+  [['\u2318K'], 'command palette: search every control', '', ''],
   [['\u2318/'], 'this menu, cursor in the search box', '', ''],
 ];
 (function buildHelp() {
@@ -8043,6 +8158,259 @@ function helpFilter(tb) {
   });
   apply();
 }
+
+/* ─────────────────────────────────────────────
+   THE COMMAND PALETTE (cmd-K)
+   Every hotkey, every dial, every panel, in one fuzzy-searchable list.
+
+   IT IS BUILT FROM THE SAME SOURCES THE REST OF THE PAGE USES, never from a
+   hand-written list. HELP_ROWS is the keyboard vocabulary, CFG_SCHEMA is every
+   tunable, CFG_TOGGLES marks the switches. A parallel list would be a fifth
+   control surface to keep in lockstep, and this project has already paid for
+   that mistake once: the Worker's LIMITS drifted from CFG_SCHEMA and every
+   gallery preset silently lost its colours. So the palette DERIVES.
+
+   Commands are built lazily on first open, because CFG_SCHEMA is read at build
+   time and a palette built at load would freeze the labels before any restore
+   or gallery load had run.
+   ───────────────────────────────────────────── */
+const palOverlay = document.getElementById('palette');
+const palInput   = document.getElementById('palInput');
+const palList    = document.getElementById('palList');
+let palCmds = null, palRows = [], palSel = 0;
+
+/* A dial the palette can DRIVE rather than merely point at. Numeric dials open
+   the gear panel filtered to that one row, because a slider needs a slider;
+   toggles flip in place, because a switch does not. */
+function palJumpToDial(key) {
+  const label = (CFG_SCHEMA[key] || [])[4] || key;
+  if (!cfgPanel.classList.contains('show')) togglePanel(cfgPanel);
+  const sliders = document.getElementById('cfgSliders');
+  const bar = document.getElementById('cfgFilter');
+  const btn = document.getElementById('cfgToggleSliders');
+  if (sliders.classList.contains('collapsed') && btn) btn.click();
+  const search = document.getElementById('cfgSearch');
+  const cat = document.getElementById('cfgCat');
+  if (cat) cat.value = '';
+  if (search) { search.value = label; refreshDials(); }
+  if (bar) bar.classList.remove('collapsed');
+  /* Scroll AFTER the filter has run, or the row is still display:none and
+     scrollIntoView measures a zero-height box and lands nowhere. */
+  const row = sliders.querySelector('.dial[data-key="' + key + '"]');
+  if (row) requestAnimationFrame(() => row.scrollIntoView({ block: 'center' }));
+  cfgStatusSay(label);
+}
+
+function palBuild() {
+  const out = [];
+  const seen = new Set();
+
+  /* 1. every hotkey row, firing the SAME event the help table's caps fire.
+        Routing through the real keydown handler means the palette can never
+        drift from what the key actually does. */
+  for (const [keys, action, voice, evKey] of HELP_ROWS) {
+    if (!evKey) continue;
+    const shifted = evKey.startsWith('⇧');
+    const bare = shifted ? evKey.slice(1) : evKey;
+    out.push({
+      title: action, sub: voice ? 'say ' + voice : 'keyboard', icon: '⚡',
+      keys: keys, hay: (action + ' ' + voice).toLowerCase(),
+      run: () => dispatchEvent(new KeyboardEvent('keydown',
+              { key: bare, shiftKey: shifted, bubbles: true })),
+    });
+    seen.add(action);
+  }
+
+  /* 2. every toggle, flipped in place with its live state shown */
+  for (const key in CFG_TOGGLES) {
+    const label = CFG_TOGGLES[key][4];
+    out.push({
+      title: 'toggle ' + label, sub: 'switch', icon: '●',
+      hay: ('toggle ' + label + ' ' + key).toLowerCase(),
+      val: () => (CFG[key] ? 'on' : 'off'),
+      run: () => {
+        CFG[key] = CFG[key] ? 0 : 1;
+        applyToggles({ skipVoice: true });
+        syncSlidersSafe();
+        cfgStatusSay(label + ': ' + (CFG[key] ? 'on' : 'off'));
+      },
+    });
+  }
+
+  /* 3. every numeric dial, as a jump into the gear panel */
+  for (const key in CFG_SCHEMA) {
+    if (Object.prototype.hasOwnProperty.call(CFG_TOGGLES, key)) continue;
+    const label = CFG_SCHEMA[key][4] || key;
+    out.push({
+      title: label, sub: 'dial · ' + (CAT_OF[key] || 'other'), icon: '▤',
+      hay: (label + ' ' + key + ' ' + (CAT_OF[key] || '')).toLowerCase(),
+      val: () => String(+(+CFG[key]).toFixed(2)),
+      run: () => palJumpToDial(key),
+    });
+  }
+
+  /* 4. the surfaces and the things that are not keys */
+  const extra = [
+    ['open settings and presets', 'panel', '⚙️', () => { if (!cfgPanel.classList.contains('show')) togglePanel(cfgPanel); }],
+    ['open the controls list', 'panel', '⌨️', () => { if (!helpPanel.classList.contains('show')) togglePanel(helpPanel); }],
+    ['browse the gallery', 'panel', '\u{1F5BC}️', () => document.getElementById('galBrowse').click()],
+    ['open the sound menu', 'panel', '♫', () => { if (!soundMenu.classList.contains('show')) muteBtn.click(); }],
+    ['copy a link to this board', 'share', '\u{1F517}', () => { if (!cfgPanel.classList.contains('show')) togglePanel(cfgPanel); document.getElementById('cfgLink').click(); }],
+    ['save this board to my browser', 'save', '\u{1F4BE}', () => document.getElementById('cfgSave').click()],
+    ['restore my saved board', 'save', '↺', () => document.getElementById('cfgLoad').click()],
+    ['reset every dial to default', 'save', '♻️', () => { if (!cfgPanel.classList.contains('show')) togglePanel(cfgPanel); document.getElementById('cfgReset').click(); }],
+    ['ask for a feature', 'requests', '\u{1F4AC}', () => {
+      if (!cfgPanel.classList.contains('show')) togglePanel(cfgPanel);
+      const t = document.getElementById('reqText');
+      if (t) { t.scrollIntoView({ block: 'center' }); t.focus(); }
+    }],
+  ];
+  for (const [title, sub, icon, run] of extra) {
+    out.push({ title, sub, icon, hay: (title + ' ' + sub).toLowerCase(), run });
+  }
+  return out;
+}
+
+/* Paints one title with its matched characters bolded. textContent for the
+   plain runs, never innerHTML with the query spliced in: the query is user
+   input and this is the one place a filter would otherwise write it back into
+   the DOM (invariant 5, the same reasoning that keeps model output unparsed). */
+function palPaint(el, text, hits) {
+  el.textContent = '';
+  if (!hits || !hits.length) { el.textContent = text; return; }
+  const set = new Set(hits);
+  let buf = '', bold = false;
+  const flush = () => {
+    if (!buf) return;
+    if (bold) { const b = document.createElement('b'); b.textContent = buf; el.appendChild(b); }
+    else el.appendChild(document.createTextNode(buf));
+    buf = '';
+  };
+  for (let i = 0; i < text.length; i++) {
+    const on = set.has(i);
+    if (on !== bold) { flush(); bold = on; }
+    buf += text[i];
+  }
+  flush();
+}
+
+function palRender() {
+  const q = palInput.value.trim().toLowerCase();
+  let list;
+  if (!q) {
+    list = palCmds.map(c => ({ c, hits: null }));
+  } else {
+    list = [];
+    for (const c of palCmds) {
+      const m = fuzzyScore(c.hay, q);
+      if (m) list.push({ c, hits: m.hits, tier: m.tier, score: m.score });
+    }
+    list.sort((a, b) => a.tier - b.tier || b.score - a.score);
+  }
+  /* 60 is a display cap, not a search cap: everything was scored, and a list
+     you cannot reach the bottom of by arrowing is not more useful than one you
+     can. The count below says how many matched, so nothing is hidden silently. */
+  const shown = list.slice(0, 60);
+  palList.textContent = '';
+  palRows = [];
+  if (!shown.length) {
+    const none = document.createElement('div');
+    none.id = 'palNone';
+    none.textContent = 'nothing matches that';
+    palList.appendChild(none);
+  }
+  shown.forEach(({ c, hits }, i) => {
+    const row = document.createElement('div');
+    row.className = 'palrow';
+    row.setAttribute('role', 'option');
+    const ic = document.createElement('div');
+    ic.className = 'palicon'; ic.textContent = c.icon;
+    const tx = document.createElement('div');
+    tx.className = 'paltext';
+    const ti = document.createElement('div');
+    ti.className = 'paltitle';
+    palPaint(ti, c.title, hits && hits.filter(h => h < c.title.length));
+    const sb = document.createElement('div');
+    sb.className = 'palsub'; sb.textContent = c.sub;
+    tx.appendChild(ti); tx.appendChild(sb);
+    row.appendChild(ic); row.appendChild(tx);
+    if (c.val) {
+      const v = document.createElement('div');
+      v.className = 'palval'; v.textContent = c.val();
+      row.appendChild(v);
+    }
+    if (c.keys) {
+      const kw = document.createElement('div');
+      kw.className = 'palkeys';
+      c.keys.forEach(k => { const kb = document.createElement('kbd'); kb.textContent = k; kw.appendChild(kb); });
+      row.appendChild(kw);
+    }
+    row.addEventListener('click', () => palRun(i));
+    /* pointerdown, not mouseover: a moving mouse must not steal the selection
+       from the arrow keys mid-type */
+    row.addEventListener('pointerdown', e => e.preventDefault());
+    palList.appendChild(row);
+    palRows.push({ el: row, cmd: c });
+  });
+  palSel = 0;
+  palMark();
+  document.getElementById('palCount').textContent =
+    q ? list.length + ' of ' + palCmds.length : palCmds.length + ' commands';
+}
+
+function palMark() {
+  palRows.forEach((r, i) => r.el.classList.toggle('sel', i === palSel));
+  const cur = palRows[palSel];
+  if (cur) cur.el.scrollIntoView({ block: 'nearest' });
+}
+
+function palRun(i) {
+  const r = palRows[i];
+  if (!r) return;
+  palClose();
+  /* Let the overlay actually leave the screen first. Several commands open a
+     panel or capture the frame, and firing them under a palette that is still
+     painted means a screenshot of the palette. */
+  setTimeout(() => { try { r.cmd.run(); } catch (_) {} }, 40);
+}
+
+function palOpen() {
+  if (!palCmds) palCmds = palBuild();
+  /* one overlay at a time */
+  soundMenu.classList.remove('show');
+  voiceMenu.classList.remove('show');
+  palOverlay.classList.add('show');
+  palInput.value = '';
+  palRender();
+  palInput.focus();
+}
+function palClose() {
+  palOverlay.classList.remove('show');
+  palInput.blur();
+}
+function palToggle() { palOverlay.classList.contains('show') ? palClose() : palOpen(); }
+
+palInput.addEventListener('input', palRender);
+palInput.addEventListener('keydown', e => {
+  /* This field swallows its keys on purpose. Every printable character is a
+     hotkey on this page, so without stopPropagation typing "star" would fire
+     a shooting star, a teeth chatter, an aurora and a spin. */
+  e.stopPropagation();
+  if (e.key === 'Escape') { e.preventDefault(); palClose(); }
+  else if (e.key === 'ArrowDown') { e.preventDefault(); palSel = Math.min(palSel + 1, palRows.length - 1); palMark(); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); palSel = Math.max(palSel - 1, 0); palMark(); }
+  else if (e.key === 'Enter') { e.preventDefault(); palRun(palSel); }
+  else if (e.key === 'Tab') {
+    /* completes to the highlighted row rather than moving focus: there is
+       nowhere else in this overlay for focus to go */
+    e.preventDefault();
+    const cur = palRows[palSel];
+    if (cur) { palInput.value = cur.cmd.title; palRender(); }
+  }
+});
+/* click the scrim to dismiss, but not a click that landed on the box */
+palOverlay.addEventListener('pointerdown', e => { if (e.target === palOverlay) palClose(); });
+
 /* photo lives on the I key now; the bar button was retired for the gear */
 document.getElementById('settings').addEventListener('click', () => togglePanel(cfgPanel));
 /* The config panel's status line, usable from outside the buildCfg IIFE.
@@ -8412,45 +8780,14 @@ let syncSliders = () => {};   // real one is assigned inside buildCfg below
      rewrites the slider's value underneath the pointer and the thumb snaps
      back mid-drag, which feels broken and is the classic way a seek bar is
      got wrong. */
-  (function scrubTransport() {
-    const bar = document.getElementById('scrubBar');
-    const out = document.getElementById('scrubTime');
-    if (!bar) return;
-    let dragging = false;
-
-    seekReadout = function () {
-      const d = music.duration, c = music.currentTime;
-      out.textContent = fmtTime(c) + ' / ' + (isFinite(d) ? fmtTime(d) : '--:--');
-      if (!dragging && isFinite(d) && d > 0) bar.value = (c / d * 100).toFixed(1);
-    };
-
-    bar.addEventListener('pointerdown', () => { dragging = true; });
-    /* pointerup on the WINDOW, not the bar: releasing outside the element is
-       normal at the ends of a drag and would otherwise leave it stuck. */
-    addEventListener('pointerup', () => {
-      if (!dragging) return;
-      dragging = false;
-      seekReadout();
-    });
-    bar.addEventListener('input', () => {
-      const pct = parseFloat(bar.value);
-      CFG.musicSeek = +pct.toFixed(1);       // the shareable start position
-      applySeek(pct);
-      const d = music.duration;
-      out.textContent = fmtTime(isFinite(d) ? pct / 100 * d : 0) + ' / ' +
-                        (isFinite(d) ? fmtTime(d) : '--:--');
-      /* keep the dial slider in the list honest too, or the panel shows two
-         different answers for one value */
-      const twin = document.querySelector('#cfgSliders input[data-key="musicSeek"]');
-      if (twin) { twin.value = CFG.musicSeek; if (twin.nextElementSibling) twin.nextElementSibling.textContent = twin.value; }
-    });
-    music.addEventListener('loadedmetadata', seekReadout);
-    music.addEventListener('seeked', seekReadout);
-    /* 4Hz, not rAF: this is a text readout, and tying it to the render loop
-       would burn frames on the art to animate a clock. */
-    setInterval(() => { if (!music.paused) seekReadout(); }, 250);
-    seekReadout();
-  })();
+  /* `seekReadout` used to be assigned by a scrubTransport IIFE driving a
+     second scrub bar in this panel. That bar is gone, so the readout now
+     refreshes the SOUND POPOVER instead: same job, one control. Callers
+     (applyActions, the bracket keys, cfgAdopt) do not care which surface is
+     listening, which is why the indirection was worth keeping. */
+  seekReadout = function () {
+    if (soundMenu.classList.contains('show')) syncSoundMenu();
+  };
 
 /* ── copy a link to this board ──
      Always hands back a working link. The short one needs the Worker; if that
@@ -8506,6 +8843,16 @@ addEventListener('keydown', e => {
      from ANYWHERE, including out of a text field, and lands the caret in the
      keyword box. It is checked before the typing guard below for that reason:
      a chord is never text entry. */
+  /* cmd-K is the palette. Checked before the typing guard for the same reason
+     cmd-/ is: a chord is never text entry, so it has to work from inside a
+     field too. It also opens the gate, because someone who knows the chord
+     does not need to be told to press a key first. */
+  if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
+    e.preventDefault();
+    if (!gate.classList.contains('gone')) enterGate();
+    palToggle();
+    return;
+  }
   if ((e.metaKey || e.ctrlKey) && e.key === '/' && gate.classList.contains('gone')) {
     e.preventDefault();
     if (helpPanel.classList.contains('show')) {
