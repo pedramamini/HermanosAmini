@@ -104,8 +104,10 @@ It runs silently without audio, see [Audio](#audio) below.
 | `Shift`+`M` | mustache: charro / handlebar / herradura | | | |
 | `H` or `?` | this list, in the piece | | | |
 
-The full list lives on `?` in the piece itself, alphabetized, with a fuzzy
-filter across the top: type `shtstr` and it finds the shooting star.
+The full list lives on `?` in the piece itself, alphabetized, with two
+filters across the top: a fuzzy keyword box (`shtstr` finds the shooting
+star), and a key box: click it, press any key, and see exactly what that key
+does.
 
 Two toggles in the settings drawer change the skull itself: **skull always on
 top** keeps every spirit, spark, and saucer behind the hero calavera, and

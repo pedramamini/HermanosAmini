@@ -212,12 +212,24 @@
   .panel td { padding: 0 2px; vertical-align: middle; white-space: nowrap; }
   .panel td:first-child { padding-right: 18px; text-align: right; }
   .panel td:nth-child(3) { color: #2fe8d0; font-style: italic; opacity: .85; padding-left: 16px; }
+  /* The help panel is the one panel whose entire job is being READ, often
+     from a couch, so it gets its own type scale: 13px panel-default was
+     squint territory. (The first attempt at these rules landed inside the
+     mobile media query because the file has two identical anchor lines;
+     they applied only on phones and the desktop stayed 13px.) */
+  #helpPanel td { font-size: 15.5px; padding-top: 2px; padding-bottom: 2px; }
+  #helpPanel td:first-child { min-width: 122px; }
+  #helpPanel td:nth-child(3) { font-size: 13.5px; }
   /* keycap: sculpted like a real key, and clickable */
   .panel kbd {
-    display: inline-block; min-width: 34px; text-align: center;
+    display: inline-block; min-width: 46px; text-align: center;
     font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
-    font-size: 12px; font-weight: 600; color: #efe8f5;
-    padding: 6px 9px 8px;
+    font-size: 16px; font-weight: 600; color: #efe8f5;
+    /* the shift glyph was the unreadable part: at 12px "\u21e7I" was nine
+       pixels of arrow mashed into a letter. Larger cap, larger type, and
+       letter-spacing so the two symbols in a combo read as two symbols. */
+    letter-spacing: .06em;
+    padding: 8px 12px 10px;
     background: linear-gradient(180deg, #46405a 0%, #322b45 55%, #292238 100%);
     border: 1px solid #16101f;
     border-radius: 7px;
@@ -321,6 +333,17 @@
     color: #f5eadf; background: none; border: 0; outline: none; padding: 0;
   }
   #helpSearch::placeholder { color: rgba(245,234,223,.34); }
+  /* the key box: press a key while it is focused and see what that key does.
+     Rendered AS a keycap so its function is legible from its shape. */
+  #helpKey {
+    flex: 0 0 74px; text-align: center;
+    font-family: 'SF Mono', 'Menlo', monospace; font-size: 15px; font-weight: 600;
+    color: #efe8f5; background: rgba(245,234,223,.08);
+    border: 1px solid rgba(245,234,223,.28); border-radius: 8px;
+    padding: 6px 4px; outline: none; caret-color: transparent;
+  }
+  #helpKey:focus { border-color: rgba(255,179,71,.75); background: rgba(245,234,223,.12); }
+  #helpKey::placeholder { color: rgba(245,234,223,.34); font-weight: 300; }
   /* the browser's own clear affordance is a light X on a light field here */
   #helpSearch::-webkit-search-cancel-button { -webkit-appearance: none; }
   #helpShown {
@@ -1346,8 +1369,10 @@
   <h2>CONTROLS</h2>
   <div id="helpFilter">
     <span class="hfglass" aria-hidden="true">&#9906;</span>
-    <input id="helpSearch" type="search" placeholder="filter&hellip; try &quot;str&quot; or &quot;sound&quot;"
-           autocomplete="off" spellcheck="false" aria-label="filter the controls">
+    <input id="helpSearch" type="search" placeholder="filter by keyword&hellip;"
+           autocomplete="off" spellcheck="false" aria-label="filter the controls by keyword">
+    <input id="helpKey" type="text" placeholder="key?" maxlength="2"
+           autocomplete="off" spellcheck="false" aria-label="filter by pressing a key">
     <span id="helpShown"></span>
   </div>
   <table id="helpTable">
@@ -2783,7 +2808,7 @@ function heartBurst(cx, cy) {
 function faceHit(cx, cy) {
   const u = toSkullUnits(cx, cy), ux = u[0], uy = u[1];
   const d = (x, y) => Math.hypot(ux - x, uy - y);
-  if (d(0, -300) < 120)  { rainbowEyeUntil = t + 5; SFX.bell(); return true; }   // third eye
+  if (!CFG.sombrero && d(0, -300) < 120) { rainbowEyeUntil = t + 5; SFX.bell(); return true; }   // third eye (hidden under the hat)
   if (d(-178, -60) < 190 || d(178, -60) < 190) { face.ringSpin += 10; SFX.shaker(); return true; } // eye rings
   if (d(0, 165) < 85)    { face.noseBurst = t + 1.2; heartBurst(cx, cy); SFX.tom(); return true; }
   if (Math.abs(ux) < 155 && uy > 325 && uy < 470) { face.chatterUntil = t + 1.6; SFX.teeth(); return true; }
@@ -3164,12 +3189,13 @@ function drawBloom(r, idx, spin, petals, shade) {
    is the crown of the skull, so the hat stays put if the silhouette is ever
    retuned, the same discipline the crown band uses. */
 const SOM_TILT = -0.13;          // radians, brim dips to the viewer's right
-/* Constrained from BOTH sides, which is why it is a measured number and not a
-   taste one. Too high and daylight shows between hat and dome, so it reads as
-   hovering rather than worn. Too low and the brim eats the third eye, which is
-   core art. -505 puts the brim's bottom edge just above the eye while still
-   overlapping the skull's crown at y = -440. */
-const SOM_SIT  = -505;
+/* Pulled DOWN over the brow, the way a hat is actually worn. The old seat
+   (-505) kept the brim above the third eye, which left the hat perched on the
+   very top of the dome like it might blow off. Covering the eye is fine
+   because the eye is not RENDERED while the hat is on: drawing a living,
+   blinking, gaze-tracking eye underneath an opaque brim would be pure wasted
+   frame time (its halo alone is a radial gradient per frame). */
+const SOM_SIT  = -400;
 
 function drawSombrero() {
   if (!CFG.sombrero) return;
@@ -3193,11 +3219,19 @@ function drawSombrero() {
   const CW = BW * 0.50, CH = BW * 0.73; // crown, from the measurements above
   const PX = BW * 0.16;                 // peak offset from centre
   const NOTCH = BW * 0.11;              // how far the crease dips below them
+  const yv = yellAmt();
+  const chat = accChat();
   const bob = Math.sin(t * 0.6) * 4 + beatPulse * 5;
 
   hctx.save();
-  hctx.translate(0, SOM_SIT + bob);
-  hctx.rotate(SOM_TILT);
+  /* YELL: the head rears back under it, and a hat has INERTIA: it lifts off
+     the brow and tips a little further than the head does, then settles. Not
+     a new oscillator, just yellAmt scaled, so it lands exactly when the yell
+     ends. CHATTER: the clacking carries up the skull as a small jiggle,
+     damped harder than the mustache because there is a whole cranium between
+     the teeth and the hat. STARE: pulled DOWN over the brow, the glower. */
+  hctx.translate(0, SOM_SIT + bob - 30 * yv + chat * 2.5 + 12 * stare.k);
+  hctx.rotate(SOM_TILT * (1 + 0.45 * yv));
 
   /* Shadow on the bone first. Without it the hat floats and the calavera
      reads as standing behind a hat rather than wearing one. */
@@ -3346,6 +3380,18 @@ function drawSombrero() {
 
 function drawCrown() {
   crownPos.length = 0;                           // stale positions are worse
+  /* the crown rides the same expression envelopes as the hat, at half the
+     amplitude: a fitted band moves less than a perched brim. crownMark
+     records getTransform(), so the pluck targets follow this for free. */
+  hctx.save();
+  hctx.translate(0, -16 * yellAmt() + accChat() * 1.6 + 6 * stare.k);
+  try {
+    drawCrownInner();
+  } finally {
+    hctx.restore();
+  }
+}
+function drawCrownInner() {
 
   /* A hat COVERS the head, so it suppresses the crown rather than stacking on
      it. Mutual exclusion enforced here, in the drawing, rather than by having
@@ -3476,17 +3522,44 @@ function bigoteColor() {
   return [PAL.bone3, PAL.bone2];
 }
 
+/* ── accessories are PART of the living face ──
+   Everything worn rides the head's rigid transforms for free (the yell lean,
+   the shudder, the bob: they wrap all of drawHero). What that misses is
+   EXPRESSION. A mustache that holds perfectly still over chattering teeth
+   reads as a sticker on a video, precisely because everything around it is
+   alive. So the accessories sample the same envelopes the face itself runs
+   on, and nothing else:
+
+     yellAmt()          0..1 while the grito plays
+     stare.k            0..1 eased while it glares
+     face.chatterUntil  teeth clacking, phase sin(t*26): the exact
+                        oscillator drawTeethLive squishes with
+
+   Using the same signals is the whole trick: the mustache does not have its
+   own idea of chattering, it moves ON THE TEETH'S CLOCK, so the two can
+   never drift out of phase. */
+function accChat() {
+  return t < face.chatterUntil ? Math.sin(t * 26) : 0;
+}
+
 function drawBigote() {
   if (!CFG.bigote) return;
   const st = Math.round(CFG.bigoteStyle) % BIG_STYLES;
   const [dark, light] = bigoteColor();
   const q = qLevel();
+  const yv = yellAmt();
+  const chat = accChat();
   /* a slow breath so it is part of a living face rather than a decal */
   const sc = 1 + Math.sin(t * 1.1) * 0.012 + beatPulse * 0.02;
 
   hctx.save();
-  hctx.translate(0, 250);
-  hctx.scale(sc, sc);
+  /* CHATTER: the mustache sits on the upper lip, so it bounces on the same
+     sin(t*26) the teeth squish with, a beat SOFTER than they do because lip
+     tissue damps it. YELL: the mouth gapes and the lip stretches, so it
+     lifts a touch and FLARES, wider and thinner, like a real mustache over
+     an open mouth. */
+  hctx.translate(0, 250 + chat * 6 - 14 * yv);
+  hctx.scale(sc * (1 + 0.16 * yv), sc * (1 - 0.10 * yv + chat * 0.02));
 
   /* Each style is a half-profile: [cx1,cy1, cx2,cy2, endX,endY] describing the
      TOP edge out to the tip, then the same coming back along the bottom. */
@@ -3521,6 +3594,12 @@ function drawBigote() {
   };
 
   for (const sd of [-1, 1]) {
+    /* STARE: each half angles DOWN toward the centre, the same slam the angry
+       brows do over the sockets. A frown is a rotation about the philtrum,
+       not a translation, so it is per-side around x=0, and it uses stare.k so
+       it eases in and out exactly when the brows do. */
+    hctx.save();
+    hctx.rotate(sd * 0.11 * stare.k);
     draw(sd);
     /* Vertical gradient, dark at the bottom: hair catches light on top. Flat
        fill made it read as a sticker, the same failure the crown taught. */
@@ -3560,6 +3639,7 @@ function drawBigote() {
       }
       hctx.restore();
     }
+    hctx.restore();                       // closes the per-side stare rotation
   }
   hctx.restore();
 }
@@ -4207,7 +4287,13 @@ function drawHero(dt) {
   }
   hctx.restore();
 
-  /* third eye, living eye in the forehead rosette */
+  /* third eye, living eye in the forehead rosette.
+     NOT drawn while the sombrero is on: the brim now covers it, and the eye
+     is one of the priciest things on this canvas (a halo gradient, a sclera,
+     a tracking iris and a blink envelope, every frame). An invisible eye
+     that still costs a gradient per frame is exactly the kind of spend the
+     quality governor exists to hunt, so it never enters the pipeline. */
+  if (!CFG.sombrero) {
   const ex = 0, ey = (-300 + 24) * U, er = 58 * U;
   let blink = (() => {             // periodic blink, ~ every 5.2 s
     const c = t % 5.2;
@@ -4282,6 +4368,8 @@ function drawHero(dt) {
   hctx.ellipse(0, 0, er * 1.5, er * 0.85 * (1 - blink * 0.92), 0, 0, Math.PI * 2);
   hctx.stroke();
   hctx.restore();
+
+  }
 
   /* THE HAT GOES LAST, over the third eye and the socket glow, because that
      is where a hat is: in front of the forehead. Painted with the crown it
@@ -7250,6 +7338,10 @@ const HELP_ROWS = [
     const alias = keys.map(k => [...k].map(ch => GLYPH[ch] || '').join(' ')).join(' ');
     tr.dataset.hay = [action, voice, keys.join(' '), alias]
       .join(' \u00b7 ').toLowerCase();
+    /* the KEY filter matches exactly, not fuzzily: pressing W means the W
+       row and the shift-W row, nothing else. Normalized bare of the shift
+       marker so both surface together. */
+    tr.dataset.kbare = keys.map(k => k.replace('\u21e7', '').toLowerCase()).join('|');
     tb.appendChild(tr);
   }
   helpFilter(tb);
@@ -7362,16 +7454,32 @@ function helpFilter(tb) {
     td.appendChild(frag);
   }
 
+  /* the key filter's normalized value: '' = off. Set by pressing a key in
+     the key box, matched EXACTLY against each row's bare keys. */
+  let keyQ = '';
+  function keyMatch(tr) {
+    return !keyQ || tr.dataset.kbare.split('|').includes(keyQ);
+  }
+
   function apply() {
     const q = input.value.trim().toLowerCase();
     if (!q) {
-      order.forEach(tr => { tr.classList.remove('hid'); paint(tr, null); tb.appendChild(tr); });
-      none.style.display = 'none';
-      shown.textContent = order.length + ' keys';
+      let hits = 0;
+      order.forEach(tr => {
+        const on = keyMatch(tr);
+        tr.classList.toggle('hid', !on);
+        if (on) hits++;
+        paint(tr, null);
+        tb.appendChild(tr);
+      });
+      none.style.display = hits ? 'none' : 'block';
+      shown.textContent = keyQ ? hits + '/' + order.length : order.length + ' keys';
       return;
     }
     const hit = [];
     for (const tr of order) {
+      /* the key filter is an AND: keyword narrows within the pressed key */
+      if (!keyMatch(tr)) { tr.classList.add('hid'); continue; }
       /* Score the action alone AND the full haystack. The action is what the
          highlight can point at; the haystack is what makes '"nova"' and the
          key letters findable. Best of the two, highlight only when the action
@@ -7413,7 +7521,43 @@ function helpFilter(tb) {
       input.value = ''; apply();
     }
   });
-  box.addEventListener('click', e => { if (e.target !== input) input.focus(); });
+  box.addEventListener('click', e => {
+    if (e.target !== input && e.target !== keyBox) input.focus();
+  });
+
+  /* ── the key box: press a key, see what it does ──
+     Not a text field in disguise: keydown is intercepted wholesale, so
+     pressing W puts a W in the box and filters to the W rows, rather than
+     typing a letter into a string. Arrows, space and brackets all land as
+     the same glyphs the table itself uses, which is what makes the box feel
+     like pressing the actual key. Backspace or Escape clears. */
+  const keyBox = document.getElementById('helpKey');
+  const KEYGLYPH = { arrowup: '\u2191', arrowdown: '\u2193', arrowleft: '\u2190',
+                     arrowright: '\u2192', ' ': 'Space', enter: 'Enter', escape: '' };
+  keyBox.addEventListener('keydown', e => {
+    e.preventDefault(); e.stopPropagation();
+    const k = e.key.toLowerCase();
+    if (k === 'escape' || k === 'backspace' || k === 'delete') {
+      keyBox.value = ''; keyQ = '';
+    } else if (k === 'shift' || k === 'meta' || k === 'control' || k === 'alt' || k === 'tab') {
+      return;                                     // modifiers alone mean nothing
+    } else {
+      const glyph = KEYGLYPH[k] !== undefined ? KEYGLYPH[k] : e.key.length === 1 ? e.key.toUpperCase() : e.key;
+      keyBox.value = glyph;
+      keyQ = (KEYGLYPH[k] !== undefined ? KEYGLYPH[k] : e.key).toLowerCase();
+      if (k === ' ') keyQ = 'space';
+    }
+    apply();
+  });
+  /* typing into it via mobile keyboards still works: take the last char */
+  keyBox.addEventListener('input', () => {
+    const v = keyBox.value.trim();
+    if (!v) { keyQ = ''; apply(); return; }
+    const c = v[v.length - 1];
+    keyBox.value = c.toUpperCase();
+    keyQ = c.toLowerCase();
+    apply();
+  });
   apply();
 }
 /* photo lives on the I key now; the bar button was retired for the gear */
