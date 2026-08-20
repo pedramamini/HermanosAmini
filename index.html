@@ -1607,6 +1607,8 @@ const CFG_SCHEMA = {
   petalCount:     [12,    4,     20,   1,     'eye petals'],
   crownBlooms:    [5,     3,     12,   1,     'crown flowers'],
   crownMetal:     [0,     0,     5,    1,     'crown metal: gold..palette'],
+  bigoteStyle:    [0,     0,     2,    1,     'mustache: 0 charro 1 handlebar 2 herradura'],
+  bigoteColor:    [0,     0,     5,    1,     'mustache colour: black..palette'],
   crownPeaks:     [4,     3,     7,    1,     'crown points'],
 };
 /* ── categories ──
@@ -1627,7 +1629,7 @@ const CFG_CATEGORY = {
          'beatSync'],
   skull: ['skullSize', 'socketGlow', 'auraSize', 'petalCount', 'rayLength',
           'rayCount', 'flickForce', 'skullOnTop', 'skullBreathe', 'floodRate', 'crownMetal', 'crownPeaks',
-          'sombrero',
+          'sombrero', 'bigote', 'bigoteStyle', 'bigoteColor',
           'flowerCrown', 'crownBlooms'],
   sky: ['tunnelCount', 'starDensity', 'dustCount', 'smokeScale', 'smokeStir',
         'smokeDecay', 'eventMinGap', 'eventMaxGap', 'autoEvents'],
@@ -1659,6 +1661,7 @@ const CFG_TOGGLES = {
   skullBreathe:[0, 0, 1, 1, 'skull breathing', 'toggle'],
   flowerCrown: [0, 0, 1, 1, 'flower crown', 'toggle'],
   sombrero:    [0, 0, 1, 1, 'sombrero', 'toggle'],
+  bigote:      [0, 0, 1, 1, 'mustache', 'toggle'],
   hudOn:       [0, 0, 1, 1, 'fps monitor', 'toggle'],
 };
 Object.assign(CFG_SCHEMA, CFG_TOGGLES);
@@ -3442,6 +3445,125 @@ function drawNoseLive() {
   hctx.lineWidth = 6; hctx.strokeStyle = PAL.magenta; hctx.stroke();
   hctx.restore();
 }
+/* ── el bigote (Ana's request) ──
+   Sits in the gap the face already leaves: the nose ends at y=215 and the
+   teeth begin near y=300, so a mustache belongs at 250 and needs no
+   rearranging of anything else.
+
+   Three styles, all of them SERIOUS rather than novelty, because the piece is
+   a reverent calavera and a curly joke moustache would read as a party
+   sticker. Each is drawn as a filled path, mirrored from a single half so the
+   two sides cannot drift apart:
+
+     0 charro      thick, level, squared ends. The classic ranchero brush.
+     1 handlebar   thinner body, ends sweeping UP into curled tips.
+     2 herradura   the horseshoe: heavy, ends dropping past the jawline.
+
+   Colour is a separate dial from style, because "which shape" and "what
+   colour" are two different questions and pairing them into one enum would
+   make eight combinations reachable only by cycling through the others. */
+const BIG_STYLES = 3;
+
+function bigoteColor() {
+  const m = Math.round(CFG.bigoteColor);
+  /* 0 black, 1 dark brown, 2 chestnut, 3 salt-and-pepper, 4 silver, then the
+     palette's own bone-dark so a wild board keeps its own identity. */
+  if (m === 0) return ['#1a1418', '#2c2429'];
+  if (m === 1) return ['#3a2318', '#523424'];
+  if (m === 2) return ['#5c3a1e', '#7a5230'];
+  if (m === 3) return ['#4a4148', '#6d626c'];      // pepper, highlight is grey
+  if (m === 4) return ['#8d8790', '#b6b0b8'];
+  return [PAL.bone3, PAL.bone2];
+}
+
+function drawBigote() {
+  if (!CFG.bigote) return;
+  const st = Math.round(CFG.bigoteStyle) % BIG_STYLES;
+  const [dark, light] = bigoteColor();
+  const q = qLevel();
+  /* a slow breath so it is part of a living face rather than a decal */
+  const sc = 1 + Math.sin(t * 1.1) * 0.012 + beatPulse * 0.02;
+
+  hctx.save();
+  hctx.translate(0, 250);
+  hctx.scale(sc, sc);
+
+  /* Each style is a half-profile: [cx1,cy1, cx2,cy2, endX,endY] describing the
+     TOP edge out to the tip, then the same coming back along the bottom. */
+  const draw = (sd) => {
+    hctx.beginPath();
+    hctx.moveTo(0, -30);
+    if (st === 0) {                                 // charro: level, blunt
+      hctx.bezierCurveTo(sd * 76, -56, sd * 160, -52, sd * 218, -26);
+      hctx.bezierCurveTo(sd * 226, -8, sd * 226, 6, sd * 220, 22);
+      hctx.bezierCurveTo(sd * 160, 40, sd * 76, 44, 0, 38);
+    } else if (st === 1) {
+      /* HANDLEBAR. My first pass hung the body BELOW the centre and only
+         hooked the very tips up, which reads as a droopy smile rather than a
+         handlebar: the eye follows the mass, not the tip. The body now runs
+         level and the whole outer third sweeps up, so the shape itself rises
+         and the curl is its conclusion instead of a decoration on a frown. */
+      hctx.bezierCurveTo(sd * 80, -50, sd * 150, -66, sd * 206, -96);
+      hctx.bezierCurveTo(sd * 250, -118, sd * 262, -78, sd * 236, -66);
+      hctx.bezierCurveTo(sd * 214, -56, sd * 208, -74, sd * 196, -62);
+      hctx.bezierCurveTo(sd * 150, -32, sd * 78, 4, 0, 16);
+    } else {
+      /* HERRADURA. The arms frame the mouth, they do not cover it: the teeth
+         start at y=300 and this is drawn from y=250, so anything past +50
+         local is on top of the teeth. The drop stops at +46 and sits OUTSIDE
+         the 130-wide tooth block. */
+      hctx.bezierCurveTo(sd * 76, -56, sd * 152, -46, sd * 194, -14);
+      hctx.bezierCurveTo(sd * 214, 14, sd * 218, 40, sd * 212, 62);
+      hctx.bezierCurveTo(sd * 188, 66, sd * 180, 34, sd * 168, 8);
+      hctx.bezierCurveTo(sd * 132, -12, sd * 66, 14, 0, 20);
+    }
+    hctx.closePath();
+  };
+
+  for (const sd of [-1, 1]) {
+    draw(sd);
+    /* Vertical gradient, dark at the bottom: hair catches light on top. Flat
+       fill made it read as a sticker, the same failure the crown taught. */
+    const g = hctx.createLinearGradient(0, -60, 0, 60);
+    g.addColorStop(0, light);
+    g.addColorStop(0.55, dark);
+    g.addColorStop(1, dark);
+    hctx.fillStyle = g;
+    hctx.fill();
+
+    /* salt and pepper: flecks, seeded per side so they do not shimmer */
+    if (Math.round(CFG.bigoteColor) === 3 && q < 3) {
+      hctx.save();
+      hctx.clip();
+      hctx.fillStyle = 'rgba(226,222,228,.62)';
+      for (let i = 0; i < 34; i++) {
+        const h = (i * 2654435761 % 991) / 991, v = (i * 40503 % 887) / 887;
+        hctx.beginPath();
+        hctx.ellipse(sd * (10 + h * 200), -34 + v * 74, 4.5, 2.2, sd * 0.3, 0, Math.PI * 2);
+        hctx.fill();
+      }
+      hctx.restore();
+    }
+
+    /* hair strokes along the grain, so it is hair and not a shape */
+    if (q < 4) {
+      hctx.save();
+      hctx.clip();
+      hctx.strokeStyle = 'rgba(255,255,255,.13)';
+      hctx.lineWidth = 2.5;
+      for (let i = 0; i < 9; i++) {
+        const u = i / 8;
+        hctx.beginPath();
+        hctx.moveTo(sd * 14, -30 + u * 56);
+        hctx.quadraticCurveTo(sd * 110, -40 + u * 62, sd * 200, -26 + u * 50);
+        hctx.stroke();
+      }
+      hctx.restore();
+    }
+  }
+  hctx.restore();
+}
+
 function drawTeethLive() {
   const tw = 260, th = 96, ty = 348;
   const y = yellAmt();
@@ -4005,6 +4127,9 @@ function drawHero(dt) {
   hctx.clip();
   drawEyeAssembly(-1); drawEyeAssembly(1);
   drawNoseLive();
+  /* between the nose and the teeth, which is both anatomically right and the
+     correct z-order: a mustache covers the upper lip, not the teeth */
+  drawBigote();
   drawTeethLive();
   drawSpiralLive(-1); drawSpiralLive(1);
   /* angry brows slam down over the sockets while it stares */
@@ -4814,13 +4939,15 @@ function fxRestyle() {
   CFG.spiralSpeed  = R(0.1, 0.7);
   CFG.auraSize     = R(0.7, 1.4);
 
-  const flourish = (Math.random() * 6) | 0;
-  CFG.flowerCrown  = flourish === 0 || flourish === 1 ? 1 : 0;
-  CFG.skullBreathe = flourish === 2 ? 1 : 0;
-  CFG.skullOnTop   = flourish === 3 ? 1 : 0;
-  CFG.sombrero     = flourish === 4 ? 1 : 0;
-  CFG.crownMetal   = (Math.random() * 6) | 0;
+  /* ACCESSORIES ARE NEVER ROLLED. The dice used to put a crown or a hat on
+     you at random, which is the one thing a viewer actually chooses: you dress
+     your calavera the way you want it and then hit the dice for a new LOOK,
+     and having it swap your hat out is the software overriding a decision you
+     made on purpose. Everything about the piece's colour, motion, sky and
+     living face still rolls; the things you put ON the skull do not.
 
+     `skullBreathe` and `skullOnTop` stay rollable: those are behaviours of the
+     skull itself rather than items worn on it. */
   applyToggles({ skipVoice: true });
   applyPalette();
   schedulePaletteRebuild();
@@ -5098,6 +5225,7 @@ const VOICE_MAP = [
   [['black hole', 'blackhole', 'agujero'],        fxBlackHole],
   [['crown', 'corona'],                           () => CHAT_FX.crown()],
   [['sombrero', 'hat', 'sombrero hat'],           () => CHAT_FX.sombrero()],
+  [['mustache', 'moustache', 'bigote'],           () => CHAT_FX.mustache()],
   /* Wrapped in an arrow, NOT `CHAT_FX.clear`. This table is built at module
      level and CHAT_FX is a `const` declared ~140 lines further down, so the
      direct reference is a temporal dead zone error that kills the whole
@@ -5292,6 +5420,7 @@ const CHAT_FX = {
      to know that two dials cooperate */
   crown:   () => { CFG.flowerCrown = 1; applyToggles({ skipVoice: true }); },
   sombrero:() => { CFG.sombrero = 1; applyToggles({ skipVoice: true }); },
+  mustache:() => { CFG.bigote = 1; applyToggles({ skipVoice: true }); },
   breathe: () => { CFG.skullBreathe = CFG.skullBreathe ? 0 : 1; applyToggles({ skipVoice: true }); },
 };
 
@@ -5363,6 +5492,13 @@ function applyActions(actions) {
       if (a.key === 'crownMetal' && !CFG.flowerCrown) {
         CFG.flowerCrown = 1;
         done.push('crown on');
+      }
+      /* same trap, same fix: a model asked for "a grey handlebar mustache"
+         sets the style and the colour and never the toggle, so nothing
+         appears while the chat reports success */
+      if ((a.key === 'bigoteStyle' || a.key === 'bigoteColor') && !CFG.bigote) {
+        CFG.bigote = 1;
+        done.push('mustache on');
       }
       if (a.key === 'musicVolume' && !muted) music.volume = CFG.musicVolume;
       done.push(`${CFG_SCHEMA[a.key][4]} \u2192 ${CFG[a.key]}`);
@@ -5550,6 +5686,25 @@ function updateHud() {
 }
 
 /* weighted event table, everything a key can do, plus the sky show */
+/* EVERY SINGULAR EFFECT, and deliberately nothing else.
+
+   Three categories are excluded, each for its own reason:
+
+   1. GALACTIC BATTLE. It is not an event, it is a three-fleet WAR that runs
+      for a minute, fills the sky with fifty saucers, and ends with a victory
+      toast. Firing that unprompted every few seconds makes the piece about
+      the battle. It stays on Q, the chat, and the fiesta key.
+   2. ACCESSORIES (crown, sombrero, mustache) and anything that reskins the
+      board (restyle). Those are the viewer's choices, and the random engine
+      changing what your calavera is WEARING is the software overruling a
+      decision somebody made on purpose.
+   3. MODES AND CAPTURE (demo, photo, clip, clear, everything). A random
+      engine that silently starts recording, or takes a screenshot, or clears
+      the sky you were watching, is not decorating: it is operating the app.
+
+   What is left is the whole singular-effect catalogue, sky and face alike.
+   The face is IN, and stays in: the stare, the chatter, the spinning rings,
+   the rainbow eye are all things the calavera does, not things it wears. */
 const EVENTS = [
   [3.0, fxShootingStar],
   [2.5, fxPetalBurst],
@@ -5568,6 +5723,11 @@ const EVENTS = [
   [0.6, fxGrito],
   [0.5, fxAlebrije],
   [0.4, fxBlackHole],
+  /* these three were missing from the table entirely: reachable from a key or
+     the chat, but the random engine could never produce them */
+  [0.9, () => { stare.until = t + 3.2; }],     // the mean mug
+  [0.8, () => spawnSkull(6)],                  // a small skull flood
+  [1.0, fxAlebrije],                           // twice: it is the best one
 ];
 const EVENTS_TOTAL = EVENTS.reduce((s, e) => s + e[0], 0);
 function randomEffect() {
@@ -6990,6 +7150,7 @@ const HELP_ROWS = [
   [['\u21e7O'], 'demo mode: reroll everything every 3 min', '', '\u21e7o'],
   [['\u21e7C'], 'crown on / off', '"crown"', '\u21e7c'],
   [['\u21e7S'], 'sombrero on / off', '"sombrero"', '\u21e7s'],
+  [['\u21e7M'], 'mustache: charro / handlebar / herradura', '"mustache"', '\u21e7m'],
   [['\u21e7B'], 'skull breathing on / off', '', '\u21e7b'],
   [['!'], 'fiesta: new look + everything + grito', '', '!'],
   [['Q'], 'galactic battle (3 fleets)', '"battle"', 'q'],
@@ -7293,6 +7454,13 @@ const DEMO_KEEP = new Set([
   'perfMode',                                 // rolling "lite" would degrade a wall
   'beatSync',                                 // asked for permanently engaged
   'autoEvents',                               // the drifting artifacts ARE the demo
+  /* ACCESSORIES: the same rule the dice follows. What you put ON the skull is
+     the one choice that is yours, so a wall display left in demo mode reskins
+     the world around your calavera without ever undressing it. Behaviours of
+     the skull (breathing, on-top) are NOT accessories and still roll. */
+  'flowerCrown', 'crownMetal', 'crownPeaks', 'crownBlooms',
+  'sombrero',
+  'bigote', 'bigoteStyle', 'bigoteColor',
 ]);
 
 /* A couple of dials can take the picture to nearly black, which on a wall
@@ -7769,7 +7937,18 @@ addEventListener('keydown', e => {
     syncMuteIcon();          // belt and braces: the media events also fire
   }
   else if (k === 'g') grito();
-  else if (k === 'm') toggleMute();
+  else if (k === 'm') {
+    if (e.shiftKey) {
+      /* cycles through the styles and then off, so all four states are one
+         key away rather than needing the panel to reach style 2 */
+      if (!CFG.bigote) { CFG.bigote = 1; CFG.bigoteStyle = 0; }
+      else if (CFG.bigoteStyle < BIG_STYLES - 1) CFG.bigoteStyle++;
+      else CFG.bigote = 0;
+      applyToggles({ skipVoice: true }); syncSlidersSafe();
+      const NM = ['charro', 'handlebar', 'herradura'];
+      cfgStatusSay(CFG.bigote ? 'bigote: ' + NM[Math.round(CFG.bigoteStyle)] : 'bigote off');
+    } else toggleMute();
+  }
   else if (k === 'arrowup')   { e.preventDefault(); CFG.musicVolume = Math.min(1, CFG.musicVolume + 0.05); if (!muted) music.volume = CFG.musicVolume; }
   else if (k === 'arrowdown') { e.preventDefault(); CFG.musicVolume = Math.max(0, CFG.musicVolume - 0.05); if (!muted) music.volume = CFG.musicVolume; }
   else if (k === 'arrowleft' || k === 'arrowright') {

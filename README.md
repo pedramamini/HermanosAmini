@@ -101,6 +101,7 @@ It runs silently without audio, see [Audio](#audio) below.
 | `Shift`+`C` | crown on / off | | | |
 | `Shift`+`B` | skull breathing on / off | | | |
 | `Shift`+`S` | sombrero on / off | | | |
+| `Shift`+`M` | mustache: charro / handlebar / herradura | | | |
 | `H` or `?` | this list, in the piece | | | |
 
 The full list lives on `?` in the piece itself, alphabetized, with a fuzzy
@@ -115,6 +116,13 @@ Open the dials and there is a filter across the top: type to search, or pick a
 category (color, motion, beat, skull, sky, sound, system). The search matches
 the label, the internal key, and the category, so `ray` and `sunbeam` both find
 the same three dials.
+
+**What the piece randomizes, and what it does not.** Left alone, artifacts
+drift through: comets, auroras, a grito, the skull's own moods. What never
+changes on its own is what your calavera is WEARING. The crown, the sombrero
+and the mustache are yours, and neither the random engine, the dice, nor demo
+mode will touch them. Dress your skull once and the sky keeps changing around
+it.
 
 Click the art: the eyes follow you, face parts react, skulls flick away.
 Click the microphone to pick how you talk to it:
@@ -143,6 +151,15 @@ from whatever palette is active.
 through the frame, and a new one grows back a few seconds later. The empty
 bezel stays behind while it is gone, so a picked crown looks picked rather
 than broken.
+
+### El Bigote
+
+`Shift`+`M` cycles three serious mustache styles: **charro** (the level
+ranchero brush), **handlebar** (tips sweeping up into curls), and **herradura**
+(the horseshoe, arms dropping past the jaw). Six colours, from black through
+dark brown and chestnut to salt-and-pepper, silver, or taken from the palette.
+
+Requested by Ana Amini, age 8.
 
 ### Sombrero
 
