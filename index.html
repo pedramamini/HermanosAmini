@@ -2199,6 +2199,11 @@ function cfgApply(obj) {
    never moved the music. */
 function cfgAdopt(obj) {
   const n = cfgApply(obj);
+  /* A board that carries BOTH headwear flags predates the one-head-one-hat
+     rule. Resolve it the way the drawing layer always rendered it (hat over
+     crown), so an old share link looks the same as it did, instead of
+     suddenly losing its hat because the crown won a coin toss. */
+  if (CFG.sombrero && CFG.flowerCrown) CFG.flowerCrown = 0;
   syncSlidersSafe();
   /* Only once the track is running. Before the gate `musicSeek` is a START
      position that enterGate applies, so seeking here would fight it. */
@@ -6171,8 +6176,8 @@ const CHAT_FX = {
   demo:    () => toggleDemo(),
   /* the crown as a single verb, so "put a crown on" does not need the model
      to know that two dials cooperate */
-  crown:   () => { CFG.flowerCrown = 1; applyToggles({ skipVoice: true }); },
-  sombrero:() => { CFG.sombrero = 1; applyToggles({ skipVoice: true }); },
+  crown:   () => { CFG.flowerCrown = 1; wearOne('flowerCrown'); applyToggles({ skipVoice: true }); syncSlidersSafe(); },
+  sombrero:() => { CFG.sombrero = 1; wearOne('sombrero'); applyToggles({ skipVoice: true }); syncSlidersSafe(); },
   mustache:() => { CFG.bigote = 1; applyToggles({ skipVoice: true }); },
   breathe: () => { CFG.skullBreathe = CFG.skullBreathe ? 0 : 1; applyToggles({ skipVoice: true }); },
 };
@@ -6245,6 +6250,21 @@ function applyActions(actions) {
       if (a.key === 'crownMetal' && !CFG.flowerCrown) {
         CFG.flowerCrown = 1;
         done.push('crown on');
+      }
+      /* one head, one hat: a set that puts headwear ON displaces the other,
+         and the reply says so rather than leaving the model to report a crown
+         that the hat then covered */
+      {
+        /* the key being SET is the one that wins. Deciding by "which flag is
+           currently 1" would be wrong here: setting flowerCrown:1 while the
+           hat is on has both at 1 for one instruction, and the hat must be
+           the one to go. */
+        const worn = a.key === 'sombrero' ? 'sombrero'
+                   : (a.key === 'flowerCrown' || a.key === 'crownMetal') ? 'flowerCrown' : null;
+        if (worn && wearOne(worn)) {
+          done.push(worn === 'sombrero' ? 'crown off (the hat takes its place)'
+                                        : 'sombrero off (the crown takes its place)');
+        }
       }
       /* same trap, same fix: a model asked for "a grey handlebar mustache"
          sets the style and the colour and never the toggle, so nothing
@@ -7612,6 +7632,21 @@ window.SKLZ = {
 
 /* ── toggles: CFG holds the truth, applyToggles() makes the world match ──
    Everything here is saved and restored with the rest of the settings. */
+/* ── one head, one hat ──
+   The crown and the sombrero occupy the same place on the skull, so turning
+   either ON turns the other OFF. Before this, the drawing layer merely HID the
+   crown under a hat while both flags stayed set, which meant taking the hat
+   off resurrected a crown you had forgotten was there, and a share link
+   carried both. State-level exclusion, in one place, called by every path
+   that can turn one on (keys, the dial switches, the chat, fx names).
+   Returns true when something was displaced, so callers can say so. */
+function wearOne(key) {
+  const other = key === 'sombrero' ? 'flowerCrown' : key === 'flowerCrown' ? 'sombrero' : null;
+  if (!other || !CFG[key] || !CFG[other]) return false;
+  CFG[other] = 0;
+  return true;
+}
+
 function applyToggles(opts) {
   const o = opts || {};
   document.body.classList.toggle('notext', !CFG.textOn);
@@ -9149,6 +9184,8 @@ let syncSliders = () => {};   // real one is assigned inside buildCfg below
       sw.dataset.key = k;
       sw.addEventListener('click', () => {
         CFG[k] = CFG[k] ? 0 : 1;
+        /* the other headwear switch in the list must flip off visibly too */
+        if (wearOne(k)) syncSlidersSafe();
         applyToggles();
       });
       const spacer = document.createElement('span');
@@ -9384,8 +9421,9 @@ addEventListener('keydown', e => {
   else if (k === 's') {
     if (e.shiftKey) {
       CFG.sombrero = CFG.sombrero ? 0 : 1;
+      const took = wearOne('sombrero');
       applyToggles({ skipVoice: true }); syncSlidersSafe();
-      cfgStatusSay('sombrero ' + (CFG.sombrero ? 'on' : 'off'));
+      cfgStatusSay(CFG.sombrero ? (took ? 'sombrero on, crown off' : 'sombrero on') : 'sombrero off');
     } else fxShootingStar();
   }
   else if (k === 'p') fxPetalBurst();
@@ -9458,9 +9496,10 @@ addEventListener('keydown', e => {
        is one crown now, so cycling would be ceremony over nothing. */
     if (e.shiftKey) {
       CFG.flowerCrown = CFG.flowerCrown ? 0 : 1;
+      const took = wearOne('flowerCrown');
       applyToggles({ skipVoice: true });
       syncSlidersSafe();
-      cfgStatusSay('crown ' + (CFG.flowerCrown ? 'on' : 'off'));
+      cfgStatusSay(CFG.flowerCrown ? (took ? 'crown on, sombrero off' : 'crown on') : 'crown off');
     } else togglePanel(cfgPanel);
   }
   else if (k === 'h' || k === '?') togglePanel(helpPanel);
