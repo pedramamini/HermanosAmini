@@ -46,7 +46,7 @@
   }
   /* zen mode: every word off the screen, art only. Panels stay usable. */
   body.notext #eyebrow, body.notext #wordmark, body.notext #tag,
-  body.notext #credit, body.notext #hud, body.notext #ghstar {
+  body.notext #credit, body.notext #hud {
     opacity: 0 !important; pointer-events: none;
   }
   #eyebrow, #tag, #credit, #wordmark { transition: opacity .6s; }
@@ -257,21 +257,21 @@
      same buttons in the same place they always did. */
   body.zendraw .ctl {
     z-index: 18;                       /* above the tray they sit on */
-    transform: translateX(260px); opacity: 0; pointer-events: none;
+    transform: translateX(372px); opacity: 0; pointer-events: none;
   }
   body.zendraw.drawer-open .ctl { transform: none; opacity: 1; pointer-events: auto; }
-  /* right/bottom 14 = the buttons' own 24 minus 10 of padding; 232 x 64 wraps
-     the four-button row with that padding on every side. */
+  /* right/bottom 14 = the buttons' own 24 minus 10 of padding; 344 x 64 wraps
+     the SIX-button row (5 gaps of 56 + 44 + 20 of padding) on every side. */
   #zenDrawer {
     position: fixed; right: 14px; bottom: 14px; z-index: 16;
-    width: 232px; height: 64px; display: none;
+    width: 344px; height: 64px; display: none;
     background: rgba(9,4,20,.58);
     border: 1px solid rgba(245,234,223,.2); border-right: 0;
     border-radius: 15px 0 0 15px;
     backdrop-filter: blur(14px) saturate(1.2);
     -webkit-backdrop-filter: blur(14px) saturate(1.2);
     box-shadow: -10px 4px 30px rgba(0,0,0,.45);
-    transform: translateX(260px);
+    transform: translateX(372px);
     transition: transform .38s cubic-bezier(.16,1,.3,1);
     pointer-events: none;
   }
@@ -296,7 +296,7 @@
     border-color: rgba(245,234,223,.5);
   }
   /* rides out to the tray's leading edge, so the same target closes it */
-  body.zendraw.drawer-open #zenTab { transform: translateX(-246px); }
+  body.zendraw.drawer-open #zenTab { transform: translateX(-358px); }
   .ctl:hover { border-color: rgba(245,234,223,.7); }
   /* off state: dim and desaturated, so silence is legible at a glance and not
      only in a tooltip nobody hovers on a wall display */
@@ -325,6 +325,26 @@
   #settings { right: 80px; font-size: 17px; }
   #mute { right: 136px; }
   #mic { right: 192px; font-size: 14px; }
+  /* The GitHub badge and the screensaver download are the two LEFTMOST
+     buttons in the same bar. They used to be pills in the top corners; making
+     them real .ctl buttons means the zen drawer, kiosk, the mobile hammer stack
+     and every future rule about "the controls" apply to them by inheritance
+     rather than by six new special cases. Same 56px pitch as the rest. */
+  #saverBtn { right: 248px; }
+  #ghstar   { right: 304px; text-decoration: none; }
+  #ghstar svg, #saverBtn svg { width: 19px; height: 19px; display: block; }
+  /* the star count rides the badge as a small tag, so the button stays the
+     same 44px circle as its neighbours instead of stretching into a pill */
+  #ghcount {
+    position: absolute; top: -6px; right: -7px;
+    min-width: 18px; height: 18px; padding: 0 5px;
+    display: grid; place-items: center;
+    font-family: 'Space Grotesk', sans-serif; font-size: 10px; font-weight: 600;
+    letter-spacing: .02em; font-variant-numeric: tabular-nums;
+    color: #120a1e; background: #ffb347;
+    border-radius: 999px; border: 1px solid rgba(18,10,30,.5);
+    line-height: 1;
+  }
   #mic.listening {
     border-color: #ff2fa0;
     box-shadow: 0 0 14px rgba(255,47,160,.8);
@@ -357,7 +377,7 @@
   body.kiosk, body.kiosk * { cursor: none !important; }
   body.kiosk .ctl, body.kiosk #tools, body.kiosk #chatDock,
   body.kiosk #voiceMenu, body.kiosk #zenTab, body.kiosk #zenDrawer,
-  body.kiosk #palette, body.kiosk #saverBtn, body.kiosk #saverModal,
+  body.kiosk #palette, body.kiosk #saverModal,
   body.kiosk .panel { display: none !important; }
   /* The gate is removed from the layout entirely, not just faded. Hiding it by
      class alone was not enough: autoResume() puts the gate BACK if autoplay is
@@ -368,7 +388,7 @@
      which on a screensaver means the wordmark and credits visibly fade away
      every time it starts. Take them out of the layout so they never appear. */
   body.kiosk #eyebrow, body.kiosk #wordmark, body.kiosk #tag,
-  body.kiosk #credit, body.kiosk #hud, body.kiosk #ghstar,
+  body.kiosk #credit, body.kiosk #hud,
   body.kiosk #demodot, body.kiosk #recdot { display: none !important; }
   .panel, .panel * { cursor: auto; }
   .panel input[type=range], .panel button, #gate { cursor: pointer; }
@@ -1066,8 +1086,10 @@
     body.tools-open #settings { transform: translateY(-120px) scale(1); transition-delay: .04s; }
     body.tools-open #mute     { transform: translateY(-178px) scale(1); transition-delay: .08s; }
     body.tools-open #mic      { transform: translateY(-236px) scale(1); transition-delay: .12s; }
+    body.tools-open #saverBtn { transform: translateY(-294px) scale(1); transition-delay: .16s; }
+    body.tools-open #ghstar   { transform: translateY(-352px) scale(1); transition-delay: .20s; }
     /* the desktop right-offsets would scatter the stack sideways */
-    #mute, #help, #mic, #settings { right: 22px; }
+    #mute, #help, #mic, #settings, #saverBtn, #ghstar { right: 22px; }
 
     /* a sheet covers the tray anyway; hide both so nothing floats over it */
     body.sheet-open .ctl, body.sheet-open #tools {
@@ -1084,58 +1106,8 @@
 
   /* GitHub star badge, top-left. Same restraint as the rest of the chrome:
      dim until you look at it. Hidden in zen mode with the other text. */
-  #ghstar {
-    top: 16px; left: 18px; z-index: 16;
-    display: inline-flex; align-items: center; gap: 7px;
-    padding: 8px 14px 8px 11px; border-radius: 999px;
-    color: rgba(245,234,223,.62); text-decoration: none;
-    font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 500;
-    letter-spacing: .04em;
-    background: rgba(9,4,20,.34);
-    border: 1px solid rgba(245,234,223,.13);
-    backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px);
-    transition: color .25s, border-color .25s, background .25s, opacity .6s;
-    -webkit-tap-highlight-color: transparent;
-  }
-  #ghstar svg { width: 20px; height: 20px; display: block; flex: 0 0 auto; }
-  #ghstar:hover {
-    color: #f5eadf; border-color: rgba(245,234,223,.4);
-    background: rgba(9,4,20,.6);
-  }
-  /* until the count loads it shows a star glyph; no layout jump either way */
-  #ghcount { min-width: 10px; font-variant-numeric: tabular-nums; }
-  /* ── the screensaver button ──
-     Deliberately the same object as #ghstar, mirrored: same pill, same glass,
-     same hover, same type. Two differently-styled badges in two top corners
-     would read as two different apps having a disagreement. */
-  /* Sits immediately right of #ghstar, which is left-anchored and whose width
-     depends on the star count. A fixed `left` would drift as the count grows
-     past two digits, so JS measures the badge once it has a number and sets
-     --ghw; 0 is only the pre-measure fallback. Icon only: a word here is a
-     second label competing with the badge's count for the same eye. */
-  #saverBtn {
-    top: 16px; left: calc(18px + var(--ghw, 0px) + 8px); z-index: 16;
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 38px; height: 38px; padding: 0; border-radius: 999px;
-    color: rgba(245,234,223,.62); cursor: pointer; user-select: none;
-    font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 500;
-    letter-spacing: .04em;
-    background: rgba(9,4,20,.34);
-    border: 1px solid rgba(245,234,223,.13);
-    backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px);
-    transition: color .25s, border-color .25s, background .25s, opacity .6s;
-    -webkit-tap-highlight-color: transparent;
-  }
-  #saverBtn svg { width: 19px; height: 19px; display: block; flex: 0 0 auto; }
-  #saverBtn:hover {
-    color: #f5eadf; border-color: rgba(245,234,223,.4);
-    background: rgba(9,4,20,.6);
-  }
-  /* zen takes the words off the screen; this is a word */
-  body.notext #saverBtn { opacity: 0 !important; pointer-events: none; }
-  @media (max-width: 760px) {
-    #saverBtn { top: 12px; left: calc(12px + var(--ghw, 0px) + 6px); }
-  }
+  /* (#ghstar and #saverBtn are .ctl buttons in the bottom bar now; their
+     sizing lives with the other .ctl rules near the top of this sheet) */
   #saverModal {
     position: fixed; inset: 0; z-index: 41; display: none;
     background: rgba(4,2,10,.62);
@@ -1640,18 +1612,6 @@
 <canvas id="hero"></canvas>
 <canvas id="dust"></canvas>
 
-<a id="ghstar" class="ui" href="https://github.com/pedramamini/HermanosAmini"
-   target="_blank" rel="noopener noreferrer" title="Star us on GitHub">
-  <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.922.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
-  <span id="ghcount">&#9733;</span>
-</a>
-<div id="saverBtn" class="ui" role="button" tabindex="0" title="get the screensaver">
-  <svg viewBox="0 0 24 24" aria-hidden="true">
-    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-          stroke-linejoin="round" d="M12 3v11m0 0-4.2-4.2M12 14l4.2-4.2M4 17v2.5A1.5 1.5 0 0 0 5.5 21h13a1.5 1.5 0 0 0 1.5-1.5V17"/>
-  </svg>
-</div>
-
 <div id="saverModal" class="ui" role="dialog" aria-modal="true" aria-label="get the screensaver">
   <div id="saverCard">
     <div class="saverclose" role="button" tabindex="0" aria-label="close">&#10005;</div>
@@ -1702,6 +1662,17 @@
 </div>
 <div id="credit" class="ui">music &middot; j. pool: latin &amp; world downtempo</div>
 <div id="tools" class="ui" title="tools">&#128296;</div>
+<a id="ghstar" class="ui ctl" href="https://github.com/pedramamini/HermanosAmini"
+   target="_blank" rel="noopener noreferrer" title="Star us on GitHub">
+  <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.922.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
+  <span id="ghcount" aria-label="stars">&#9733;</span>
+</a>
+<div id="saverBtn" class="ui ctl" role="button" tabindex="0" title="get the screensaver">
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          stroke-linejoin="round" d="M12 3v11m0 0-4.2-4.2M12 14l4.2-4.2M4 17v2.5A1.5 1.5 0 0 0 5.5 21h13a1.5 1.5 0 0 0 1.5-1.5V17"/>
+  </svg>
+</div>
 <div id="mic" class="ui ctl" title="voice control">&#127908;</div>
 <div id="mute" class="ui ctl" title="sound">&#9835;</div>
 <div id="settings" class="ui ctl" title="settings &amp; presets">&#9881;</div>
@@ -9664,17 +9635,9 @@ ideaSend.addEventListener('click', async () => {
   const el = document.getElementById('ghcount');
   if (!el) return;
   const KEY = 'sklz.ghstars.v1', TTL = 6 * 3600 * 1000;
-  const badge = document.getElementById('ghstar');
-  /* the screensaver button hangs off this badge's right edge, and the badge
-     is as wide as its number, so measure after every write rather than once */
-  const place = () => {
-    if (badge) document.documentElement.style.setProperty('--ghw', badge.offsetWidth + 'px');
-  };
   const show = n => {
     el.textContent = n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k' : String(n);
-    place();
   };
-  place();                                  // star glyph width, before any count
   try {
     const c = JSON.parse(localStorage.getItem(KEY) || 'null');
     if (c && Date.now() - c.at < TTL) { show(c.n); return; }
