@@ -646,6 +646,18 @@
     font-variant-numeric: tabular-nums;
   }
   #helpTable tr.hid { display: none; }
+  /* Keyboard selection. A CLASS, not :hover, for the same reason as the
+     palette: the arrows own this, and a mouse resting over the table while you
+     arrow through it would light a second row and make Enter ambiguous. The
+     keycap itself gets the highlight ring, because that is the thing Enter
+     presses. */
+  #helpTable tr.sel td { background: rgba(145,70,255,.16); }
+  #helpTable tr.sel td:first-child { border-radius: 10px 0 0 10px; }
+  #helpTable tr.sel td:last-child  { border-radius: 0 10px 10px 0; }
+  #helpTable tr.sel kbd {
+    border-color: rgba(255,179,71,.85);
+    box-shadow: 0 0 0 2px rgba(255,179,71,.35), 0 3px 0 rgba(0,0,0,.45);
+  }
   /* the matched characters. Weight AND color, so it survives being read at a
      glance on a moving background. */
   #helpTable b.hl { color: #ffb347; font-weight: 600; }
@@ -8453,6 +8465,39 @@ function helpFilter(tb) {
     shown.textContent = hit.length + '/' + order.length;
   }
 
+  /* ── keyboard selection ──
+     Focus stays in the keyword box the whole time. Arrows move a highlight
+     through the VISIBLE rows in their current (relevance) order, Enter presses
+     the highlighted row's first keycap, and typing re-filters and snaps the
+     highlight back to the top hit. So "hat", down, down, Enter fires the third
+     match without the hands ever leaving the field, which is the whole point
+     of a list of hotkeys: you should not need the mouse to use it.
+
+     Enter dispatches through the keycap's own click handler rather than
+     re-deriving the key event here. That handler already knows about shift
+     rows, the second cap of a two-key row, and the capture keys that close
+     the panel before firing; a second copy of that logic would drift. */
+  let sel = -1;
+  const visible = () => order.filter(tr => !tr.classList.contains('hid'))
+                             .sort((a, b) => (a.compareDocumentPosition(b) & 4) ? -1 : 1);
+  function mark(i, scroll) {
+    const rows = visible();
+    order.forEach(tr => tr.classList.remove('sel'));
+    if (!rows.length) { sel = -1; return; }
+    sel = Math.max(0, Math.min(rows.length - 1, i));
+    rows[sel].classList.add('sel');
+    if (scroll) rows[sel].scrollIntoView({ block: 'nearest' });
+  }
+  function fireSel() {
+    const rows = visible();
+    const tr = rows[sel];
+    if (!tr) return false;
+    const kb = tr.querySelector('kbd');
+    if (!kb) return false;
+    kb.click();
+    return true;
+  }
+
   input.addEventListener('input', () => {
     apply();
     /* The list reorders by relevance, so whatever you were looking at is no
@@ -8461,6 +8506,11 @@ function helpFilter(tb) {
        is the reason you typed. */
     const sc = helpPanel.querySelector('.sheetbody') || helpPanel;
     if (sc.scrollTop) sc.scrollTop = 0;
+    /* the top hit is pre-selected only while a query is live: with the box
+       empty the list is a reference table, not a menu, and a permanently lit
+       first row would read as "A is special" */
+    mark(input.value.trim() ? 0 : -1, false);
+    if (!input.value.trim()) order.forEach(tr => tr.classList.remove('sel'));
   });
   /* Escape clears before it does anything else. The global handler blurs the
      field on Escape and the panel's own handler would close the panel, so
@@ -8470,6 +8520,17 @@ function helpFilter(tb) {
     if (e.key === 'Escape' && input.value) {
       e.stopPropagation(); e.preventDefault();
       input.value = ''; apply();
+      order.forEach(tr => tr.classList.remove('sel')); sel = -1;
+      return;
+    }
+    if (e.key === 'ArrowDown') { e.preventDefault(); e.stopPropagation(); mark(sel + 1, true); return; }
+    if (e.key === 'ArrowUp')   { e.preventDefault(); e.stopPropagation(); mark(sel - 1, true); return; }
+    if (e.key === 'Enter') {
+      e.preventDefault(); e.stopPropagation();
+      /* Enter with nothing highlighted takes the top visible row, so a query
+         plus Enter works even before an arrow has been pressed */
+      if (sel < 0) mark(0, false);
+      fireSel();
     }
   });
   box.addEventListener('click', e => {
