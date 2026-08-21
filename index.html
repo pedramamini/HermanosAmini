@@ -2067,9 +2067,15 @@ const CFG_SCHEMA = {
   crownPeaks:     [4,     3,     7,    1,     'crown points'],
   /* ── the pointer ──
      Nine cursors, indexed like every other named dial here (see bigoteStyle).
-     0 is the candle this piece has always had. 1 hands the OS pointer back.
-     2..8 are drawn shapes. See CURSORS for why they are SVG and not canvas. */
-  cursorStyle:    [0,     0,     8,    1,     'cursor: 0 candle 1 system 2 big 3 skull 4 knife 5 sword 6 marigold 7 bone 8 crosshair'],
+     0 is the candle this piece had as its pointer until v1.66.0. 1 hands the
+     OS pointer back. 2..8 are drawn shapes. See CURSORS for why they are SVG
+     and not canvas.
+     THE DEFAULT IS 8, THE CROSSHAIR. Changing a default here changes every
+     share link and saved board that does NOT pin the dial, since the share
+     string carries only non-default values. Checked before flipping: of the
+     stored shorts, only one pinned cursorStyle and it pinned 4 explicitly, so
+     it is unaffected; no gallery preset pins it. */
+  cursorStyle:    [8,     0,     8,    1,     'cursor: 0 candle 1 system 2 big 3 skull 4 knife 5 sword 6 marigold 7 bone 8 crosshair'],
 };
 /* ── categories ──
    Every dial belongs to exactly one, for the filter dropdown. Kept as a
@@ -5673,7 +5679,7 @@ function fxRestyle() {
      for it in the dice by name. `system` (1) is excluded from the roll only
      because rolling it would look like the feature broke; anyone who wants the
      OS pointer back picks it deliberately. */
-  CFG.cursorStyle = Math.random() < 0.35 ? 0 : 2 + ((Math.random() * 7) | 0);
+  CFG.cursorStyle = Math.random() < 0.2 ? 0 : 2 + ((Math.random() * 7) | 0);
 
   applyToggles({ skipVoice: true });
   applyPalette();
