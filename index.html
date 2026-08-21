@@ -2997,12 +2997,12 @@ function drawSkull(ctx, S, opt) {
   skullPath();
   ctx.clip();
 
-  /* dome sutures */
-  ctx.lineWidth = 4; ctx.globalAlpha = 0.53; ctx.strokeStyle = opt.bone3;
-  ctx.beginPath(); ctx.moveTo(0, -440);
-  for (let y = -440; y < -260; y += 24) ctx.lineTo(((y / 24) % 2 ? 10 : -10), y);
-  ctx.stroke();
-  ctx.globalAlpha = 1;
+  /* The dome suture that used to be drawn here was REMOVED. It was a 4px
+     zigzag of only +/-10px amplitude from the apex down to the third eye,
+     which at the hero's size does not read as a cranial suture at all: it
+     reads as a hairline crack, a seam in the render. Pedram pointed at it
+     and called it a glitch, and he was right to. The tunnel skulls never
+     showed it legibly either, so nothing is lost. */
 
   /* ── eye sockets: dark wells ringed with petals ── */
   if (!opt.animFace) for (const sx of [-1, 1]) {
@@ -3675,7 +3675,13 @@ const SOM_TILT = -0.13;          // radians, brim dips to the viewer's right
    because the eye is not RENDERED while the hat is on: drawing a living,
    blinking, gaze-tracking eye underneath an opaque brim would be pure wasted
    frame time (its halo alone is a radial gradient per frame). */
-const SOM_SIT  = -400;
+/* -365, not -400. At -400 the crown's base (hat y 20) landed at skull
+   y -475, which is ABOVE the dome's apex at -440: the head never entered
+   the hat. The brim sliced across the top of the skull and the crown hovered
+   over it, and that is precisely the "floating in front" read. At -365 the
+   crown base sits 12px below the apex, so the dome visibly goes up INTO the
+   hat, while the brim's near edge still clears the eye sockets by 40px. */
+const SOM_SIT  = -365;
 
 function drawSombrero() {
   if (!CFG.sombrero) return;
@@ -3710,20 +3716,58 @@ function drawSombrero() {
      ends. CHATTER: the clacking carries up the skull as a small jiggle,
      damped harder than the mustache because there is a whole cranium between
      the teeth and the hat. STARE: pulled DOWN over the brow, the glower. */
-  hctx.translate(0, SOM_SIT + bob - 30 * yv + chat * 2.5 + 12 * stare.k);
-  hctx.rotate(SOM_TILT * (1 + 0.45 * yv));
+  const lift = SOM_SIT + bob - 30 * yv + chat * 2.5 + 12 * stare.k;
+  const tilt = SOM_TILT * (1 + 0.45 * yv);
 
-  /* Shadow on the bone first. Without it the hat floats and the calavera
-     reads as standing behind a hat rather than wearing one. */
-  hctx.save();
-  hctx.globalAlpha = 0.40;
-  hctx.fillStyle = PAL.dark;
-  hctx.beginPath();
-  hctx.moveTo(-BW * 0.84, BW * 0.02);
-  hctx.quadraticCurveTo(0, BW * 0.42, BW * 0.84, BW * 0.02);
-  hctx.quadraticCurveTo(0, BW * 0.50, -BW * 0.84, BW * 0.02);
-  hctx.closePath(); hctx.fill();
-  hctx.restore();
+  /* brim geometry, shared by the shadow below and the brim itself.
+     BOT is 0.30, down from 0.36: a brim seen from eye level is nearly
+     edge-on, and a 270px-thick slab across the forehead is what a PLATE held
+     in front of a face looks like. The thickness was measured from a photo
+     taken from above the hat, which is not where a viewer of this piece
+     stands. */
+  const TIPT = -BW * 0.12;
+  const TIPB = -BW * 0.10;
+  const BOT  = BW * 0.30;
+
+  /* ── THE SHADOW THE BRIM THROWS ON THE SKULL ──
+     This is the single thing that makes a hat WORN rather than held up in
+     front of a face, and the old version got it wrong twice over: it painted
+     a lens of shade BEFORE the brim, in a spot the brim then covered, and it
+     was not clipped to the bone, so what little showed bled into the sky.
+
+     Drawn here, before the hat's own transform, because skullOutlinePath()
+     is valid in exactly this frame (the face-clip block and drawCrown both
+     enter it the same way). Clip to the silhouette, THEN move into hat space
+     and fill a band that hangs off the brim's near edge: the shade follows
+     the brim's curve, falls off downward, and stops dead at the bone's
+     outline, which is what a cast shadow does. It darkens the top of the
+     petals and sockets too, correctly: a shadow does not know what it lands
+     on. */
+  if (q < 4) {
+    hctx.save();
+    skullOutlinePath(hctx, 0);
+    hctx.clip();
+    hctx.translate(0, lift);
+    hctx.rotate(tilt);
+    const D = BW * 0.21;                   // how far the shade reaches down
+    hctx.beginPath();
+    hctx.moveTo(-BW, TIPB);
+    hctx.bezierCurveTo(-BW * 0.77, BOT * 0.34, -BW * 0.39, BOT * 0.92, 0, BOT);
+    hctx.bezierCurveTo(BW * 0.39, BOT * 0.92, BW * 0.77, BOT * 0.34, BW, TIPB);
+    hctx.lineTo(BW, TIPB + D);
+    hctx.bezierCurveTo(BW * 0.77, BOT * 0.34 + D, BW * 0.39, BOT * 0.92 + D, 0, BOT + D);
+    hctx.bezierCurveTo(-BW * 0.39, BOT * 0.92 + D, -BW * 0.77, BOT * 0.34 + D, -BW, TIPB + D);
+    hctx.closePath();
+    const sg = hctx.createLinearGradient(0, BOT * 0.55, 0, BOT + D);
+    sg.addColorStop(0, 'rgba(0,0,0,.58)');
+    sg.addColorStop(0.45, 'rgba(0,0,0,.34)');
+    sg.addColorStop(1, 'rgba(0,0,0,0)');
+    hctx.fillStyle = sg; hctx.fill();
+    hctx.restore();
+  }
+
+  hctx.translate(0, lift);
+  hctx.rotate(tilt);
 
   /* ── the crown: a CATTLEMAN CREASE, not a dome ──
      Two peaks with a notch pinched between them. This is the single feature
@@ -3780,9 +3824,6 @@ function drawSombrero() {
      FRONT now turns DOWN harder: the bottom edge at centre drops from 0.31 to
      0.36 of the half-width, so the brim shades the eyes rather than framing
      them. A hat worn low is what "tough" looks like in a silhouette. */
-  const TIPT = -BW * 0.12;
-  const TIPB = -BW * 0.10;
-  const BOT  = BW * 0.36;
   hctx.beginPath();
   hctx.moveTo(-BW, TIPT);
   hctx.bezierCurveTo(-BW * 0.75, TIPT * 0.68, -BW * 0.36, -14, 0, 0);
@@ -3792,12 +3833,34 @@ function drawSombrero() {
   hctx.bezierCurveTo(-BW * 0.39, BOT * 0.92, -BW * 0.77, BOT * 0.34, -BW, TIPB);
   hctx.quadraticCurveTo(-BW - 14, (TIPT + TIPB) / 2, -BW, TIPT);
   hctx.closePath();
-  const bg = hctx.createLinearGradient(0, TIPT, 0, BOT);
+  /* Seen from eye level you are looking at the brim's UNDERSIDE, which is
+     in its own shadow, with only the curled tips catching light. The old
+     gradient ran light-at-top to dark-at-bottom, which is the shading of a
+     brim viewed from ABOVE, and that contradiction (a top-lit brim on a hat
+     whose crown you see from the front) is part of why the hat did not sit.
+     Horizontal now: dark through the middle, lifting toward each tip. */
+  const bg = hctx.createLinearGradient(-BW, 0, BW, 0);
   bg.addColorStop(0, F1);
-  bg.addColorStop(0.45, F2);
-  bg.addColorStop(1, F3);
+  bg.addColorStop(0.22, F3);
+  bg.addColorStop(0.5, F3);
+  bg.addColorStop(0.78, F3);
+  bg.addColorStop(1, F1);
   hctx.fillStyle = bg; hctx.fill();
   hctx.strokeStyle = F3; hctx.lineWidth = 6; hctx.stroke();
+
+  /* a thin lit lip along the NEAR edge: the one line of the brim that faces
+     the light when the underside is toward you. Without it the bottom edge
+     is a hard black cut against the bone and reads as a paper edge. */
+  if (q < 4) {
+    hctx.save();
+    hctx.beginPath();
+    hctx.moveTo(-BW * 0.9, TIPB + BOT * 0.10);
+    hctx.bezierCurveTo(-BW * 0.72, BOT * 0.40, -BW * 0.38, BOT * 0.94, 0, BOT - 3);
+    hctx.bezierCurveTo(BW * 0.38, BOT * 0.94, BW * 0.72, BOT * 0.40, BW * 0.9, TIPB + BOT * 0.10);
+    hctx.strokeStyle = 'rgba(255,236,214,.20)'; hctx.lineWidth = 2.5;
+    hctx.stroke();
+    hctx.restore();
+  }
 
   /* the crown casts onto the brim: one ellipse of shade is most of what
      separates "two shapes stacked" from "one object under a light" */
