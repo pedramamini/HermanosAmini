@@ -357,7 +357,8 @@
   body.kiosk, body.kiosk * { cursor: none !important; }
   body.kiosk .ctl, body.kiosk #tools, body.kiosk #chatDock,
   body.kiosk #voiceMenu, body.kiosk #zenTab, body.kiosk #zenDrawer,
-  body.kiosk #palette, body.kiosk .panel { display: none !important; }
+  body.kiosk #palette, body.kiosk #saverBtn, body.kiosk #saverModal,
+  body.kiosk .panel { display: none !important; }
   /* The gate is removed from the layout entirely, not just faded. Hiding it by
      class alone was not enough: autoResume() puts the gate BACK if autoplay is
      refused, and a screensaver has no one to click it. CSS wins over any class
@@ -380,25 +381,34 @@
   .panel {
     position: fixed; z-index: 15; right: 24px; bottom: 80px;
     max-height: 82vh; overflow-y: auto; width: auto; min-width: 500px;
-    background: rgba(10,5,22,.45); border: 1px solid rgba(245,234,223,.16);
+    /* .82, not .45. At .45 the art showed straight through the text and the
+       panels were hard to read over a busy board, which is the opposite of
+       what a reading surface is for. The blur is doubled with it: a heavy
+       tint over a light blur still lets high-contrast shapes ghost through. */
+    background: rgba(10,5,22,.82); border: 1px solid rgba(245,234,223,.2);
     border-radius: 14px; padding: 18px 26px; color: #f5eadf;
     font-family: 'Space Grotesk', sans-serif; font-size: 13px;
-    backdrop-filter: blur(10px); display: none;
+    backdrop-filter: blur(20px) saturate(1.15);
+    -webkit-backdrop-filter: blur(20px) saturate(1.15);
+    box-shadow: 0 24px 70px rgba(0,0,0,.5);
+    display: none;
   }
   .panel.show { display: block; }
-  /* CENTRED, not corner-anchored. The gear and the controls list are modal
-     reading surfaces: you stop looking at the art to use them, and a 600px
-     sheet pinned to the bottom-right corner spends half its width over the
-     skull it is describing. The sound and voice popovers deliberately do NOT
-     move: they are one-glance controls that must point at the button that
-     opened them, and centring those would break the pointing.
-     Corner-anchoring is dropped explicitly (right/bottom auto) or the fixed
-     box keeps its old edge and the translate just slides it off-screen. */
+  /* RIGHT-ALIGNED, above the button bar that opens them. Centring (v1.59.0)
+     put a solid panel across the middle of the composition, and now that the
+     panels are properly opaque that is most of the picture gone. Parked at the
+     right edge over the control bar, the whole left two thirds of the art
+     stays visible while you work, and the panel sits directly above the button
+     you pressed to get it.
+     `transform: none` is load-bearing: the centring rule set a translate, and
+     several code paths (the mobile sheet drag, togglePanel's reset) read and
+     write `style.transform`, so leaving a stale translate here would offset
+     every panel by half its own size. */
   #cfgPanel, #helpPanel, #galPanel {
-    right: auto; bottom: auto;
-    left: 50%; top: 50%;
-    transform: translate(-50%, -50%);
-    max-height: 86vh;
+    right: 24px; left: auto;
+    bottom: 84px; top: auto;
+    transform: none;
+    max-height: calc(100vh - 116px);
   }
   /* The one panel whose entire job is being READ, so it is sized to the table
      rather than to the viewport. It used to inherit `width: auto`, which on a
@@ -1094,6 +1104,97 @@
   }
   /* until the count loads it shows a star glyph; no layout jump either way */
   #ghcount { min-width: 10px; font-variant-numeric: tabular-nums; }
+  /* ── the screensaver button ──
+     Deliberately the same object as #ghstar, mirrored: same pill, same glass,
+     same hover, same type. Two differently-styled badges in two top corners
+     would read as two different apps having a disagreement. */
+  #saverBtn {
+    top: 16px; right: 18px; z-index: 16;
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 8px 14px 8px 11px; border-radius: 999px;
+    color: rgba(245,234,223,.62); cursor: pointer; user-select: none;
+    font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 500;
+    letter-spacing: .04em;
+    background: rgba(9,4,20,.34);
+    border: 1px solid rgba(245,234,223,.13);
+    backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px);
+    transition: color .25s, border-color .25s, background .25s, opacity .6s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #saverBtn svg { width: 19px; height: 19px; display: block; flex: 0 0 auto; }
+  #saverBtn:hover {
+    color: #f5eadf; border-color: rgba(245,234,223,.4);
+    background: rgba(9,4,20,.6);
+  }
+  /* zen takes the words off the screen; this is a word */
+  body.notext #saverBtn { opacity: 0 !important; pointer-events: none; }
+  @media (max-width: 760px) {
+    /* the label is the first thing to go: the icon still says "download" */
+    #saverBtn span { display: none; }
+    #saverBtn { padding: 8px 10px; top: 12px; right: 12px; }
+  }
+  #saverModal {
+    position: fixed; inset: 0; z-index: 41; display: none;
+    background: rgba(4,2,10,.62);
+    backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+  }
+  #saverModal.show { display: block; }
+  #saverCard {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: min(520px, calc(100vw - 32px)); max-height: 86vh; overflow-y: auto;
+    padding: 26px 30px 24px; border-radius: 18px;
+    color: #f5eadf; font-family: 'Space Grotesk', sans-serif;
+    background: rgba(11,5,24,.94);
+    border: 1px solid rgba(245,234,223,.2);
+    box-shadow: 0 30px 90px rgba(0,0,0,.72);
+    animation: palIn .18s cubic-bezier(.16,1,.3,1);
+  }
+  #saverCard h3 {
+    font-family: 'Anton', Impact, sans-serif; font-size: 21px;
+    letter-spacing: .1em; color: #ffb347; margin-bottom: 10px;
+    padding-right: 34px;
+  }
+  .saverlede { font-size: 13.5px; line-height: 1.55; color: rgba(245,234,223,.82); }
+  .saverbtn {
+    display: block; margin: 18px 0 6px; padding: 13px 0;
+    text-align: center; text-decoration: none; cursor: pointer;
+    font-size: 14.5px; font-weight: 500; color: #fff;
+    background: linear-gradient(180deg, rgba(145,70,255,.95), rgba(110,45,210,.95));
+    border: 1px solid rgba(255,255,255,.22); border-radius: 10px;
+    transition: filter .18s;
+  }
+  .saverbtn:hover { filter: brightness(1.14); }
+  #saverVer {
+    text-align: center; font-size: 10.5px; letter-spacing: .1em;
+    text-transform: uppercase; color: rgba(245,234,223,.4);
+    min-height: 14px;                      /* no layout jump when it resolves */
+  }
+  .saversteps {
+    margin: 16px 0 0; padding-left: 20px;
+    font-size: 13px; line-height: 1.65; color: rgba(245,234,223,.86);
+  }
+  .saversteps li { margin-bottom: 7px; }
+  .saversteps code, .saverfine code {
+    font-family: 'SF Mono', 'Menlo', monospace; font-size: 12px;
+    padding: 1px 5px; border-radius: 4px;
+    background: rgba(245,234,223,.1);
+  }
+  .saverfine {
+    margin-top: 16px; padding-top: 13px; font-size: 11.5px; line-height: 1.5;
+    color: rgba(245,234,223,.45);
+    border-top: 1px solid rgba(245,234,223,.12);
+  }
+  .saverclose {
+    position: absolute; top: 16px; right: 16px;
+    width: 30px; height: 30px; display: grid; place-items: center;
+    border-radius: 50%; cursor: pointer; font-size: 13px;
+    color: rgba(245,234,223,.65);
+    background: rgba(245,234,223,.08);
+    border: 1px solid rgba(245,234,223,.16);
+    transition: color .2s, background .2s;
+  }
+  .saverclose:hover { color: #f5eadf; background: rgba(245,234,223,.18); }
+
   /* ── voice mode menu: a small popover above the mic ── */
   #voiceMenu {
     position: fixed; right: 24px; bottom: 80px; z-index: 24; display: none;
@@ -1541,6 +1642,40 @@
   <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.922.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
   <span id="ghcount">&#9733;</span>
 </a>
+<div id="saverBtn" class="ui" role="button" tabindex="0" title="get the screensaver">
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          stroke-linejoin="round" d="M12 3v11m0 0-4.2-4.2M12 14l4.2-4.2M4 17v2.5A1.5 1.5 0 0 0 5.5 21h13a1.5 1.5 0 0 0 1.5-1.5V17"/>
+  </svg>
+  <span>screensaver</span>
+</div>
+
+<div id="saverModal" class="ui" role="dialog" aria-modal="true" aria-label="get the screensaver">
+  <div id="saverCard">
+    <div class="saverclose" role="button" tabindex="0" aria-label="close">&#10005;</div>
+    <h3>Take it home</h3>
+    <p class="saverlede">The macOS screensaver runs this exact piece, live. It is
+      not a recording: it pulls the art from the web, so it updates itself as
+      new things ship. Silent by design, and it fills every display you have.</p>
+    <a id="saverDl" class="saverbtn" href="https://github.com/pedramamini/HermanosAmini/releases/latest"
+       target="_blank" rel="noopener noreferrer">
+      <span id="saverDlText">download for macOS</span>
+    </a>
+    <div id="saverVer"></div>
+    <ol class="saversteps">
+      <li>Unzip it. You get <code>SKLZ.saver</code>.</li>
+      <li>Double-click it. macOS asks whether to install for you or for
+        everyone; either is fine.</li>
+      <li>It opens <b>System Settings &rarr; Screen Saver</b> with SKLZ selected.</li>
+      <li>Hit <b>Options&hellip;</b> to choose what it shows: the living art, demo
+        mode (a new look every 3 minutes), or one specific board from a share
+        link you made.</li>
+    </ol>
+    <p class="saverfine">Signed and notarized by Apple, so it installs without a
+      Gatekeeper warning. Windows users: there is a <code>.scr</code> on the same
+      release page, still untested on real hardware.</p>
+  </div>
+</div>
 <div id="eyebrow" class="ui">los que amamos nunca mueren</div>
 <div id="wordmark" class="ui"><span id="wm-stack">SKLZ<span id="wm-fill" aria-hidden="true">SKLZ</span></span><small>ritmos de los muertos</small></div>
 <div id="tag" class="ui">una obra psicod&eacute;lica de los hermanos amini</div>
@@ -8430,6 +8565,7 @@ function palBuild() {
     ['open settings and presets', 'panel', '⚙️', () => { if (!cfgPanel.classList.contains('show')) togglePanel(cfgPanel); }],
     ['open the controls list', 'panel', '⌨️', () => { if (!helpPanel.classList.contains('show')) togglePanel(helpPanel); }],
     ['browse the gallery', 'panel', '\u{1F5BC}️', () => document.getElementById('galBrowse').click()],
+    ['get the macOS screensaver', 'download', '\u{1F5B5}️', () => document.getElementById('saverBtn').click()],
     ['open the sound menu', 'panel', '♫', () => { if (!soundMenu.classList.contains('show')) muteBtn.click(); }],
     ['copy a link to this board', 'share', '\u{1F517}', () => { if (!cfgPanel.classList.contains('show')) togglePanel(cfgPanel); document.getElementById('cfgLink').click(); }],
     ['save this board to my browser', 'save', '\u{1F4BE}', () => document.getElementById('cfgSave').click()],
@@ -9478,6 +9614,74 @@ ideaSend.addEventListener('click', async () => {
       try { localStorage.setItem(KEY, JSON.stringify({ n: d.stargazers_count, at: Date.now() })); } catch (_) {}
     })
     .catch(() => {});
+})();
+
+/* ── the screensaver offer ──
+   A download button in the top-right corner and the modal behind it.
+
+   THE LINK ALWAYS POINTS AT THE LATEST RELEASE, and it does so in two layers,
+   because this project has already shipped a stale download once: the README's
+   link served a broken v1.30.0 build for seventeen tags because nobody checked
+   what a stranger actually received.
+
+     1. The href is hard-coded to `/releases/latest`, which GitHub resolves
+        server-side. That works with no JS, no network call, and forever.
+     2. On open, ONE call to the GitHub API upgrades it to the direct asset URL
+        and prints the version, so a click starts the download instead of
+        landing on a page where you still have to find the zip.
+
+   Layer 2 is a nicety that can fail. Layer 1 is the guarantee, so nothing here
+   ever REPLACES a working link with a broken one: the fetch only ever
+   overwrites the href once it holds a real asset. */
+(function screensaverOffer() {
+  const btn = document.getElementById('saverBtn');
+  const modal = document.getElementById('saverModal');
+  const dl = document.getElementById('saverDl');
+  const dlText = document.getElementById('saverDlText');
+  const ver = document.getElementById('saverVer');
+  if (!btn || !modal) return;
+  let resolved = false;
+
+  function resolveLatest() {
+    if (resolved) return;
+    resolved = true;                       // one call per page, not per open
+    fetch('https://api.github.com/repos/pedramamini/HermanosAmini/releases/latest')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (!d) return;
+        if (d.tag_name) ver.textContent = d.tag_name + ' · signed + notarized';
+        /* find the macOS asset by NAME rather than by position: the release
+           carries a Windows .scr too, and assets[0] is whichever was uploaded
+           first, which is not a promise anyone made. */
+        const mac = (d.assets || []).find(a => /macos/i.test(a.name) && /\.zip$/i.test(a.name));
+        if (mac && mac.browser_download_url) {
+          dl.href = mac.browser_download_url;
+          dl.removeAttribute('target');     // a direct file download, not a page
+          const mb = mac.size ? ' · ' + (mac.size / 1024).toFixed(0) + ' KB' : '';
+          dlText.textContent = 'download for macOS' + mb;
+        }
+      })
+      .catch(() => {});                    // the hard-coded href still works
+  }
+
+  function open() {
+    modal.classList.add('show');
+    resolveLatest();
+  }
+  function close() { modal.classList.remove('show'); }
+
+  btn.addEventListener('click', open);
+  btn.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+  });
+  modal.querySelector('.saverclose').addEventListener('click', close);
+  /* the scrim closes, a click inside the card does not */
+  modal.addEventListener('pointerdown', e => { if (e.target === modal) close(); });
+  addEventListener('keydown', e => {
+    if (e.key === 'Escape' && modal.classList.contains('show')) {
+      e.stopPropagation(); close();
+    }
+  }, true);   // capture: the art's own Escape handler would otherwise eat it
 })();
 
 /* ── hammer tray (mobile) ──

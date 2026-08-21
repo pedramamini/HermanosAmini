@@ -5,6 +5,14 @@
 </p>
 
 <p align="center">
+  <a href="https://www.youtube.com/shorts/cTG8Gs4MtuU"><img src="https://img.youtube.com/vi/cTG8Gs4MtuU/maxresdefault.jpg" alt="Watch SKLZ in motion" width="360"></a>
+</p>
+
+<p align="center">
+  <b><a href="https://www.youtube.com/shorts/cTG8Gs4MtuU">▶ Watch it move (60 seconds)</a></b>
+</p>
+
+<p align="center">
   <a href="https://runmaestro.ai"><img src="https://runmaestro.ai/assets/made-with-maestro.svg" alt="Made with Maestro"></a>
 </p>
 
