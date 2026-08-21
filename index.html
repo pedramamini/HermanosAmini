@@ -1108,10 +1108,15 @@
      Deliberately the same object as #ghstar, mirrored: same pill, same glass,
      same hover, same type. Two differently-styled badges in two top corners
      would read as two different apps having a disagreement. */
+  /* Sits immediately right of #ghstar, which is left-anchored and whose width
+     depends on the star count. A fixed `left` would drift as the count grows
+     past two digits, so JS measures the badge once it has a number and sets
+     --ghw; 0 is only the pre-measure fallback. Icon only: a word here is a
+     second label competing with the badge's count for the same eye. */
   #saverBtn {
-    top: 16px; right: 18px; z-index: 16;
-    display: inline-flex; align-items: center; gap: 7px;
-    padding: 8px 14px 8px 11px; border-radius: 999px;
+    top: 16px; left: calc(18px + var(--ghw, 0px) + 8px); z-index: 16;
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 38px; height: 38px; padding: 0; border-radius: 999px;
     color: rgba(245,234,223,.62); cursor: pointer; user-select: none;
     font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 500;
     letter-spacing: .04em;
@@ -1129,9 +1134,7 @@
   /* zen takes the words off the screen; this is a word */
   body.notext #saverBtn { opacity: 0 !important; pointer-events: none; }
   @media (max-width: 760px) {
-    /* the label is the first thing to go: the icon still says "download" */
-    #saverBtn span { display: none; }
-    #saverBtn { padding: 8px 10px; top: 12px; right: 12px; }
+    #saverBtn { top: 12px; left: calc(12px + var(--ghw, 0px) + 6px); }
   }
   #saverModal {
     position: fixed; inset: 0; z-index: 41; display: none;
@@ -1647,7 +1650,6 @@
     <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
           stroke-linejoin="round" d="M12 3v11m0 0-4.2-4.2M12 14l4.2-4.2M4 17v2.5A1.5 1.5 0 0 0 5.5 21h13a1.5 1.5 0 0 0 1.5-1.5V17"/>
   </svg>
-  <span>screensaver</span>
 </div>
 
 <div id="saverModal" class="ui" role="dialog" aria-modal="true" aria-label="get the screensaver">
@@ -9662,9 +9664,17 @@ ideaSend.addEventListener('click', async () => {
   const el = document.getElementById('ghcount');
   if (!el) return;
   const KEY = 'sklz.ghstars.v1', TTL = 6 * 3600 * 1000;
+  const badge = document.getElementById('ghstar');
+  /* the screensaver button hangs off this badge's right edge, and the badge
+     is as wide as its number, so measure after every write rather than once */
+  const place = () => {
+    if (badge) document.documentElement.style.setProperty('--ghw', badge.offsetWidth + 'px');
+  };
   const show = n => {
     el.textContent = n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k' : String(n);
+    place();
   };
+  place();                                  // star glyph width, before any count
   try {
     const c = JSON.parse(localStorage.getItem(KEY) || 'null');
     if (c && Date.now() - c.at < TTL) { show(c.n); return; }
