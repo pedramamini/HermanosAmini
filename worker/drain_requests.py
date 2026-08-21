@@ -112,16 +112,36 @@ def issue_body(row):
     # we prompted for.
     followup = ""
     turns = []
+    chat = None
     raw = row.get("detail")
     if raw:
         try:
             parsed = json.loads(raw)
             if isinstance(parsed, list):
                 turns = [t for t in parsed if isinstance(t, dict) and t.get("q")]
+            elif isinstance(parsed, dict) and parsed.get("spec"):
+                # the agentic chat's interview (2026-08-21 onward): the model's
+                # distilled spec plus the spoken exchange it came from
+                chat = parsed
         except (ValueError, TypeError):
             turns = [{"q": row.get("probe_q") or "What should it look like?",
                       "a": raw}]
-    if turns:
+    if chat:
+        # Spec first, because that is what gets built. Transcript under a
+        # fold so the summary can be checked against what was actually said
+        # without taking over the issue.
+        lines = [f"\n## Spec\n\n{chat['spec'].strip()}\n"]
+        tx = [m for m in (chat.get("transcript") or [])
+              if isinstance(m, dict) and (m.get("content") or "").strip()]
+        if tx:
+            lines.append("\n<details><summary>The conversation this came from"
+                         " (spoken, via the agentic chat)</summary>\n")
+            for m in tx:
+                speaker = "**Calavera:**" if m.get("role") == "assistant" else "**Viewer:**"
+                lines.append(f"\n{speaker} {m['content'].strip()}\n")
+            lines.append("\n</details>\n")
+        followup = "".join(lines)
+    elif turns:
         lines = []
         for t in turns:
             a = (t.get("a") or "").strip()
@@ -164,6 +184,9 @@ def labels_for(row):
                 if any((t or {}).get("a", "").strip() for t in parsed):
                     return LABELS
                 return LABELS + ",needs-detail"
+            # a chat interview with a real spec is the most scoped kind there is
+            if isinstance(parsed, dict) and len((parsed.get("spec") or "").strip()) >= 20:
+                return LABELS
         except (ValueError, TypeError):
             pass
         return LABELS

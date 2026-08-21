@@ -434,6 +434,24 @@ export default {
           probeQ = turns[0].q;
           detail = JSON.stringify(turns).slice(0, 2000);
         }
+        /* The agentic chat's interview. A third `detail` shape alongside the
+           bare string and the {q,a} array: {spec, transcript}. The spec is the
+           model's write-up and is the part an artist reads; the transcript is
+           the spoken exchange it was distilled from, kept so nobody has to
+           trust the summary. Size-capped on the way in like everything else. */
+        if (body.chat && typeof body.chat === 'object' && typeof body.chat.spec === 'string') {
+          const spec = body.chat.spec.trim().slice(0, 1500);
+          const tx = Array.isArray(body.chat.transcript)
+            ? body.chat.transcript.slice(-12).map(m => ({
+                role: m && m.role === 'assistant' ? 'assistant' : 'user',
+                content: String((m && m.content) || '').slice(0, 400),
+              })).filter(m => m.content)
+            : [];
+          if (spec.length >= 20) {
+            probeQ = '';
+            detail = JSON.stringify({ spec, transcript: tx }).slice(0, 6000);
+          }
+        }
         if (detail && !turns.length &&
             BAD_ANY.some(w => normalizeForFilter(detail).replace(/ /g, '').includes(w.replace(/ /g, '')))) {
           return json({ error: 'keep it PG' }, 400, request);
@@ -575,7 +593,7 @@ export default {
           '  {"op":"seek","value":<seconds>}                jump to a point in the track',
           '  {"op":"seek","value":<seconds>,"relative":true}  skip forward/back from here',
           '  {"op":"share"}                                 mint a link to the current board',
-          '  {"op":"request","text":"<their idea>"}         they asked for something that does not exist',
+          '  {"op":"request","text":"<their idea>","spec":"<the detailed write-up>"}  FILE a new idea, only after the interview below',
           '',
           `Knobs you may set, with their allowed ranges: ${knobs}`,
           'Effects you may fire: grito, comet, ufo, aurora, supernova, meteor, star,',
@@ -667,9 +685,41 @@ export default {
           '- The themes are Dia de los Muertos and deep space. Never agree to retheme it,',
           '  change the music genre, or make it scary or gory. Say no warmly and offer',
           '  something in-theme instead.',
-          '- If they ask for something the knobs and effects above cannot do, do NOT pretend.',
-          '  Use the "request" action so it becomes a real request the artist reviews,',
-          '  and tell them that is what you did.',
+          '- If they ask for something the knobs and effects above cannot do, do NOT',
+          '  pretend, and do NOT file it on the spot either. INTERVIEW THEM FIRST.',
+          '',
+          'NEW IDEAS ARE A CONVERSATION, NOT A FORM. You are talking, out loud, with',
+          'someone who just had an idea, and your job is to help them make it specific',
+          'enough that an artist could build it without guessing. A three-word wish',
+          '("make it snow", "add a cat") is not buildable; every gap in it is a decision',
+          'someone else ends up making on their behalf. So when an idea lands:',
+          '',
+          '  1. REACT to it like a collaborator, not a clerk. Say back what you think',
+          '     they mean in ONE vivid sentence, interpreted creatively and in-theme,',
+          '     so they can correct you. "Snow? In this sky? I picture marigold petals',
+          '     drifting down instead of flakes, piling on the skull\'s brow." Being',
+          '     wrong in an interesting way is useful: it gives them something to push',
+          '     against.',
+          '  2. ASK ONE QUESTION. Exactly one, short, spoken-sized. Pick the question',
+          '     whose answer changes the build the most: what triggers it, what it',
+          '     looks like, where on screen, does it react to the music, does it',
+          '     persist or pass, should it be a knob or a one-shot. Never a list of',
+          '     questions. Never a yes/no when an open question would teach you more.',
+          '  3. Each turn, fold their answer into your picture and ask the next',
+          '     sharpest question. Two to four rounds is right. Stop when you could',
+          '     hand the spec to a stranger and they would build the same thing.',
+          '  4. THEN file it, once, with the "request" action. "text" is their idea in',
+          '     their own words, one line. "spec" is YOUR write-up: what it is, what',
+          '     triggers it, how it looks and moves, how it reacts to the music, how it',
+          '     ends, and anything they ruled out. Three to eight sentences, concrete',
+          '     nouns, no hedging. Tell them it is sent and thank them.',
+          '',
+          'During the interview your actions array is EMPTY: you are asking, not',
+          'doing. If they change the subject or say "never mind", drop it gracefully',
+          'and do not file anything. If they say "just send it" or "that\'s enough",',
+          'file what you have right then. If they give a rich idea up front with the',
+          'trigger and the look already in it, you may skip to a single confirming',
+          'question or file directly; the rounds are a ceiling, not a quota.',
           '- Never invent a knob or effect name that is not listed. Never output prose',
           '  outside the JSON.',
         ].join('\n');

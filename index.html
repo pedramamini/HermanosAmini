@@ -6302,7 +6302,16 @@ function applyActions(actions) {
       done.push('minting a link');
 
     } else if (a.op === 'request' && typeof a.text === 'string' && a.text.length > 6) {
-      captureIdea(a.text.trim());
+      /* The chat has ALREADY run the interview out loud by the time it files
+         (see the Worker prompt: react, ask one question, fold in, repeat).
+         So the modal's own typed follow-up is skipped; asking a second set of
+         questions in a form, about an idea they just spent four spoken turns
+         on, would read as not having listened. The modal still opens, for
+         the email and the send button, and it carries the spec the model
+         wrote plus the spoken exchange so the issue reads as the conversation
+         it was. */
+      const spec = typeof a.spec === 'string' ? a.spec.trim().slice(0, 1500) : '';
+      captureIdea(a.text.trim(), { spec, transcript: chatHist.slice(-12) });
       done.push('sent to the artists');
     }
   }
@@ -9551,9 +9560,11 @@ function paintTurns(el, turns) {
   }
 }
 
-function captureIdea(text) {
+let ideaFromChat = null;      // {spec, transcript} when the chat ran the interview
+function captureIdea(text, fromChat) {
   if (!text || ideaModal.classList.contains('show')) return;
   ideaPending = text.slice(0, 600);
+  ideaFromChat = fromChat && fromChat.spec ? fromChat : null;
   ideaQuote.textContent = '\u201c' + ideaPending + '\u201d';
   ideaEmail.value = localStorage.getItem('sklz.email.v1') || '';
   ideaProbe.hidden = true; ideaAsk.textContent = ''; ideaDetail.value = '';
@@ -9561,6 +9572,17 @@ function captureIdea(text) {
   ideaRounds.textContent = '';
   ideaSend.textContent = 'send it';
   ideaModal.classList.add('show');
+  if (ideaFromChat) {
+    /* the interview already happened, out loud. Show the spec the chat wrote
+       so they can see what is about to be filed, and skip the typed probe. */
+    ideaRounds.textContent = 'we talked it through. here is what gets sent:';
+    ideaAsk.textContent = ideaFromChat.spec;
+    ideaProbe.hidden = false;
+    ideaDetail.hidden = true;
+    ideaMore.hidden = true;
+    return;
+  }
+  ideaDetail.hidden = false;
   /* fetch the first question while they are reading the card, so the follow-up
      is usually already on screen by the time they reach for the button */
   askNext();
@@ -9604,6 +9626,8 @@ function bankAnswer() {
   askNext();
 }
 function closeIdea() {
+  ideaFromChat = null;
+  ideaDetail.hidden = false;
   ideaModal.classList.remove('show');
   ideaPending = ''; ideaQuestion = ''; ideaTurns = [];
   ideaProbe.hidden = true; ideaDetail.value = '';
@@ -9628,10 +9652,14 @@ ideaSend.addEventListener('click', async () => {
          answer and hit "send it" rather than "answer" clearly meant to
          include it, and silently dropping it is the rudest thing this form
          could do. */
-      body: JSON.stringify({ request: body, email, config: galConfigPayload(),
-                             turns: ideaTurns.concat(
-                               ideaQuestion && (ideaDetail.value || '').trim()
-                                 ? [{ q: ideaQuestion, a: ideaDetail.value.trim() }] : []) })
+      body: JSON.stringify(ideaFromChat
+        /* the chat interview: the model's spec plus the spoken exchange */
+        ? { request: body, email, config: galConfigPayload(),
+            chat: { spec: ideaFromChat.spec, transcript: ideaFromChat.transcript } }
+        : { request: body, email, config: galConfigPayload(),
+            turns: ideaTurns.concat(
+              ideaQuestion && (ideaDetail.value || '').trim()
+                ? [{ q: ideaQuestion, a: ideaDetail.value.trim() }] : []) })
     });
     if (!r.ok) throw new Error('rejected');
     if (email) { try { localStorage.setItem('sklz.email.v1', email); } catch (_) {} }
