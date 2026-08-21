@@ -335,16 +335,24 @@
   #ghstar svg, #saverBtn svg { width: 19px; height: 19px; display: block; }
   /* the star count rides the badge as a small tag, so the button stays the
      same 44px circle as its neighbours instead of stretching into a pill */
+  /* Built from the SAME ink as the button it sits on: the button's own glass
+     tint and its own border colour, with the count in the same muted bone the
+     glyphs use. An amber badge was the one saturated object in a row of six
+     deliberately quiet circles and read as a notification, which is the wrong
+     register for a star count. It brightens with the button on hover, so the
+     number is there when you look for it and recedes when you do not. */
   #ghcount {
-    position: absolute; top: -6px; right: -7px;
-    min-width: 18px; height: 18px; padding: 0 5px;
+    position: absolute; top: -5px; right: -6px;
+    min-width: 17px; height: 17px; padding: 0 4px;
     display: grid; place-items: center;
-    font-family: 'Space Grotesk', sans-serif; font-size: 10px; font-weight: 600;
+    font-family: 'Space Grotesk', sans-serif; font-size: 9.5px; font-weight: 500;
     letter-spacing: .02em; font-variant-numeric: tabular-nums;
-    color: #120a1e; background: #ffb347;
-    border-radius: 999px; border: 1px solid rgba(18,10,30,.5);
+    color: rgba(245,234,223,.6); background: rgba(6,3,15,.62);
+    border-radius: 999px; border: 1px solid rgba(245,234,223,.25);
     line-height: 1;
+    transition: color .3s, border-color .3s;
   }
+  #ghstar:hover #ghcount { color: #f5eadf; border-color: rgba(245,234,223,.7); }
   #mic.listening {
     border-color: #ff2fa0;
     box-shadow: 0 0 14px rgba(255,47,160,.8);
