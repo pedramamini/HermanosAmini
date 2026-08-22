@@ -7,8 +7,6 @@
 <p align="center">
   <b><a href="https://www.youtube.com/watch?v=r097BYxAFWs">▶ Watch it on the wall</a></b>
   &nbsp;·&nbsp;
-  <a href="https://www.youtube.com/shorts/cTG8Gs4MtuU">the 60-second short</a>
-  &nbsp;·&nbsp;
   <a href="https://hermanosamini.com">open the live piece</a>
 </p>
 
