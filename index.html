@@ -711,12 +711,12 @@
     text-align: right; color: #2fe8d0; font-size: 12px;
     font-family: 'SF Mono', 'Menlo', monospace;
   }
-  #cfgPanel input[type=range], #smBar, .smvrow input[type=range] {
+  #cfgPanel input[type=range], #smBar, .smvrow input[type=range], .ccrow input[type=range] {
     -webkit-appearance: none; appearance: none; width: 100%; height: 3px;
     background: linear-gradient(90deg, rgba(145,70,255,.8), rgba(47,232,208,.5));
     border-radius: 2px; outline: none;
   }
-  #cfgPanel input[type=range]::-webkit-slider-thumb, #smBar::-webkit-slider-thumb, .smvrow input[type=range]::-webkit-slider-thumb {
+  #cfgPanel input[type=range]::-webkit-slider-thumb, #smBar::-webkit-slider-thumb, .smvrow input[type=range]::-webkit-slider-thumb, .ccrow input[type=range]::-webkit-slider-thumb {
     -webkit-appearance: none; appearance: none;
     width: 15px; height: 15px; border-radius: 50%;
     background: radial-gradient(circle at 35% 30%, #fff, #c9a0ff 40%, #9146FF);
@@ -1286,7 +1286,8 @@
     color: #2fe8d0; text-align: right; font-variant-numeric: tabular-nums;
   }
   .smvrow input[type=range] { margin: 0; width: 100%; }
-  #smVoicePick {
+  .smvrow[hidden] { display: none; }
+  #smVoicePickUNUSED {
     grid-column: 2 / 4; width: 100%;
     font-family: 'Space Grotesk', sans-serif; font-size: 11.5px;
     color: #f5eadf; background: rgba(245,234,223,.06);
@@ -1354,6 +1355,38 @@
   .cdacts button:hover { background: rgba(245,234,223,.16); color: #f5eadf; }
   #chatMute.muted { color: #ff2fa0; }
   #chatDock.min #chatBody { display: none; }
+  #chatCfg.on { background: rgba(145,70,255,.35); color: #f5eadf; }
+  /* the voice config expands out of the TOP of the chat, between the bar
+     and the log. It is a drawer inside the dock: same glass, a hairline
+     under it, and it vanishes when the dock is minimized along with the body. */
+  #chatConf {
+    padding: 9px 11px 8px;
+    border-bottom: 1px solid rgba(245,234,223,.1);
+    background: rgba(245,234,223,.03);
+    animation: vmIn .2s cubic-bezier(.16,1,.3,1);
+  }
+  #chatConf[hidden], #chatDock.min #chatConf { display: none; }
+  .ccrow {
+    display: grid; grid-template-columns: 44px 1fr 34px; align-items: center;
+    gap: 8px; margin-bottom: 7px; font-size: 10.5px;
+    color: rgba(245,234,223,.62); letter-spacing: .08em; text-transform: uppercase;
+  }
+  .ccrow:last-of-type { margin-bottom: 0; }
+  .ccrow[hidden] { display: none; }          /* `hidden` loses to display:grid otherwise */
+  .ccrow.ccsrc { display: flex; gap: 8px; margin-bottom: 9px; white-space: nowrap; }
+  .ccrow b {
+    font-family: 'SF Mono', 'Menlo', monospace; font-size: 10.5px; font-weight: 500;
+    color: #2fe8d0; text-align: right; font-variant-numeric: tabular-nums;
+  }
+  .ccrow input[type=range] { margin: 0; width: 100%; }
+  .ccrow #smVoicePick {
+    grid-column: 2 / 4; width: 100%;
+    font-family: 'Space Grotesk', sans-serif; font-size: 11.5px;
+    color: #f5eadf; background: rgba(245,234,223,.06);
+    border: 1px solid rgba(245,234,223,.2); border-radius: 7px;
+    padding: 5px 8px; outline: none; text-transform: none; letter-spacing: 0;
+  }
+  .ccacts { display: flex; gap: 6px; padding-top: 8px; }
   #chatDock.min { width: 258px; }
   #chatBody { display: block; }
   #chatLog {
@@ -1764,18 +1797,16 @@
   </div>
   <div id="smPinNote"></div>
   <div class="smsep"></div>
-  <div class="vmhead" style="padding-top:0">her voice <span id="smVoiceSrc" class="smsrc"></span></div>
+  <div class="vmhead" style="padding-top:0">levels</div>
   <div class="smvoice">
-    <label class="smvrow"><span>voice</span>
-      <select id="smVoicePick" aria-label="voice"></select></label>
-    <label class="smvrow"><span>speed</span>
-      <input id="smVoiceRate" type="range" min="0.6" max="1.6" step="0.02" aria-label="speaking rate"><b id="smVoiceRateV"></b></label>
-    <label class="smvrow" id="smVoicePitchRow"><span>pitch</span>
-      <input id="smVoicePitch" type="range" min="0.5" max="1.6" step="0.02" aria-label="pitch"><b id="smVoicePitchV"></b></label>
-    <div class="smacts" style="padding:6px 0 0">
-      <div class="smact" id="smVoiceTry" role="button" tabindex="0">hear her</div>
-      <div class="smact" id="smVoiceReset" role="button" tabindex="0">reset voice</div>
-    </div>
+    <label class="smvrow"><span>music</span>
+      <input id="smVolMusic" type="range" min="0" max="1" step="0.05" data-key="musicVolume" aria-label="music volume"><b></b></label>
+    <label class="smvrow"><span>effects</span>
+      <input id="smVolSfx" type="range" min="0" max="1" step="0.05" data-key="sfxVolume" aria-label="sound effects volume"><b></b></label>
+    <label class="smvrow"><span>gritos</span>
+      <input id="smVolGrito" type="range" min="0" max="1" step="0.05" data-key="gritoVolume" aria-label="grito volume"><b></b></label>
+    <label class="smvrow"><span>her voice</span>
+      <input id="smVolVoice" type="range" min="0" max="1" step="0.05" data-key="voiceVolume" aria-label="voice volume"><b></b></label>
   </div>
   <div class="smsep"></div>
   <div class="vmhead" style="padding-top:0">silence</div>
@@ -1815,9 +1846,23 @@
     <div class="cdglyph">&#9760;</div>
     <div class="cdtitle">la calavera<span id="chatPeek"></span></div>
     <div class="cdacts">
+      <button id="chatCfg" title="her voice" aria-expanded="false" aria-controls="chatConf">&#9881;</button>
       <button id="chatMute" title="mute the voice">&#128266;</button>
       <button id="chatMin" title="minimize">&#9866;</button>
       <button id="chatEnd" title="end chat">&#10005;</button>
+    </div>
+  </div>
+  <div id="chatConf" hidden>
+    <div class="ccrow ccsrc"><span>her voice</span><span id="smVoiceSrc" class="smsrc"></span></div>
+    <label class="ccrow"><span>voice</span>
+      <select id="smVoicePick" aria-label="voice"></select></label>
+    <label class="ccrow"><span>speed</span>
+      <input id="smVoiceRate" type="range" min="0.6" max="1.6" step="0.02" aria-label="speaking rate"><b id="smVoiceRateV"></b></label>
+    <label class="ccrow" id="smVoicePitchRow"><span>pitch</span>
+      <input id="smVoicePitch" type="range" min="0.5" max="1.6" step="0.02" aria-label="pitch"><b id="smVoicePitchV"></b></label>
+    <div class="ccacts">
+      <div class="smact" id="smVoiceTry" role="button" tabindex="0">hear her</div>
+      <div class="smact" id="smVoiceReset" role="button" tabindex="0">reset voice</div>
     </div>
   </div>
   <div id="chatBody">
@@ -2102,6 +2147,7 @@ const CFG_SCHEMA = {
   musicVolume:    [0.9,   0,     1,    0.05,  'music volume'],
   musicSeek:      [0,     0,     100,  0.1,   'start at (% of track)'],
   gritoVolume:    [1.0,   0,     1,    0.05,  'grito volume'],
+  voiceVolume:    [1.0,   0,     1,    0.05,  'her voice volume'],
   sfxVolume:      [0.55,  0,     1,    0.05,  'gesture sfx volume'],
   /* ── color ── */
   palette:        [0,     0,     7,    1,     'palette (0-7)'],
@@ -2158,7 +2204,7 @@ const CFG_CATEGORY = {
           'flowerCrown', 'crownBlooms'],
   sky: ['tunnelCount', 'starDensity', 'dustCount', 'smokeScale', 'smokeStir',
         'smokeDecay', 'eventMinGap', 'eventMaxGap', 'autoEvents'],
-  sound: ['musicVolume', 'musicSeek', 'gritoVolume', 'sfxVolume', 'musicOn',
+  sound: ['musicVolume', 'musicSeek', 'gritoVolume', 'sfxVolume', 'voiceVolume', 'musicOn',
          'trackOn', 'sfxOn'],
   system: ['perfMode', 'hudOn', 'textOn', 'voiceOn', 'cursorStyle'],
 };
@@ -6425,6 +6471,7 @@ async function speakServer(text, seq) {
       ttsAudio.onended = ttsAudio.onerror = () => { URL.revokeObjectURL(url); res(); };
       ttsAudio.src = url;
       ttsAudio.playbackRate = VOICE.serverRate;
+      ttsAudio.volume = CFG.voiceVolume;
       ttsAudio.play().catch(() => res());
     });
     return true;
@@ -6437,7 +6484,7 @@ function speakBrowser(text, done) {
     const u = new SpeechSynthesisUtterance(text);
     const v = pickBrowserVoice();
     if (v) { u.voice = v; u.lang = v.lang; } else u.lang = 'en-US';
-    u.rate = VOICE.rate; u.pitch = VOICE.pitch;
+    u.rate = VOICE.rate; u.pitch = VOICE.pitch; u.volume = CFG.voiceVolume;
     let resumed = false;
     const resume = () => { if (resumed) return; resumed = true; clearTimeout(ttsGuard); done(); };
     u.onend = resume; u.onerror = resume;
@@ -6653,6 +6700,18 @@ chatInput.addEventListener('keydown', e => {
 chatMicB.addEventListener('click', e => {
   e.stopPropagation();
   chatMicOn(!chatMicB.classList.contains('listening'));
+});
+const chatCfgB = document.getElementById('chatCfg');
+const chatConf = document.getElementById('chatConf');
+chatCfgB.addEventListener('click', e => {
+  e.stopPropagation();
+  const open = chatConf.hidden;
+  chatConf.hidden = !open;
+  chatCfgB.classList.toggle('on', open);
+  chatCfgB.setAttribute('aria-expanded', String(open));
+  /* voices may have loaded since the page did, and the source may have
+     resolved after the first paint; rebuild on every open rather than once */
+  if (open) { chatDock.classList.remove('min'); syncVoiceUI(); }
 });
 chatMuteB.addEventListener('click', e => {
   e.stopPropagation();
@@ -7903,6 +7962,7 @@ function applyToggles(opts) {
   document.body.classList.toggle('notext', !CFG.textOn);
   syncZenDrawer();                      // zen hides the words; the drawer hides the buttons
   applyCursor();                        // cursorStyle is restored/shared like any dial
+  if (typeof syncLevels === 'function') syncLevels();
   /* sound: the flag is still called `muted` and still lives on CFG.musicOn,
      but it now means ALL audio, not just the track */
   muted = !CFG.musicOn;
@@ -8140,6 +8200,30 @@ document.getElementById('smVoiceReset').addEventListener('click', () => {
   cfgStatusSay('voice reset');
 });
 
+/* ── levels ──
+   Four sliders, one handler. Each is bound to a CFG key by data-key, so they
+   save, share and restore with the board like every other dial; this is a
+   second control surface for the same values, not a second store. Writing
+   the value applies it the way applyToggles does for the master: the music
+   element, the sfx bus, and the live TTS element all read CFG directly. */
+function syncLevels() {
+  document.querySelectorAll('#soundMenu .smvrow input[data-key]').forEach(r => {
+    r.value = CFG[r.dataset.key];
+    r.nextElementSibling.textContent = Math.round(CFG[r.dataset.key] * 100) + '%';
+  });
+}
+document.querySelectorAll('#soundMenu .smvrow input[data-key]').forEach(r => {
+  r.addEventListener('input', () => {
+    const k = r.dataset.key, v = +r.value;
+    CFG[k] = v;
+    r.nextElementSibling.textContent = Math.round(v * 100) + '%';
+    if (k === 'musicVolume' && trackOn()) music.volume = v;
+    if (k === 'sfxVolume' && sfxBus) sfxBus.gain.value = v;
+    if (k === 'voiceVolume') ttsAudio.volume = v;
+    syncSlidersSafe();
+  });
+});
+
 document.getElementById('smMuteTrack').addEventListener('click', () => setAudioSwitch('trackOn', !trackOn()));
 document.getElementById('smMuteSfx').addEventListener('click', () => setAudioSwitch('sfxOn', !effectsOn()));
 smMute.addEventListener('click', () => { toggleMute(); syncSoundMenu(); });
@@ -8148,7 +8232,7 @@ muteBtn.addEventListener('click', e => {
   e.stopPropagation();
   const open = soundMenu.classList.toggle('show');
   voiceMenu.classList.remove('show');     // one popover at a time
-  if (open) { syncSoundMenu(); syncVoiceUI(); }
+  if (open) { syncSoundMenu(); syncLevels(); }
 });
 /* 4Hz while open, and ONLY while open: a clock that ticks behind a closed
    panel is pure waste on a display nobody is touching. */
@@ -9048,7 +9132,7 @@ function palBuild() {
     ['browse the gallery', 'panel', '\u{1F5BC}️', () => document.getElementById('galBrowse').click()],
     ['get the macOS screensaver', 'download', '\u{1F5B5}️', () => document.getElementById('saverBtn').click()],
     ['open the sound menu', 'panel', '♫', () => { if (!soundMenu.classList.contains('show')) muteBtn.click(); }],
-    ['tune her voice', 'panel', '\u{1F5E3}️', () => { if (!soundMenu.classList.contains('show')) muteBtn.click(); setTimeout(() => document.getElementById('smVoicePick').focus(), 60); }],
+    ['tune her voice', 'panel', '\u{1F5E3}️', () => { if (!chatDock.classList.contains('show')) setVoiceMode(2); if (chatConf.hidden) chatCfgB.click(); setTimeout(() => document.getElementById('smVoicePick').focus(), 80); }],
     ['hear her voice', 'voice', '\u{1F50A}', () => document.getElementById('smVoiceTry').click()],
     ['copy a link to this board', 'share', '\u{1F517}', () => { if (!cfgPanel.classList.contains('show')) togglePanel(cfgPanel); document.getElementById('cfgLink').click(); }],
     ['save this board to my browser', 'save', '\u{1F4BE}', () => document.getElementById('cfgSave').click()],
@@ -9238,7 +9322,7 @@ const DEMO_EVERY_MS = 180000;                 // three minutes
 const DEMO_KEEP = new Set([
   'textOn',                                   // zen: demo owns this, see below
   'musicOn', 'trackOn', 'sfxOn',              // MUTE: the viewer's call, never ours
-  'musicVolume', 'gritoVolume', 'sfxVolume',  // the rest of "mute/unmute"
+  'musicVolume', 'gritoVolume', 'sfxVolume', 'voiceVolume',  // the rest of "mute/unmute"
   'voiceOn',                                  // microphone: never turn one on
   'hudOn',                                    // debug overlay is not art
   'perfMode',                                 // rolling "lite" would degrade a wall
