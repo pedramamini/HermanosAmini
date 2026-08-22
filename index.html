@@ -6320,7 +6320,11 @@ function startRecog(onFinal) {
   recog = new SR();
   recog.continuous = true;
   recog.interimResults = false;
-  recog.lang = 'en-US';
+  /* Bilingual by design (2026-08-22): the chat answers in whatever language
+     it is spoken to, and the voice models are Spanish. But the recognizer
+     cannot detect language mid-stream, so a Spanish browser hears Spanish
+     and everyone else is heard in English. Typed Spanish always works. */
+  recog.lang = /^es/i.test(navigator.language || '') ? 'es-MX' : 'en-US';
   recog.onresult = e => {
     for (let i = e.resultIndex; i < e.results.length; i++)
       onFinal(e.results[i][0].transcript);
