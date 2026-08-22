@@ -6382,11 +6382,11 @@ micBtn.addEventListener('click', e => {
   e.stopPropagation();
   /* one surface at a time: opening the mic closes the gear/help panels and
      the sound popover, exactly as opening them closes the mic's menu */
-  document.querySelectorAll('.panel').forEach(x => { x.classList.remove('show'); x.style.transform = ''; });
-  document.body.classList.remove('sheet-open');
-  soundMenu.classList.remove('show');
-  if (chatOpen) { chatDock.classList.toggle('min'); return; }
-  voiceMenu.classList.toggle('show');
+  const wasMin = chatOpen && chatDock.classList.contains('min');
+  const wasMenu = voiceMenu.classList.contains('show');
+  dismissSurfaces();                        // (minimises the chat if open)
+  if (chatOpen) { chatDock.classList.toggle('min', !wasMin); return; }
+  voiceMenu.classList.toggle('show', !wasMenu);
 });
 voiceMenu.querySelectorAll('.vmopt').forEach(o => {
   o.addEventListener('click', e => {
@@ -8331,8 +8331,10 @@ smMute.addEventListener('click', () => { toggleMute(); syncSoundMenu(); });
 
 muteBtn.addEventListener('click', e => {
   e.stopPropagation();
-  const open = soundMenu.classList.toggle('show');
-  voiceMenu.classList.remove('show');     // one popover at a time
+  const was = soundMenu.classList.contains('show');
+  dismissSurfaces();
+  const open = !was;
+  if (open) soundMenu.classList.add('show');
   if (open) { syncSoundMenu(); syncLevels(); }
 });
 /* 4Hz while open, and ONLY while open: a clock that ticks behind a closed
@@ -8518,14 +8520,25 @@ const ideaRounds= document.getElementById('ideaRounds');
 const ideaSkip  = document.getElementById('ideaSkip');
 
 const cfgPanel = document.getElementById('cfgPanel');
+/* ONE SURFACE AT A TIME. Every button in the bar opens through here, so
+   pressing gear while help is up, or the screensaver while the palette is
+   up, swaps surfaces instead of stacking them. The chat dock is the one
+   exception: it holds a conversation in progress, so it is MINIMISED, not
+   closed. Closing it would throw away the transcript. */
+const lateClosers = [];                       // modals defined later register here
+function dismissSurfaces() {
+  document.querySelectorAll('.panel').forEach(x => { x.classList.remove('show'); x.style.transform = ''; });
+  document.body.classList.remove('sheet-open');
+  voiceMenu.classList.remove('show');
+  soundMenu.classList.remove('show');
+  if (typeof palClose === 'function' && palOverlay.classList.contains('show')) palClose();
+  if (typeof ideaModal !== 'undefined' && ideaModal.classList.contains('show')) ideaModal.classList.remove('show');
+  if (typeof chatOpen !== 'undefined' && chatOpen) chatDock.classList.add('min');
+  for (const f of lateClosers) f();
+}
 function togglePanel(p) {
   const was = p.classList.contains('show');
-  document.querySelectorAll('.panel').forEach(x => {
-    x.classList.remove('show');
-    x.style.transform = '';                 // drop any leftover drag offset
-  });
-  voiceMenu.classList.remove('show');       // gear/help also dismiss the mic popover
-  soundMenu.classList.remove('show');       // ...and the sound popover
+  dismissSurfaces();
   if (!was) p.classList.add('show');
   /* The controls sheet opens READY TO TYPE, so cmd+/ then a word is the whole
      interaction. Skipped on phones, where focusing an input throws the
@@ -9356,9 +9369,7 @@ function palRun(i) {
 
 function palOpen() {
   if (!palCmds) palCmds = palBuild();
-  /* one overlay at a time */
-  soundMenu.classList.remove('show');
-  voiceMenu.classList.remove('show');
+  dismissSurfaces();                        // one surface at a time
   palOverlay.classList.add('show');
   palInput.value = '';
   palRender();
@@ -10084,6 +10095,7 @@ function captureIdea(text, fromChat) {
   ideaQuestion = ''; ideaTurns = []; paintTurns(ideaThread, ideaTurns);
   ideaRounds.textContent = '';
   ideaSend.textContent = 'send it';
+  dismissSurfaces();
   ideaModal.classList.add('show');
   if (ideaFromChat) {
     /* the interview already happened, out loud. Show the spec the chat wrote
@@ -10356,10 +10368,12 @@ ideaSend.addEventListener('click', async () => {
   }
 
   function open() {
+    dismissSurfaces();
     modal.classList.add('show');
     resolveLatest();
   }
   function close() { modal.classList.remove('show'); }
+  lateClosers.push(close);
 
   btn.addEventListener('click', open);
   btn.addEventListener('keydown', e => {
