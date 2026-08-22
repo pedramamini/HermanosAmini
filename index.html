@@ -2201,7 +2201,7 @@ const CFG_CATEGORY = {
   skull: ['skullSize', 'socketGlow', 'auraSize', 'petalCount', 'rayLength',
           'rayCount', 'flickForce', 'skullOnTop', 'skullBreathe', 'floodRate', 'crownMetal', 'crownPeaks',
           'sombrero', 'bigote', 'bigoteStyle', 'bigoteColor',
-          'flowerCrown', 'crownBlooms'],
+          'flowerCrown', 'crownBlooms', 'thirdEye', 'eyeRings', 'cheekRings'],
   sky: ['tunnelCount', 'starDensity', 'dustCount', 'smokeScale', 'smokeStir',
         'smokeDecay', 'eventMinGap', 'eventMaxGap', 'autoEvents'],
   sound: ['musicVolume', 'musicSeek', 'gritoVolume', 'sfxVolume', 'voiceVolume', 'musicOn',
@@ -2238,6 +2238,11 @@ const CFG_TOGGLES = {
   beatSync:    [1, 0, 1, 1, 'sync to the beat', 'toggle'],
   skullOnTop:  [0, 0, 1, 1, 'skull always on top', 'toggle'],
   skullBreathe:[0, 0, 1, 1, 'skull breathing', 'toggle'],
+  /* Face parts the viewer can strip off the hero. Default on; each guards
+     only its own draw, so the socket, gaze and hit tests stay intact. */
+  thirdEye:    [1, 0, 1, 1, 'third eye', 'toggle'],
+  eyeRings:    [1, 0, 1, 1, 'eye rings', 'toggle'],
+  cheekRings:  [1, 0, 1, 1, 'cheek rings', 'toggle'],
   flowerCrown: [0, 0, 1, 1, 'flower crown', 'toggle'],
   sombrero:    [0, 0, 1, 1, 'sombrero', 'toggle'],
   bigote:      [0, 0, 1, 1, 'mustache', 'toggle'],
@@ -2570,6 +2575,7 @@ function initAudio() {
    functions, so the art's own autonomous chatter, stares and random events
    stay silent by construction: there is no flag anyone can forget to pass. */
 let sfxBus = null;
+let voiceDuck = 1;                 // 0.3 while his voice plays; see duck()
 const sfxLast = Object.create(null);
 
 function sfxReady() {
@@ -2581,7 +2587,7 @@ function sfxReady() {
     sfxBus = actx.createGain();
     sfxBus.connect(masterBus);
   }
-  sfxBus.gain.value = CFG.sfxVolume;
+  sfxBus.gain.value = CFG.sfxVolume * voiceDuck;
   return actx;
 }
 
@@ -3143,7 +3149,9 @@ function drawSkull(ctx, S, opt) {
     ctx.lineWidth = 6; ctx.strokeStyle = A1; ctx.stroke();
   }
 
-  /* forehead rosette (third-eye seat) */
+  /* forehead rosette (third-eye seat). The hero's is baked into the sprite,
+     so the thirdEye toggle has to reach in here; applyToggles rebakes. */
+  if (!opt.animFace || CFG.thirdEye) {
   ctx.save();
   ctx.translate(0, -300);
   for (let ring = 0; ring < 2; ring++) {
@@ -3167,6 +3175,7 @@ function drawSkull(ctx, S, opt) {
   ctx.fill();
   ctx.lineWidth = 5; ctx.strokeStyle = opt.bone3; ctx.stroke();
   ctx.restore();
+  }
 
   /* cheek spirals */
   if (!opt.animFace) for (const sx of [-1, 1]) {
@@ -4093,8 +4102,23 @@ function crownPluck(cx, cy) {
     if (d2 < p.r * p.r && d2 < bestD) { best = p; bestD = d2; }
   }
   if (!best) return false;
+  crownDrop(best);
+  return true;
+}
 
+/* The crown sheds a bloom on its own now and then (autoEvents only). A
+   viewer who never clicks the crown has no way to learn it is pluckable;
+   one falling and growing back is the hint. Same path as a click, so the
+   sound, the spark and the regrow are identical. */
+let nextCrownDropT = 0;
+function crownAutoDrop() {
+  if (!CFG.flowerCrown || CFG.sombrero || !CFG.autoEvents || t < nextCrownDropT) return;
+  nextCrownDropT = t + 25 + Math.random() * 50;         // roughly once a minute
+  const live = crownPos.filter(p => !crownOut.has(p.id));
+  if (live.length) crownDrop(live[Math.floor(Math.random() * live.length)]);
+}
 
+function crownDrop(best) {
   crownOut.set(best.id, t + CROWN_REGROW);
   if (canSpawn('crownbit')) {
     /* Falls in FRONT of the skull. `behind` is a spawn roll for most sparks,
@@ -4111,7 +4135,6 @@ function crownPluck(cx, cy) {
     });
   }
   SFX.pluck(pluckSeq++);
-  return true;
 }
 
 function drawEyeAssembly(side) {
@@ -4129,7 +4152,7 @@ function drawEyeAssembly(side) {
      a rotation argument, so the per-petal transform stack was pure overhead:
      24 petals were 24 fills and 48 state changes, now they are 2 fills. */
   hctx.globalAlpha = 0.92;
-  for (const parity of [0, 1]) {
+  if (CFG.eyeRings) for (const parity of [0, 1]) {
     hctx.beginPath();
     for (let i = parity; i < NP; i += 2) {
       const a = (i / NP) * Math.PI * 2 + rot;
@@ -4143,7 +4166,7 @@ function drawEyeAssembly(side) {
   hctx.globalAlpha = 1;
   /* 18 arcs per eye, 36 per frame, for a ring of dots nobody can resolve on a
      struggling display. First thing to go. */
-  const ND = q >= 4 ? 0 : q >= 3 ? 9 : 18;
+  const ND = !CFG.eyeRings ? 0 : q >= 4 ? 0 : q >= 3 ? 9 : 18;
   if (ND) {                                          // dot ring: one fill, not 18
     hctx.beginPath();
     for (let i = 0; i < ND; i++) {
@@ -5098,7 +5121,7 @@ function drawHero(dt) {
      correct z-order: a mustache covers the upper lip, not the teeth */
   drawBigote();
   drawTeethLive();
-  drawSpiralLive(-1); drawSpiralLive(1);
+  if (CFG.cheekRings) { drawSpiralLive(-1); drawSpiralLive(1); }
   /* angry brows slam down over the sockets while it stares */
   if (stare.k > 0.02) {
     hctx.save();
@@ -5180,7 +5203,7 @@ function drawHero(dt) {
      a tracking iris and a blink envelope, every frame). An invisible eye
      that still costs a gradient per frame is exactly the kind of spend the
      quality governor exists to hunt, so it never enters the pipeline. */
-  if (!CFG.sombrero) {
+  if (!CFG.sombrero && CFG.thirdEye) {
   const ex = 0, ey = (-300 + 24) * U, er = 58 * U;
   let blink = (() => {             // periodic blink, ~ every 5.2 s
     const c = t % 5.2;
@@ -6497,12 +6520,24 @@ const ttsAudio = new Audio();
 ttsAudio.preload = 'auto';
 let ttsSeq = 0;
 
+/* His voice is the loudest thing in the room. Rather than cap the music at
+   a level where a 1.0 voice always wins (it would be too quiet the other 99%
+   of the time), the music and effects DUCK to 30% while he speaks and come
+   back when he stops. Every music.volume writer goes through musicVol(). */
+function musicVol() { return trackOn() ? CFG.musicVolume * voiceDuck : 0; }
+function duck(on) {
+  voiceDuck = on ? 0.3 : 1;
+  if (music && !music.paused) music.volume = musicVol();
+  if (sfxBus) sfxBus.gain.value = CFG.sfxVolume * voiceDuck;
+}
 function speak(text) {
   if (chatMuted) return;
   const useServer = ttsCfg.source !== 'browser';
   const seq = ++ttsSeq;
   /* hold the mic for the whole utterance either way */
+  duck(true);
   const arm = () => {
+    duck(false);
     ttsHold = false;
     if (voiceMode === 2 && recog && recog._wanted) { try { recog.start(); } catch (_) {} }
   };
@@ -6610,7 +6645,7 @@ function applyActions(actions) {
         CFG.bigote = 1;
         done.push('mustache on');
       }
-      if (a.key === 'musicVolume' && trackOn()) music.volume = CFG.musicVolume;
+      if (a.key === 'musicVolume') music.volume = musicVol();
       done.push(`${CFG_SCHEMA[a.key][4]} \u2192 ${CFG[a.key]}`);
 
     } else if (a.op === 'fx' && Object.prototype.hasOwnProperty.call(CHAT_FX, a.name)) {
@@ -7690,6 +7725,7 @@ function frame(now) {
   mouse.str *= Math.exp(-dt * CFG.smokeDecay);   // slow fade: the stir lingers
   if (!gateGone && gate.classList.contains('gone')) gateGone = true;
   if (gateGone && CFG.autoEvents && t > nextEventT) spawnEvent();
+  if (gateGone) crownAutoDrop();
   else if (!CFG.autoEvents) nextEventT = t + CFG.eventMinGap;   // no burst when re-enabled
 
   /* rated skull flood (viewer request #2). Default 0 = off, so this changes
@@ -7817,7 +7853,7 @@ function startMusic() {
   const t0 = performance.now();
   (function ramp() {
     const p = Math.min((performance.now() - t0) / 4000, 1);
-    music.volume = trackOn() ? p * CFG.musicVolume : 0;
+    music.volume = p * musicVol();
     if (p < 1) requestAnimationFrame(ramp);
   })();
   if (!musicStarted) { musicStarted = true; loadGritos(); }
@@ -8016,8 +8052,10 @@ function wearOne(key) {
   return true;
 }
 
+let bakedThirdEye = 1;
 function applyToggles(opts) {
   const o = opts || {};
+  if (!!CFG.thirdEye !== !!bakedThirdEye) { bakedThirdEye = CFG.thirdEye; schedulePaletteRebuild(); }
   document.body.classList.toggle('notext', !CFG.textOn);
   syncZenDrawer();                      // zen hides the words; the drawer hides the buttons
   applyCursor();                        // cursorStyle is restored/shared like any dial
@@ -8025,7 +8063,7 @@ function applyToggles(opts) {
   /* sound: the flag is still called `muted` and still lives on CFG.musicOn,
      but it now means ALL audio, not just the track */
   muted = !CFG.musicOn;
-  music.volume = trackOn() ? CFG.musicVolume : 0;
+  music.volume = musicVol();
   applyMuteGain();
   syncMuteIcon();
   /* fps monitor */
@@ -8276,8 +8314,8 @@ document.querySelectorAll('#soundMenu .smvrow input[data-key]').forEach(r => {
     const k = r.dataset.key, v = +r.value;
     CFG[k] = v;
     r.nextElementSibling.textContent = Math.round(v * 100) + '%';
-    if (k === 'musicVolume' && trackOn()) music.volume = v;
-    if (k === 'sfxVolume' && sfxBus) sfxBus.gain.value = v;
+    if (k === 'musicVolume') music.volume = musicVol();
+    if (k === 'sfxVolume' && sfxBus) sfxBus.gain.value = v * voiceDuck;
     if (k === 'voiceVolume') ttsAudio.volume = v;
     syncSlidersSafe();
   });
@@ -9679,7 +9717,7 @@ let syncSliders = () => {};   // real one is assigned inside buildCfg below
     r.addEventListener('input', () => {
       CFG[k] = parseFloat(r.value);
       v.textContent = r.value;
-      if (k === 'musicVolume' && trackOn()) music.volume = CFG.musicVolume;
+      if (k === 'musicVolume') music.volume = musicVol();
       if (k === 'musicSeek') { applySeek(CFG.musicSeek); seekReadout(); }
       if (k === 'perfMode') resize();
       if (PALETTE_KEYS.includes(k)) schedulePaletteRebuild();
@@ -9878,8 +9916,8 @@ addEventListener('keydown', e => {
       cfgStatusSay(CFG.bigote ? 'bigote: ' + NM[Math.round(CFG.bigoteStyle)] : 'bigote off');
     } else toggleMute();
   }
-  else if (k === 'arrowup')   { e.preventDefault(); CFG.musicVolume = Math.min(1, CFG.musicVolume + 0.05); if (trackOn()) music.volume = CFG.musicVolume; }
-  else if (k === 'arrowdown') { e.preventDefault(); CFG.musicVolume = Math.max(0, CFG.musicVolume - 0.05); if (trackOn()) music.volume = CFG.musicVolume; }
+  else if (k === 'arrowup')   { e.preventDefault(); CFG.musicVolume = Math.min(1, CFG.musicVolume + 0.05); music.volume = musicVol(); }
+  else if (k === 'arrowdown') { e.preventDefault(); CFG.musicVolume = Math.max(0, CFG.musicVolume - 0.05); music.volume = musicVol(); }
   else if (k === 'arrowleft' || k === 'arrowright') {
     e.preventDefault();                            // keep the page from scrolling
     const [, min, max, step] = CFG_SCHEMA.skullSize;
