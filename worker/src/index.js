@@ -163,6 +163,7 @@ function cors(request) {
     'Access-Control-Allow-Origin': ok ? origin : ALLOWED_ORIGINS[0],
     'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Expose-Headers': 'X-SKLZ-TTS',
     'Access-Control-Max-Age': '86400',
   };
 }
@@ -531,6 +532,103 @@ export default {
          its own CFG_SCHEMA before applying, so a jailbroken reply cannot reach
          past the knobs that already exist. Anything the art cannot do becomes
          a request on the issue board instead, which is the whole loop. */
+      /* ── /api/tts: the calavera's voice, rendered server-side ──
+         GET  /api/tts/config        -> { source, voices, ... } which engine is on
+         POST /api/tts { text, voice } -> audio/mpeg, or 204 when the kill switch is off
+
+         THE KILL SWITCH IS A WRANGLER VAR, NOT A CLIENT SETTING. `TTS_SOURCE` in
+         wrangler.toml is one of "browser" | "melotts" | "aura". The client asks
+         /api/tts/config on load and obeys; it cannot choose an engine, only
+         tune whatever is enabled. Flipping to "browser" costs zero neurons and
+         needs nothing but a redeploy, which is the whole point: if Aura turns
+         out to eat the daily allowance, one line turns it off without touching
+         the page.
+
+         COST CONTROL. Same per-network hourly quota the chat uses, because a
+         TTS call without a chat call is almost always a script. Text is capped
+         at 400 chars: a reply longer than that is a paragraph, and paragraphs
+         are exactly the thing Aura bills by. Cache by (source, voice, text)
+         hash for a day, so the tuning modal's "say it again" and repeated
+         canned lines ("sent to the artists") cost nothing after the first. */
+      if (request.method === 'GET' && path === '/api/tts/config') {
+        const source = ['melotts', 'aura'].includes(env.TTS_SOURCE) ? env.TTS_SOURCE : 'browser';
+        return json({
+          source,
+          /* what the client may tune for THIS source. Browser voices are
+             enumerated client-side, so only the server engines list here. */
+          voices: source === 'aura'
+            ? ['angus', 'asteria', 'arcas', 'orion', 'orpheus', 'athena', 'luna', 'zeus', 'perseus', 'helios', 'hera', 'stella']
+            : source === 'melotts' ? ['en', 'es', 'fr', 'zh', 'jp', 'kr'] : [],
+          cache: 86400,
+        }, 200, request);
+      }
+      if (request.method === 'POST' && path === '/api/tts') {
+        const source = ['melotts', 'aura'].includes(env.TTS_SOURCE) ? env.TTS_SOURCE : 'browser';
+        if (source === 'browser') return new Response(null, { status: 204, headers: cors(request) });
+        const body = await request.json().catch(() => null);
+        const text = String((body && body.text) || '').trim().slice(0, 400);
+        if (text.length < 2) return json({ error: 'nothing to say' }, 400, request);
+        const voice = String((body && body.voice) || '').toLowerCase().replace(/[^a-z]/g, '').slice(0, 12);
+
+        const ip = request.headers.get('CF-Connecting-IP') || '0.0.0.0';
+        const author = await hashIp(ip, env.SALT || 'sklz');
+        const hourBucket = Math.floor(Date.now() / 3600000);
+        const quota = await env.sklz_presets.prepare(
+          'SELECT n FROM writes WHERE author_hash = ? AND hour_bucket = ?'
+        ).bind(author + ':tts', hourBucket).first();
+        const TTS_LIMIT = 240;
+        if (quota && quota.n >= TTS_LIMIT) return json({ error: 'quota', limited: true }, 429, request);
+
+        /* cache first: a canned line said twice costs once */
+        const keyRaw = source + '|' + voice + '|' + text;
+        const keyBuf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(keyRaw));
+        const key = [...new Uint8Array(keyBuf)].slice(0, 16).map(b => b.toString(16).padStart(2, '0')).join('');
+        const cacheReq = new Request('https://sklz-tts.cache/' + key);
+        const cache = caches.default;
+        const hit = await cache.match(cacheReq);
+        if (hit) {
+          const h = new Headers(hit.headers);
+          for (const [k, v] of Object.entries(cors(request))) h.set(k, v);
+          h.set('X-SKLZ-TTS', source + ' cached');
+          return new Response(hit.body, { status: 200, headers: h });
+        }
+
+        await env.sklz_presets.prepare(
+          'INSERT INTO writes (author_hash, hour_bucket, n) VALUES (?, ?, 1) ' +
+          'ON CONFLICT(author_hash, hour_bucket) DO UPDATE SET n = n + 1'
+        ).bind(author + ':tts', hourBucket).run();
+
+        let audio;
+        try {
+          if (source === 'aura') {
+            const AURA = ['angus', 'asteria', 'arcas', 'orion', 'orpheus', 'athena', 'luna', 'zeus', 'perseus', 'helios', 'hera', 'stella'];
+            const resp = await env.AI.run('@cf/deepgram/aura-1',
+              { text, speaker: AURA.includes(voice) ? voice : 'angus', encoding: 'mp3' },
+              { returnRawResponse: true });
+            audio = await resp.arrayBuffer();
+          } else {
+            const MELO = ['en', 'es', 'fr', 'zh', 'jp', 'kr'];
+            const out = await env.AI.run('@cf/myshell-ai/melotts',
+              { prompt: text, lang: MELO.includes(voice) ? voice : 'en' });
+            /* MeloTTS returns either raw mpeg bytes or {audio: base64} depending
+               on the binding version; accept both rather than guess */
+            if (out instanceof ArrayBuffer) audio = out;
+            else if (out && out.audio) audio = Uint8Array.from(atob(out.audio), c => c.charCodeAt(0)).buffer;
+            else if (out && typeof out.arrayBuffer === 'function') audio = await out.arrayBuffer();
+            else throw new Error('unexpected melotts shape');
+          }
+        } catch (e) {
+          return json({ error: 'tts failed', detail: String(e).slice(0, 120) }, 502, request);
+        }
+        const res = new Response(audio, {
+          status: 200,
+          headers: { 'Content-Type': 'audio/mpeg', 'Cache-Control': 'public, max-age=86400',
+                     'X-SKLZ-TTS': source, ...cors(request) },
+        });
+        ctx.waitUntil(cache.put(cacheReq, res.clone()));
+        return res;
+      }
+
       if (request.method === 'POST' && path === '/api/chat') {
         const body = await request.json().catch(() => null);
         if (!body || !Array.isArray(body.messages)) {

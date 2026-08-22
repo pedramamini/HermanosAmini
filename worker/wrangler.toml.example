@@ -10,6 +10,10 @@ database_id = "your-d1-database-id"
 
 [vars]
 SALT = "change-me-any-random-string"
+# The calavera\'s voice. "browser" = free speechSynthesis on the viewer\'s
+# machine; "melotts" and "aura" render on Workers AI (see /api/tts). This is
+# the kill switch: set "browser" and redeploy to stop spending neurons.
+TTS_SOURCE = "aura"
 
 [ai]
 binding = "AI"

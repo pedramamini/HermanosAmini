@@ -711,12 +711,12 @@
     text-align: right; color: #2fe8d0; font-size: 12px;
     font-family: 'SF Mono', 'Menlo', monospace;
   }
-  #cfgPanel input[type=range], #smBar {
+  #cfgPanel input[type=range], #smBar, .smvrow input[type=range] {
     -webkit-appearance: none; appearance: none; width: 100%; height: 3px;
     background: linear-gradient(90deg, rgba(145,70,255,.8), rgba(47,232,208,.5));
     border-radius: 2px; outline: none;
   }
-  #cfgPanel input[type=range]::-webkit-slider-thumb, #smBar::-webkit-slider-thumb {
+  #cfgPanel input[type=range]::-webkit-slider-thumb, #smBar::-webkit-slider-thumb, .smvrow input[type=range]::-webkit-slider-thumb {
     -webkit-appearance: none; appearance: none;
     width: 15px; height: 15px; border-radius: 50%;
     background: radial-gradient(circle at 35% 30%, #fff, #c9a0ff 40%, #9146FF);
@@ -1269,6 +1269,31 @@
     color: rgba(245,234,223,.42); font-variant-numeric: tabular-nums;
   }
   #smPinNote b { color: #ffb347; font-weight: 500; }
+  .smsrc {
+    font-size: 9px; letter-spacing: .12em; margin-left: 6px;
+    padding: 1px 6px; border-radius: 999px;
+    color: rgba(245,234,223,.55); background: rgba(245,234,223,.08);
+    border: 1px solid rgba(245,234,223,.14); text-transform: lowercase;
+  }
+  .smvoice { padding: 0 10px 4px; }
+  .smvrow {
+    display: grid; grid-template-columns: 44px 1fr 34px; align-items: center;
+    gap: 8px; margin-bottom: 7px; font-size: 10.5px;
+    color: rgba(245,234,223,.62); letter-spacing: .08em; text-transform: uppercase;
+  }
+  .smvrow b {
+    font-family: 'SF Mono', 'Menlo', monospace; font-size: 10.5px; font-weight: 500;
+    color: #2fe8d0; text-align: right; font-variant-numeric: tabular-nums;
+  }
+  .smvrow input[type=range] { margin: 0; width: 100%; }
+  #smVoicePick {
+    grid-column: 2 / 4; width: 100%;
+    font-family: 'Space Grotesk', sans-serif; font-size: 11.5px;
+    color: #f5eadf; background: rgba(245,234,223,.06);
+    border: 1px solid rgba(245,234,223,.2); border-radius: 7px;
+    padding: 5px 8px; outline: none; text-transform: none; letter-spacing: 0;
+  }
+  #smVoicePick option { background: #150a26; color: #f5eadf; }
   .smsep {
     height: 1px; margin: 9px 8px 6px;
     background: rgba(245,234,223,.12);
@@ -1738,6 +1763,20 @@
     <div class="smact" id="smPin" role="button" tabindex="0">start here when shared</div>
   </div>
   <div id="smPinNote"></div>
+  <div class="smsep"></div>
+  <div class="vmhead" style="padding-top:0">her voice <span id="smVoiceSrc" class="smsrc"></span></div>
+  <div class="smvoice">
+    <label class="smvrow"><span>voice</span>
+      <select id="smVoicePick" aria-label="voice"></select></label>
+    <label class="smvrow"><span>speed</span>
+      <input id="smVoiceRate" type="range" min="0.6" max="1.6" step="0.02" aria-label="speaking rate"><b id="smVoiceRateV"></b></label>
+    <label class="smvrow" id="smVoicePitchRow"><span>pitch</span>
+      <input id="smVoicePitch" type="range" min="0.5" max="1.6" step="0.02" aria-label="pitch"><b id="smVoicePitchV"></b></label>
+    <div class="smacts" style="padding:6px 0 0">
+      <div class="smact" id="smVoiceTry" role="button" tabindex="0">hear her</div>
+      <div class="smact" id="smVoiceReset" role="button" tabindex="0">reset voice</div>
+    </div>
+  </div>
   <div class="smsep"></div>
   <div class="vmhead" style="padding-top:0">silence</div>
   <div class="vmopt" id="smMuteTrack">
@@ -6294,27 +6333,120 @@ function chatSay(who, text) {
 /* Speaking out loud through the same mic we are listening on feeds the
    recognizer its own voice and the conversation talks to itself. Hold
    recognition for the duration of every utterance. */
+/* ─────────────────────────────────────────────
+   THE CALAVERA'S VOICE
+   Two engines behind one speak(). Which one is live is decided by the
+   Worker (`TTS_SOURCE` in wrangler.toml), fetched once at load into
+   `ttsCfg.source`. The viewer cannot change the SOURCE; that is a cost
+   decision and it stays server-side as a one-line kill switch. The viewer
+   can TUNE whatever source is on: voice, rate, pitch, and for the browser
+   engine the named voice, from the sound popover.
+
+   Server audio plays through an <audio> element tapped into masterBus, so it
+   lands in clips like every other sound (invariant 7). Any failure (quota,
+   network, the model returning 502, the source being "browser") falls back
+   to speechSynthesis, so the calavera never goes mute because a server did.
+
+   Tuning lives in VOICE, persisted to localStorage but NOT in CFG: it is a
+   property of the viewer's ears, not of the board, so it must not ride along
+   in a share link or reroll with the dice. */
+const VOICE_STORE = 'sklz.voice.v1';
+const VOICE = Object.assign({
+  browserName: '',        // '' = let the fallback chain pick
+  rate: 1.02, pitch: 0.92,
+  serverVoice: '',        // '' = the server's default for its engine
+  serverRate: 1.0,
+}, (() => { try { return JSON.parse(localStorage.getItem(VOICE_STORE) || '{}'); } catch (_) { return {}; } })());
+function voiceSave() { try { localStorage.setItem(VOICE_STORE, JSON.stringify(VOICE)); } catch (_) {} }
+
+const ttsCfg = { source: 'browser', voices: [], loaded: false };
+/* Deferred to a load event rather than run here: GALLERY_API is a const
+   declared ~2000 lines further down, so a module-level call from this spot
+   would be a temporal-dead-zone throw that kills the whole script (invariant
+   3, the autoResume lesson). */
+addEventListener('load', () => {
+  fetch(GALLERY_API.replace('/presets', '/tts/config'))
+    .then(r => r.ok ? r.json() : null)
+    .then(d => { if (d && d.source) { ttsCfg.source = d.source; ttsCfg.voices = d.voices || []; } })
+    .catch(() => {})
+    .finally(() => { ttsCfg.loaded = true; syncVoiceUI(); });
+});
+
+/* The browser fallback chain. Spanish-accented English first, because this
+   is a Dia de los Muertos calavera, then the best neutral voice each platform
+   ships. Evaluated lazily: getVoices() is empty until the voiceschanged
+   event on most browsers. */
+function pickBrowserVoice() {
+  const vs = speechSynthesis.getVoices();
+  if (!vs.length) return null;
+  if (VOICE.browserName) {
+    const v = vs.find(v => v.name === VOICE.browserName);
+    if (v) return v;
+  }
+  const prefer = [/^Paulina/, /^Mónica/, /espa.ol de Estados/i, /^Google español/, /^Samantha/, /^Daniel/, /Google US English/];
+  for (const re of prefer) { const v = vs.find(v => re.test(v.name)); if (v) return v; }
+  return vs.find(v => /^en/i.test(v.lang)) || vs[0];
+}
+
+const ttsAudio = new Audio();
+ttsAudio.preload = 'auto';
+let ttsSeq = 0;
+
 function speak(text) {
-  if (chatMuted || !window.speechSynthesis) return;
+  if (chatMuted) return;
+  const useServer = ttsCfg.source !== 'browser';
+  const seq = ++ttsSeq;
+  /* hold the mic for the whole utterance either way */
+  const arm = () => {
+    ttsHold = false;
+    if (voiceMode === 2 && recog && recog._wanted) { try { recog.start(); } catch (_) {} }
+  };
+  if (recog && recog._wanted) { ttsHold = true; try { recog.stop(); } catch (_) {} }
+
+  if (useServer) {
+    speakServer(text, seq).then(ok => { if (!ok && seq === ttsSeq) speakBrowser(text, arm); else if (seq === ttsSeq) arm(); });
+    return;
+  }
+  speakBrowser(text, arm);
+}
+
+async function speakServer(text, seq) {
+  try {
+    const r = await fetch(GALLERY_API.replace('/presets', '/tts'), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: text.slice(0, 400), voice: VOICE.serverVoice }),
+    });
+    if (r.status !== 200) return false;          // 204 = switched off, 429 = quota, 502 = model
+    const blob = await r.blob();
+    if (seq !== ttsSeq) return true;               // a newer line superseded this one
+    if (actx && masterBus) tapGrito(ttsAudio);     // into the recording bus, once
+    const url = URL.createObjectURL(blob);
+    await new Promise(res => {
+      ttsAudio.onended = ttsAudio.onerror = () => { URL.revokeObjectURL(url); res(); };
+      ttsAudio.src = url;
+      ttsAudio.playbackRate = VOICE.serverRate;
+      ttsAudio.play().catch(() => res());
+    });
+    return true;
+  } catch (_) { return false; }
+}
+
+function speakBrowser(text, done) {
+  if (!window.speechSynthesis) { done(); return; }
   try {
     const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'en-US'; u.rate = 1.02; u.pitch = 0.92;
+    const v = pickBrowserVoice();
+    if (v) { u.voice = v; u.lang = v.lang; } else u.lang = 'en-US';
+    u.rate = VOICE.rate; u.pitch = VOICE.pitch;
     let resumed = false;
-    const resume = () => {
-      if (resumed) return;
-      resumed = true;
-      clearTimeout(ttsGuard);
-      ttsHold = false;
-      if (voiceMode === 2 && recog && recog._wanted) { try { recog.start(); } catch (_) {} }
-    };
+    const resume = () => { if (resumed) return; resumed = true; clearTimeout(ttsGuard); done(); };
     u.onend = resume; u.onerror = resume;
     /* Chrome intermittently never fires onend on a long utterance. Without a
        fallback that leaves ttsHold stuck true and the microphone dead for the
        rest of the conversation, so bound the hold by the worst-case duration. */
     const ttsGuard = setTimeout(resume, 2500 + text.length * 90);
-    if (recog && recog._wanted) { ttsHold = true; try { recog.stop(); } catch (_) {} }
     speechSynthesis.speak(u);
-  } catch (_) {}
+  } catch (_) { done(); }
 }
 
 const RECOLOR_KEYS = new Set(['palette', 'hueShift', 'satMul', 'boneHue', 'boneSat',
@@ -7924,6 +8056,90 @@ document.getElementById('smPin').addEventListener('click', e => {
   cfgStatusSay('shared links now start at ' + fmtTime(music.currentTime));
 });
 
+/* ── voice tuning ──
+   One UI, two engines. The pick list is browser voices when the source is
+   "browser" and the server's speaker list otherwise; the pitch row only
+   exists for the browser engine because neither server model takes pitch.
+   Everything writes VOICE and persists; nothing here touches CFG. */
+const SAMPLE_LINES = [
+  'Snow? In this sky? I picture marigold petals drifting down instead of flakes.',
+  'The bass is the trigger, then. Do they pile up on the skull, or just pass through?',
+  'Los que amamos nunca mueren.',
+  'I can dim the smoke, spin the rings, or throw a grito. What do you want?',
+];
+function syncVoiceUI() {
+  const pick = document.getElementById('smVoicePick');
+  const src = document.getElementById('smVoiceSrc');
+  const rate = document.getElementById('smVoiceRate');
+  const pitch = document.getElementById('smVoicePitch');
+  const pitchRow = document.getElementById('smVoicePitchRow');
+  if (!pick) return;
+  const server = ttsCfg.source !== 'browser';
+  src.textContent = server ? ttsCfg.source : 'browser';
+  pick.textContent = '';
+  if (server) {
+    const d = document.createElement('option');
+    d.value = ''; d.textContent = 'default (' + (ttsCfg.voices[0] || 'server') + ')';
+    pick.appendChild(d);
+    for (const v of ttsCfg.voices) {
+      const o = document.createElement('option'); o.value = v; o.textContent = v; pick.appendChild(o);
+    }
+    pick.value = ttsCfg.voices.includes(VOICE.serverVoice) ? VOICE.serverVoice : '';
+    rate.value = VOICE.serverRate;
+    pitchRow.hidden = true;
+  } else {
+    const vs = (window.speechSynthesis ? speechSynthesis.getVoices() : [])
+      .filter(v => /^(en|es)/i.test(v.lang));
+    const d = document.createElement('option');
+    const auto = pickBrowserVoice();
+    d.value = ''; d.textContent = 'auto' + (auto ? ' (' + auto.name.replace(/ \(.*\)$/, '') + ')' : '');
+    pick.appendChild(d);
+    for (const v of vs) {
+      const o = document.createElement('option');
+      o.value = v.name; o.textContent = v.name.replace(/ \(.*\)$/, '') + ' · ' + v.lang;
+      pick.appendChild(o);
+    }
+    pick.value = vs.some(v => v.name === VOICE.browserName) ? VOICE.browserName : '';
+    rate.value = VOICE.rate;
+    pitch.value = VOICE.pitch;
+    pitchRow.hidden = false;
+  }
+  document.getElementById('smVoiceRateV').textContent = (+rate.value).toFixed(2) + '×';
+  document.getElementById('smVoicePitchV').textContent = (+pitch.value).toFixed(2);
+}
+if (window.speechSynthesis) speechSynthesis.addEventListener('voiceschanged', syncVoiceUI);
+
+document.getElementById('smVoicePick').addEventListener('change', e => {
+  if (ttsCfg.source !== 'browser') VOICE.serverVoice = e.target.value;
+  else VOICE.browserName = e.target.value;
+  voiceSave(); syncVoiceUI();
+  speak(SAMPLE_LINES[0]);                        // hear the change immediately
+});
+document.getElementById('smVoiceRate').addEventListener('input', e => {
+  const v = +e.target.value;
+  if (ttsCfg.source !== 'browser') { VOICE.serverRate = v; ttsAudio.playbackRate = v; }
+  else VOICE.rate = v;
+  document.getElementById('smVoiceRateV').textContent = v.toFixed(2) + '×';
+  voiceSave();
+});
+document.getElementById('smVoicePitch').addEventListener('input', e => {
+  VOICE.pitch = +e.target.value;
+  document.getElementById('smVoicePitchV').textContent = VOICE.pitch.toFixed(2);
+  voiceSave();
+});
+/* "hear her" cycles the sample lines so repeated presses compare the same
+   voice on different sentences rather than replaying one */
+let sampleIdx = 0;
+document.getElementById('smVoiceTry').addEventListener('click', () => {
+  speak(SAMPLE_LINES[sampleIdx++ % SAMPLE_LINES.length]);
+});
+document.getElementById('smVoiceReset').addEventListener('click', () => {
+  VOICE.browserName = ''; VOICE.rate = 1.02; VOICE.pitch = 0.92;
+  VOICE.serverVoice = ''; VOICE.serverRate = 1.0;
+  voiceSave(); syncVoiceUI();
+  cfgStatusSay('voice reset');
+});
+
 document.getElementById('smMuteTrack').addEventListener('click', () => setAudioSwitch('trackOn', !trackOn()));
 document.getElementById('smMuteSfx').addEventListener('click', () => setAudioSwitch('sfxOn', !effectsOn()));
 smMute.addEventListener('click', () => { toggleMute(); syncSoundMenu(); });
@@ -7932,7 +8148,7 @@ muteBtn.addEventListener('click', e => {
   e.stopPropagation();
   const open = soundMenu.classList.toggle('show');
   voiceMenu.classList.remove('show');     // one popover at a time
-  if (open) syncSoundMenu();
+  if (open) { syncSoundMenu(); syncVoiceUI(); }
 });
 /* 4Hz while open, and ONLY while open: a clock that ticks behind a closed
    panel is pure waste on a display nobody is touching. */
@@ -8832,6 +9048,8 @@ function palBuild() {
     ['browse the gallery', 'panel', '\u{1F5BC}️', () => document.getElementById('galBrowse').click()],
     ['get the macOS screensaver', 'download', '\u{1F5B5}️', () => document.getElementById('saverBtn').click()],
     ['open the sound menu', 'panel', '♫', () => { if (!soundMenu.classList.contains('show')) muteBtn.click(); }],
+    ['tune her voice', 'panel', '\u{1F5E3}️', () => { if (!soundMenu.classList.contains('show')) muteBtn.click(); setTimeout(() => document.getElementById('smVoicePick').focus(), 60); }],
+    ['hear her voice', 'voice', '\u{1F50A}', () => document.getElementById('smVoiceTry').click()],
     ['copy a link to this board', 'share', '\u{1F517}', () => { if (!cfgPanel.classList.contains('show')) togglePanel(cfgPanel); document.getElementById('cfgLink').click(); }],
     ['save this board to my browser', 'save', '\u{1F4BE}', () => document.getElementById('cfgSave').click()],
     ['restore my saved board', 'save', '↺', () => document.getElementById('cfgLoad').click()],
