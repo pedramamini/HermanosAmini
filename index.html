@@ -4545,10 +4545,17 @@ function stepHole(dt) {
     /* a boom is a shockwave drawn at a fixed point, not a travelling object:
        dragging one looks like a bug, so it is exempt */
     if (sp.kind === 'boom') continue;
+    if (sp.eat !== undefined) continue;           // already past the horizon
     const dx = hole.x - sp.x, dy = hole.y - sp.y;
     const d2 = dx * dx + dy * dy;
     const d = Math.sqrt(d2) + 1e-3;
-    if (d < EAT) { sparks.splice(i, 1); continue; }
+    if (d < EAT) {
+      /* Small sparks vanish at the horizon, as before. A DRAGON is a 330px
+         body with a head, and a body that winks out the instant its nose
+         touches the horizon reads as a bug. It gets the swallow below. */
+      if (sp.kind === 'alebrije') { holeSwallow(sp); continue; }
+      sparks.splice(i, 1); continue;
+    }
     /* inverse-square, clamped near the horizon so nothing gets flung across
        the screen by a divide-by-almost-zero */
     const a = Math.min(2600, G / Math.max(d2, 900));
@@ -4558,6 +4565,84 @@ function stepHole(dt) {
     sp.vx += (-dy / d) * a * 0.45 * dt;
     sp.vy += (dx / d) * a * 0.45 * dt;
   }
+  /* UFOs are not sparks: they live in their own list with their own flight
+     model, so the hole has to reach for them separately. Same field, same
+     tangential kick, same horizon. Skulls are deliberately NOT here: the
+     tunnel is the piece's structure and a hole that ate it would be eating
+     the stage. */
+  /* The spark constant is tuned for embers over a 16s life and is far too
+     weak to turn a saucer: measured, a UFO 300px out feels 1.8 px/s^2 and
+     sails off. Heavy things get a capture field instead: inverse-SQUARE is
+     the wrong law for a cinematic pull, because it does nothing until it
+     does everything. This is 1/d, clamped, so the grab is felt across the
+     whole frame and tightens smoothly into the horizon. REACH is the radius
+     inside which the hole is in charge of the object's fate. */
+  const REACH = H * 0.9, GH = 14000 * hole.str;
+  const pullHeavy = (o) => {
+    const dx = hole.x - o.x, dy = hole.y - o.y;
+    const d = Math.hypot(dx, dy) + 1e-3;
+    if (d < EAT) return true;                    // caller swallows
+    if (d > REACH) return false;
+    const a = Math.min(520, GH / Math.max(d, 80));
+    o.vx += (dx / d) * a * dt;
+    o.vy += (dy / d) * a * dt;
+    /* Tangential kick, and it must DECAY with distance or the object finds a
+       stable ring and circles forever: measured, a constant kick parked the
+       saucer at 200px indefinitely. It is strongest mid-range (the visible
+       spiral) and gone at the horizon (the plunge). */
+    const nd = Math.min(1, d / REACH);
+    const orb = 0.9 * nd * (1 - nd) * 4;             // peaks at nd = 0.5, 0 at both ends
+    o.vx += (-dy / d) * a * orb * dt;
+    o.vy += (dx / d) * a * orb * dt;
+    /* Radial damping only: bleed the outward/orbital momentum so the spiral
+       tightens, while leaving the inward component alone. Uniform drag was
+       what let the ring above form. */
+    const vr = (o.vx * dx + o.vy * dy) / d;          // +ve = moving inward
+    const tx = o.vx - (dx / d) * vr, ty = o.vy - (dy / d) * vr;
+    const keep = 1 - 1.4 * dt;
+    o.vx = (dx / d) * Math.max(vr, vr * keep) + tx * keep;
+    o.vy = (dy / d) * Math.max(vr, vr * keep) + ty * keep;
+    const v = Math.hypot(o.vx, o.vy), VMAX = 300;
+    if (v > VMAX) { o.vx *= VMAX / v; o.vy *= VMAX / v; }
+    return false;
+  };
+  for (let i = ufos.length - 1; i >= 0; i--) {
+    const u = ufos[i];
+    if (u.eat !== undefined) continue;
+    if (pullHeavy(u)) holeSwallow(u);
+  }
+  /* the dragon is a spark, but it is a HEAVY spark: give it the capture
+     field too, on top of the ember pull it already got above */
+  for (const sp of sparks) {
+    if (sp.kind !== 'alebrije' || sp.eat !== undefined || sp.life < 0) continue;
+    if (pullHeavy(sp)) holeSwallow(sp);
+  }
+}
+
+/* ── the swallow ──
+   Crossing the event horizon starts a 0.9s death rather than a deletion. The
+   victim spirals inward along the tangent, shrinks, and fades, and only then
+   leaves its list. `eat` is the 0..1 progress and doubles as the "already
+   falling" flag the pull loops check, so the field stops fighting the spiral.
+   `ea` is the angle on the way in; `er` the radius, which decays to zero. */
+function holeSwallow(o) {
+  o.eat = 0;
+  o.ea = Math.atan2(o.y - hole.y, o.x - hole.x);
+  o.er = Math.hypot(o.x - hole.x, o.y - hole.y);
+  o.vx = 0; o.vy = 0;
+  if (o.kind === 'alebrije') o.max = o.life + 1.2;   // let its own envelope fade the body
+  SFX.knock();
+}
+/* One step of a swallow. Returns true when the object is gone and the caller
+   should remove it. Shared by UFOs and dragons so the death looks the same. */
+function stepSwallow(o, dt) {
+  o.eat = Math.min(1, o.eat + dt / 0.9);
+  const k = 1 - o.eat;
+  o.ea += dt * (5 + 9 * o.eat);                       // spin faster as it falls
+  const r = o.er * k * k;                             // quadratic: slow, then a plunge
+  o.x = hole.x + Math.cos(o.ea) * r;
+  o.y = hole.y + Math.sin(o.ea) * r;
+  return o.eat >= 1;
 }
 
 function fxBlackHole() {
@@ -5500,6 +5585,10 @@ function updateUfos(dt) {
   }
   for (let i = ufos.length - 1; i >= 0; i--) {
     const u = ufos[i];
+    if (u.eat !== undefined) {                  // past the horizon: on rails
+      if (stepSwallow(u, dt)) ufos.splice(i, 1);
+      continue;
+    }
     if (dwell) {
       /* wander inside the frame until fates cross */
       if (t > u.retargetT) {
@@ -5615,7 +5704,17 @@ function drawUfos() {
     const bank = Math.max(-0.6, Math.min(0.6, u.vx * (t < u.jukeT ? 0.004 : 0.002)));
     dctx.save();
     dctx.translate(u.x, u.y);
-    dctx.rotate(bank);
+    if (u.eat !== undefined) {
+      /* being swallowed: it tumbles, shrinks to nothing and dims, the way a
+         thing falling past an event horizon is stretched and redshifted. The
+         spin outruns the bank, so bank is dropped here. */
+      const k = 1 - u.eat;
+      dctx.rotate(u.ea * 2);
+      dctx.scale(Math.max(0.02, k), Math.max(0.02, k * (0.55 + 0.45 * k)));
+      dctx.globalAlpha *= Math.pow(k, 0.6);
+    } else {
+      dctx.rotate(bank);
+    }
     /* shield flash after a glancing hit */
     const hitAge = t - u.hitT;
     if (hitAge < 0.35) {
@@ -6567,7 +6666,15 @@ function drawDust(dt) {
     if (sp.life > sp.max) { sparks.splice(k, 1); continue; }
     dctx = (sp.behind || CFG.skullOnTop) ? tctx : DUST_CTX;  // depth: spawn roll, or forced behind
     const fade = 1 - sp.life / sp.max;
-    sp.x += sp.vx * dt; sp.y += sp.vy * dt;
+    if (sp.eat !== undefined) {
+      /* past the horizon: the head rides the spiral, and because the dragon
+         records its spine from the head each frame, the body is dragged in
+         after it, segment by segment. When the head reaches the centre the
+         envelope (max was pulled in at the swallow) has faded the rest. */
+      if (stepSwallow(sp, dt) && sp.life > sp.max) { sparks.splice(k, 1); continue; }
+    } else {
+      sp.x += sp.vx * dt; sp.y += sp.vy * dt;
+    }
     if (sp.kind === 'comet') {
       /* traveler with a true positional trail + shed sparkle debris */
       sp.vy += 6 * dt;
@@ -6625,7 +6732,10 @@ function drawDust(dt) {
       const dir = sp.vx > 0 ? 1 : -1;
       const hue0 = sp.hue * 360, hue1 = (hue0 + 55) % 360;    // analogous iridescence
       /* head rides a serpentine; spine records where it has been */
-      const hx = sp.x, hy = sp.y + Math.sin(t * 1.9 + sp.ph) * 30 + Math.sin(t * 0.7 + sp.ph * 2) * 14;
+      /* the serpentine wobble is a flight behaviour; a head being dragged
+         into a singularity does not weave, it is hauled */
+      const wob = sp.eat === undefined ? 1 : Math.max(0, 1 - sp.eat * 3);
+      const hx = sp.x, hy = sp.y + (Math.sin(t * 1.9 + sp.ph) * 30 + Math.sin(t * 0.7 + sp.ph * 2) * 14) * wob;
       if (!sp.spine) sp.spine = [];
       /* distance-gated sampling: ~6px per vertebra -> ~330px of body */
       const lastP = sp.spine[sp.spine.length - 1];
