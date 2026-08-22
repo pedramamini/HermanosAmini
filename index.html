@@ -4590,9 +4590,11 @@ function stepSwarm(dt) {
     const fade = Math.min(1, (t - k.born) * 1.6) *
                  (k.until ? Math.min(1, (k.until - t) * 0.55) : 1);
     tctx.save();
-    tctx.translate(k.x, k.y);
+    const L = holeLens(k.x, k.y);             // the flood warps like the tunnel
+    tctx.translate(k.x + (L ? L.dx : 0), k.y + (L ? L.dy : 0));
+    if (L) holeLensApply(tctx, L);
     tctx.rotate(lite ? k.rot * 0.3 : k.rot);
-    tctx.globalAlpha = 0.82 * fade;
+    tctx.globalAlpha = 0.82 * fade * (L ? L.alpha : 1);
     tctx.drawImage(spr, -px / 2, -px / 2, px, px);
     tctx.restore();
   }
@@ -4792,6 +4794,45 @@ addEventListener('pointerdown', e => {
   if (flickAt(e.clientX, e.clientY)) SFX.knock();
 });
 
+/* ── gravitational lensing for a skull at screen position (sx, sy) ──
+   Returns null outside the hole's reach, or {dx, dy, ang, k, dim}:
+     dx,dy  displacement toward the hole (screen px)
+     ang    angle to the hole, for the stretch axis
+     k      radial stretch factor (1..3.2); tangential is 1/sqrt(k)
+     dim    0..1 brightness, 0 at the horizon
+   Shared by the tunnel and the swarm so both skull populations warp the
+   same way. Pure function of position and hole.str; nothing persists, so
+   when the hole dies the tunnel is exactly what it was. */
+function holeLens(sx, sy) {
+  if (hole.str <= 0.001) return null;
+  const hdx = hole.x - sx, hdy = hole.y - sy;
+  const hd = Math.hypot(hdx, hdy) + 1e-3;
+  const HR = H * 0.115;                       // the shader's core radius
+  const REACH = HR * 4.2;
+  if (hd >= REACH) return null;
+  const u = 1 - hd / REACH;                   // 0 at reach, 1 at centre
+  const a = u * u * hole.str;                 // quadratic: gentle at the edge
+  const pull = a * 0.7;                       // never crosses the centre
+  /* Brightness, not alpha, carries the horizon. A skull that goes
+     TRANSPARENT near the hole leaves an empty ring, which is a hole with
+     nothing falling in. One that goes BLACK while still stretched is a
+     body silhouetted against the glow on its way over the edge, which is
+     the image everyone has of a black hole. Alpha only drops in the last
+     fifth of the core, so the streak finally disappears into the centre
+     instead of sitting on it. */
+  const dim = Math.max(0, Math.min(1, (hd - HR * 0.35) / (HR * 1.6)));
+  const alpha = Math.max(0, Math.min(1, (hd - HR * 0.12) / (HR * 0.3)));
+  return { dx: hdx * pull, dy: hdy * pull, ang: Math.atan2(hdy, hdx),
+           k: 1 + 2.6 * a, dim, alpha };
+}
+/* applies the lens to the current context at the skull's origin */
+function holeLensApply(ctx, L) {
+  ctx.rotate(L.ang);
+  ctx.scale(L.k, 1 / Math.sqrt(L.k));
+  ctx.rotate(-L.ang);
+  if (L.dim < 1) ctx.filter = 'brightness(' + (0.06 + 0.94 * L.dim).toFixed(2) + ')';
+}
+
 function drawTunnel(dt) {
   tctx.clearRect(0, 0, W * DPR, H * DPR);
   tctx.save();
@@ -4802,6 +4843,11 @@ function drawTunnel(dt) {
   const rot = t * 0.045;
   const maxR = Math.hypot(W, H) * 0.62;
 
+  /* clear the hit-test table every frame. It was only ever WRITTEN, so a
+     skull culled this frame (alpha, LOD thinning, tunnelCount shrink) kept
+     the position it had the last time it was drawn, and a click on empty sky
+     could flick a skull that was not there. */
+  skullPos.fill(undefined);
   // painter's order: far first
   const order = [];
   const nTun = Math.min(N_SKULLS, Math.round(CFG.tunnelCount));
@@ -4852,12 +4898,21 @@ function drawTunnel(dt) {
     const lite = isLite() || px0 < 110;
     const spr = (lite ? VARIANTS_STATIC : VARIANTS)[i % VARIANTS.length];
     const px = spr.width * s * beatS;
-    skullPos[i] = { x: W / 2 + x, y: H / 2 + y, r: px * 0.34, d };
     tctx.save();
+    /* SPAGHETTIFICATION. The tunnel skulls are the piece's structure on a
+       fixed recycling orbit, so the hole does not EAT them (a skull that left
+       the list would leave a gap forever). It warps them, which is what a
+       real hole does to light: pulled toward it, stretched along the radial
+       axis into a streak, darkened into the horizon, and back out the far
+       side as the tunnel carries them on. See holeLens(). */
+    const L = holeLens(W / 2 + x, H / 2 + y);
+    if (L) { x += L.dx; y += L.dy; }
+    skullPos[i] = { x: W / 2 + x, y: H / 2 + y, r: px * 0.34, d };   // after the pull, so clicks land
     tctx.translate(x, y);
+    if (L) holeLensApply(tctx, L);
     /* lite: fixed seeded tilt, no continuous spin */
     tctx.rotate((lite ? skullSpin[i] * 0.5 : tempoT * skullSpin[i] * CFG.skullSpinMax + Math.sin(t * 0.4 + i * 1.7) * 0.06) + fxRot);
-    tctx.globalAlpha = alpha;
+    tctx.globalAlpha = alpha * (L ? L.alpha : 1);
     tctx.drawImage(spr, -px / 2, -px / 2, px, px);
     if (lite) { tctx.restore(); continue; }            // static face, done
 
