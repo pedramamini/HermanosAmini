@@ -49,9 +49,14 @@ with**.
 2. **Play with it.** 59 live dials, 8 palettes, 5 backgrounds, voice control,
    and a gallery of boards other people built. Break it however you want; nothing you do is
    permanent.
-3. **Ask it for something it doesn't have.** Tell it you want a comet that
-   sheds marigold petals, or a skull that hums along. That request becomes a
-   **public GitHub issue** in this repo.
+3. **Ask it for something it doesn't have.** Tell it you want snow, or a
+   skull that hums along. It doesn't take the order and file it. It talks
+   it through with you, out loud: *"Snow? In this sky? I picture marigold
+   petals drifting down instead of flakes. What sets it off, the music or
+   a key?"* One question at a time, a few rounds, until the idea is
+   specific enough that a stranger could build it. Then it writes the
+   spec itself and that becomes a **public GitHub issue** in this repo,
+   with your conversation attached.
 4. **It comes back changed.** Approved requests get built by AI agents, merged,
    tagged, and deployed to the live site. The thing you asked for shows up in
    the art, and you get told when it does.
@@ -140,8 +145,13 @@ Click the microphone to pick how you talk to it:
 - **Agentic chat** opens a conversation in the bottom right. Ask for what you
   want in plain language ("dim the smoke", "make everything more purple") and
   it changes the piece while it answers. Type or talk; it talks back unless you
-  mute it. Ask for something that does not exist yet and it files that as a
-  request for the artists instead of pretending.
+  mute it. Ask for something that does not exist yet and it does not pretend,
+  and it does not just file a ticket either: it interviews you. It reinterprets
+  the idea in its own terms so you have something to push against, asks one
+  sharp question per turn (what triggers it, what it looks like, does it follow
+  the music, does it stay or pass), and after a few rounds writes up a spec and
+  sends that to the artists with the conversation attached. Say "never mind"
+  and it drops it; say "just send it" and it files what it has.
 
 The chat can only turn dials that already exist. It cannot retheme the piece,
 and it is told to refuse if you ask.
@@ -398,13 +408,17 @@ Read [ART_DIRECTION.md](ART_DIRECTION.md) first. It's short and it's the whole
 deal. Then open an issue describing what you want to see, as a viewer, not as
 code. If it fits the piece and one of the brothers approves it, it gets built.
 
-You can also just ask from inside the art. The request box in the settings
-drawer, and the chat when you ask for something that does not exist yet, both
-file a real public issue. The piece asks you up to three follow-up questions
-first, generated from your own words, because "skeleton with hair" does not
-say where the hair goes or how it moves, and every gap is a decision somebody
-ends up making on the artists' behalf. Leave an email and you get exactly two
-messages: one when it lands on the board, one when it ships.
+You can also just ask from inside the art, and that is the better way. Both
+the request box in the settings drawer and the agentic chat file a real public
+issue, and both make you talk it through first, because "skeleton with hair"
+does not say where the hair goes or how it moves, and every gap is a decision
+somebody ends up making on the artists' behalf. The request box asks up to
+three follow-up questions generated from your own words. The chat goes
+further: it has the conversation with you, spoken if you like, reinterpreting
+the idea creatively and drilling down one question at a time, then writes the
+spec itself. Issues that arrive that way carry a **Spec** section and the
+full exchange it came from. Leave an email and you get exactly two messages:
+one when it lands on the board, one when it ships.
 
 ## Releases
 
