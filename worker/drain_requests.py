@@ -28,6 +28,7 @@ Usage:
 
 import argparse
 import json
+import re
 import os
 import shutil
 import subprocess
@@ -93,6 +94,22 @@ def q(s):
     return str(s).replace("'", "''")
 
 
+
+def quote_viewer(text):
+    """Viewer text goes on the public board UNDER OUR ACCOUNT, so it must read
+    as quoted speech, never as our Markdown. Three things are neutralised:
+    `@name` (would ping a stranger from pedramamini), `#123` / URLs that
+    GitHub autolinks, and Markdown syntax (images, headings, HTML) that would
+    render as if we wrote it. Everything stays legible; nothing executes."""
+    ZW = "\u200b"                                  # zero-width space
+    t = str(text or "")
+    t = t.replace("@", "@" + ZW)                   # defuses the mention
+    t = re.sub(r"(?<![\w/])#(\d+)", lambda m: "#" + ZW + m.group(1), t)   # issue autolink
+    t = re.sub(r"https?://", lambda m: m.group(0)[:-2] + ZW + "//", t)  # no live links
+    t = re.sub(r"[<>*_`~\[\]!|]", lambda m: "\\" + m.group(0), t)  # Markdown/HTML inert
+    return t
+
+
 def issue_body(row):
     cfg = ""
     if row.get("config"):
@@ -130,7 +147,7 @@ def issue_body(row):
         # Spec first, because that is what gets built. Transcript under a
         # fold so the summary can be checked against what was actually said
         # without taking over the issue.
-        lines = [f"\n## Spec\n\n{chat['spec'].strip()}\n"]
+        lines = [f"\n## Spec\n\n{quote_viewer(chat['spec'].strip())}\n"]
         tx = [m for m in (chat.get("transcript") or [])
               if isinstance(m, dict) and (m.get("content") or "").strip()]
         if tx:
@@ -138,24 +155,24 @@ def issue_body(row):
                          " (spoken, via the agentic chat)</summary>\n")
             for m in tx:
                 speaker = "**Calavera:**" if m.get("role") == "assistant" else "**Viewer:**"
-                lines.append(f"\n{speaker} {m['content'].strip()}\n")
+                lines.append(f"\n{speaker} {quote_viewer(m['content'].strip())}\n")
             lines.append("\n</details>\n")
         followup = "".join(lines)
     elif turns:
         lines = []
         for t in turns:
-            a = (t.get("a") or "").strip()
-            lines.append(f"\n**We asked:** {t['q'].strip()}\n")
+            a = quote_viewer((t.get("a") or "").strip())
+            lines.append(f"\n**We asked:** {quote_viewer(t['q'].strip())}\n")
             lines.append(f"\n**They said:**\n\n> {a}\n" if a
                          else "\nThey skipped that one.\n")
         followup = "".join(lines)
     elif row.get("probe_q"):
-        followup = (f"\n**We asked:** {row['probe_q'].strip()}\n\n"
+        followup = (f"\n**We asked:** {quote_viewer(row['probe_q'].strip())}\n\n"
                     f"They skipped it, so this one still needs scoping before it "
                     f"can be built.\n")
 
     return (
-        f"> {row['body']}\n"
+        f"> {quote_viewer(row['body'])}\n"
         f"{followup}\n"
         f"Asked at hermanosamini.com on {when}. The viewer {who}.\n\n"
         f"**This is not approved yet.** Per "
@@ -194,7 +211,7 @@ def labels_for(row):
 
 
 def title_for(body):
-    t = " ".join(body.split())
+    t = " ".join(quote_viewer(body).split())
     return (t[:68] + "...") if len(t) > 71 else t
 
 
