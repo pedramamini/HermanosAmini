@@ -324,7 +324,7 @@
   #help { right: 24px; font-family: 'Space Grotesk', sans-serif; font-weight: 500; }
   #settings { right: 80px; font-size: 17px; }
   #mute { right: 136px; }
-  #mic { right: 192px; font-size: 14px; }
+  #mic { right: 192px; font-size: 15px; }
   /* The GitHub badge and the screensaver download are the two LEFTMOST
      buttons in the same bar. They used to be pills in the top corners; making
      them real .ctl buttons means the zen drawer, kiosk, the mobile hammer stack
@@ -1751,7 +1751,7 @@
           stroke-linejoin="round" d="M12 3v11m0 0-4.2-4.2M12 14l4.2-4.2M4 17v2.5A1.5 1.5 0 0 0 5.5 21h13a1.5 1.5 0 0 0 1.5-1.5V17"/>
   </svg>
 </div>
-<div id="mic" class="ui ctl" title="voice control">&#127908;</div>
+<div id="mic" class="ui ctl" title="talk to her">&#128172;</div>
 <div id="mute" class="ui ctl" title="sound">&#9835;</div>
 <div id="settings" class="ui ctl" title="settings &amp; presets">&#9881;</div>
 <div id="help" class="ui ctl" title="controls">?</div>
@@ -8671,7 +8671,7 @@ const HELP_ROWS = [
   [['L'], 'keyword voice on / off', '', 'l'],
   [['\u21e7L'], 'agentic chat on / off', '', '\u21e7l'],
   [['.'], 'hold to talk, release to send', '', ''],
-  [['🎤'], 'pick keyword or agentic chat', '', ''],
+  [['💬'], 'pick keyword or agentic chat', '', ''],
   [['D'], 'fps / quality monitor', '', 'd'],
   [['C'], 'settings + presets', '', 'c'],
   [['H', '?'], 'this menu', '', 'h'],
@@ -8686,7 +8686,7 @@ const HELP_ROWS = [
      Plain letters first A-Z; a shifted variant sorts next to its own letter
      (J then Shift-J); everything that is not a letter goes to the bottom in a
      stated order, since "where does Space go" has no alphabetical answer. */
-  const TAIL = ['Enter', 'Space', '.', '\u2191', '\u2190', '?', '\u{1F3A4}'];
+  const TAIL = ['Enter', 'Space', '.', '\u2191', '\u2190', '?', '\u{1F4AC}'];
   const sortKey = ([keys]) => {
     const k = keys[0];
     const bare = k.replace('\u21e7', '');
@@ -8758,7 +8758,7 @@ const HELP_ROWS = [
     const GLYPH = {
       '\u21e7': 'shift', '\u2191': 'arrow up', '\u2193': 'arrow down',
       '\u2190': 'arrow left', '\u2192': 'arrow right',
-      '\u{1F3A4}': 'mic microphone', '.': 'period push to talk',
+      '\u{1F4AC}': 'chat speech bubble talk voice', '.': 'period push to talk',
     };
     const alias = keys.map(k => [...k].map(ch => GLYPH[ch] || '').join(' ')).join(' ');
     tr.dataset.hay = [action, voice, keys.join(' '), alias]
