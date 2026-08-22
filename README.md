@@ -1,15 +1,15 @@
 # HermanosAmini
 
 <p align="center">
-  <a href="https://hermanosamini.com"><img src="og.jpg" alt="SKLZ · Ritmos de los Muertos: the hero calavera, third eye open, deep in the skull tunnel" width="820"></a>
+  <a href="https://www.youtube.com/watch?v=r097BYxAFWs"><img src="https://img.youtube.com/vi/r097BYxAFWs/maxresdefault.jpg" alt="SKLZ · Ritmos de los Muertos running on a video wall: the hero calavera, third eye open, in a sea of drifting sugar skulls" width="820"></a>
 </p>
 
 <p align="center">
-  <a href="https://www.youtube.com/shorts/cTG8Gs4MtuU"><img src="https://img.youtube.com/vi/cTG8Gs4MtuU/maxresdefault.jpg" alt="Watch SKLZ in motion" width="360"></a>
-</p>
-
-<p align="center">
-  <b><a href="https://www.youtube.com/shorts/cTG8Gs4MtuU">▶ Watch it move (60 seconds)</a></b>
+  <b><a href="https://www.youtube.com/watch?v=r097BYxAFWs">▶ Watch it on the wall</a></b>
+  &nbsp;·&nbsp;
+  <a href="https://www.youtube.com/shorts/cTG8Gs4MtuU">the 60-second short</a>
+  &nbsp;·&nbsp;
+  <a href="https://hermanosamini.com">open the live piece</a>
 </p>
 
 <p align="center">
