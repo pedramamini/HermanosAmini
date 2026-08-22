@@ -6451,7 +6451,14 @@ function voiceSave() { try { localStorage.setItem(VOICE_STORE, JSON.stringify(VO
 /* sessionVoice: picked once per page load from the server roster when the
    user has not chosen one (serverVoice === ''). Deliberately NOT saved, so a
    fresh load can bring a different man to the mic. */
-const ttsCfg = { source: 'browser', voices: [], loaded: false, sessionVoice: '' };
+/* `source` starts as 'server' ON PURPOSE. It used to start as 'browser', so
+   every line spoken before /api/tts/config answered (the greeting, a fast
+   first chat) came out in Apple's Paulina, and the calavera changed faces
+   mid-conversation. Now the page assumes the server until told otherwise,
+   and a line that arrives before the config is QUEUED, not re-voiced. */
+const ttsCfg = { source: 'server', voices: [], loaded: false, sessionVoice: '', ready: null };
+let ttsReadyResolve = null;
+ttsCfg.ready = new Promise(res => { ttsReadyResolve = res; });
 /* Deferred to a load event rather than run here: GALLERY_API is a const
    declared ~2000 lines further down, so a module-level call from this spot
    would be a temporal-dead-zone throw that kills the whole script (invariant
@@ -6462,7 +6469,7 @@ addEventListener('load', () => {
     .then(d => { if (d && d.source) { ttsCfg.source = d.source; ttsCfg.voices = d.voices || [];
       if (ttsCfg.voices.length) ttsCfg.sessionVoice = ttsCfg.voices[Math.floor(Math.random() * ttsCfg.voices.length)]; } })
     .catch(() => {})
-    .finally(() => { ttsCfg.loaded = true; syncVoiceUI(); });
+    .finally(() => { ttsCfg.loaded = true; syncVoiceUI(); ttsReadyResolve(); });
 });
 
 /* The browser fallback chain. Spanish-accented English first, because this
@@ -6509,7 +6516,13 @@ function speak(text) {
   if (recog && recog._wanted) { ttsHold = true; try { recog.stop(); } catch (_) {} }
 
   if (useServer) {
-    speakServer(text, seq).then(ok => { if (!ok && seq === ttsSeq) speakBrowser(text, arm); else if (seq === ttsSeq) arm(); });
+    /* ONE VOICE. If the server refuses a line (quota, model hiccup, offline)
+       he says nothing for that line rather than switching to a browser voice.
+       A silent beat is in character; a second man is not. The browser engine
+       is used only when the SOURCE is configured 'browser'. */
+    ttsCfg.ready.then(() => ttsCfg.source === 'browser'
+      ? speakBrowser(text, arm)
+      : speakServer(text, seq).then(() => { if (seq === ttsSeq) arm(); }));
     return;
   }
   speakBrowser(text, arm);
