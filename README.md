@@ -1,7 +1,7 @@
 # HermanosAmini
 
 <p align="center">
-  <a href="https://www.youtube.com/watch?v=r097BYxAFWs"><img src="https://img.youtube.com/vi/r097BYxAFWs/maxresdefault.jpg" alt="SKLZ · Ritmos de los Muertos running on a video wall: the hero calavera, third eye open, in a sea of drifting sugar skulls" width="820"></a>
+  <a href="https://www.youtube.com/watch?v=r097BYxAFWs"><img src="docs/wall-thumbnail.jpg" alt="SKLZ · Ritmos de los Muertos: the hero calavera, third eye open, in a sea of drifting sugar skulls over a purple nebula" width="820"></a>
 </p>
 
 <p align="center">
