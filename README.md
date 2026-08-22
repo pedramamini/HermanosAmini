@@ -5,9 +5,9 @@
 </p>
 
 <p align="center">
-  <b><a href="https://www.youtube.com/watch?v=r097BYxAFWs">▶ Watch it on the wall</a></b>
+  <b><a href="https://hermanosamini.com">Open the Live Piece</a></b>
   &nbsp;·&nbsp;
-  <a href="https://hermanosamini.com">open the live piece</a>
+  <a href="https://www.youtube.com/watch?v=r097BYxAFWs">▶ Watch it on the wall</a>
 </p>
 
 <p align="center">
