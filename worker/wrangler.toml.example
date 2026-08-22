@@ -9,6 +9,8 @@ database_name = "sklz-presets"
 database_id = "your-d1-database-id"
 
 [vars]
+# Required. The Worker refuses to serve on this placeholder. Generate your own:
+#   openssl rand -hex 24
 SALT = "change-me-any-random-string"
 # The calavera\'s voice. "browser" = free speechSynthesis on the viewer\'s
 # machine; "melotts" and "aura" render on Workers AI (see /api/tts). This is

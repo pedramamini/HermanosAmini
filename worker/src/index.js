@@ -180,6 +180,14 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname.replace(/\/+$/, '');
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(request) });
+    /* SALT must be YOURS. It keys the IP hashes behind every quota and the
+       share-link dedup. The example file ships a placeholder on purpose, and
+       this refuses to serve until it is replaced, because a fork that keeps
+       the placeholder has guessable hashes and nothing would otherwise tell
+       them. 16+ chars, any string: `openssl rand -hex 24`. */
+    if (!env.SALT || env.SALT.length < 16 || /change-me/i.test(env.SALT)) {
+      return json({ error: 'SALT is unset or still the placeholder; see wrangler.toml.example' }, 503, request);
+    }
 
     try {
       /* ── list ── */
@@ -230,8 +238,8 @@ export default {
         if (!clean) return json({ error: 'nothing to share' }, 400, request);
 
         const ip = request.headers.get('CF-Connecting-IP') || '0.0.0.0';
-        const author = await hashIp(ip, env.SALT || 'sklz');
-        const h = await shareHash(clean, env.SALT || 'sklz');
+        const author = await hashIp(ip, env.SALT);
+        const h = await shareHash(clean, env.SALT);
 
         /* Idempotent by content. Clicking share twice on the same board must
            not mint a second code: it fills the table for nothing and hands
@@ -467,7 +475,7 @@ export default {
         }
 
         const ip = request.headers.get('CF-Connecting-IP') || '0.0.0.0';
-        const author = await hashIp(ip, env.SALT || 'sklz');
+        const author = await hashIp(ip, env.SALT);
         const hour = Math.floor(Date.now() / 3600000);
         const quota = await env.sklz_presets.prepare(
           'SELECT n FROM writes WHERE author_hash = ? AND hour_bucket = ?'
@@ -501,7 +509,7 @@ export default {
         if (!config) return json({ error: 'config missing or unrecognized' }, 400, request);
 
         const ip = request.headers.get('CF-Connecting-IP') || '0.0.0.0';
-        const author = await hashIp(ip, env.SALT || 'sklz');
+        const author = await hashIp(ip, env.SALT);
         const hour = Math.floor(Date.now() / 3600000);
         const quota = await env.sklz_presets.prepare(
           'SELECT n FROM writes WHERE author_hash = ? AND hour_bucket = ?'
@@ -580,7 +588,7 @@ export default {
         const voice = String((body && body.voice) || '').toLowerCase().replace(/[^a-z]/g, '').slice(0, 12);
 
         const ip = request.headers.get('CF-Connecting-IP') || '0.0.0.0';
-        const author = await hashIp(ip, env.SALT || 'sklz');
+        const author = await hashIp(ip, env.SALT);
         const hourBucket = Math.floor(Date.now() / 3600000);
         const quota = await env.sklz_presets.prepare(
           'SELECT n FROM writes WHERE author_hash = ? AND hour_bucket = ?'
@@ -653,7 +661,7 @@ export default {
            costs real money per call, so it gets a tighter quota than writes
            and its own bucket (chatting must not consume preset saves). */
         const ip = request.headers.get('CF-Connecting-IP') || '0.0.0.0';
-        const author = await hashIp(ip, env.SALT || 'sklz');
+        const author = await hashIp(ip, env.SALT);
         const hour = Math.floor(Date.now() / 3600000);
         const bucket = `chat:${author}`;
         const quota = await env.sklz_presets.prepare(
