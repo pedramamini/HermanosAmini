@@ -98,7 +98,7 @@ It runs silently without audio, see [Audio](#audio) below.
 | `I` | save a photo | | `W` | whirl the cheek spirals |
 | `J` | flood with skulls | | `X` | meteor shower |
 | `K` | comet | | `Y` | mean mug |
-| `L` | keyword voice | | `Z` | zen mode (hide text) |
+| `L` | talk to the calavera | | `Z` | zen mode (hide text) |
 | `M` | mute all sound | | `Enter` | surprise me |
 | `N` | nose heart burst | | `Space` | play / pause |
 | `O` | roll a whole new look | | `Esc` | close the open panel |
@@ -138,11 +138,9 @@ mode will touch them. Dress your skull once and the sky keeps changing around
 it.
 
 Click the art: the eyes follow you, face parts react, skulls flick away.
-Click the microphone to pick how you talk to it:
+Click the speech bubble to talk to it:
 
-- **Keyword commands** listen for single words. Say "grito", "ufo", or
-  "supernova" and the art responds.
-- **Agentic chat** opens a conversation in the bottom right. Ask for what you
+- **The chat** opens a conversation in the bottom right. Ask for what you
   want in plain language ("dim the smoke", "make everything more purple") and
   it changes the piece while it answers. Type or talk; it talks back unless you
   mute it. Ask for something that does not exist yet and it does not pretend,

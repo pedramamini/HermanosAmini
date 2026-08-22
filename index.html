@@ -384,7 +384,7 @@
   /* kiosk / screensaver: no pointer exists, so no chrome and no cursor */
   body.kiosk, body.kiosk * { cursor: none !important; }
   body.kiosk .ctl, body.kiosk #tools, body.kiosk #chatDock,
-  body.kiosk #voiceMenu, body.kiosk #zenTab, body.kiosk #zenDrawer,
+  body.kiosk #zenTab, body.kiosk #zenDrawer,
   body.kiosk #palette, body.kiosk #saverModal,
   body.kiosk .panel { display: none !important; }
   /* The gate is removed from the layout entirely, not just faded. Hiding it by
@@ -1191,17 +1191,6 @@
   .saverclose:hover { color: #f5eadf; background: rgba(245,234,223,.18); }
 
   /* ── voice mode menu: a small popover above the mic ── */
-  #voiceMenu {
-    position: fixed; right: 24px; bottom: 80px; z-index: 24; display: none;
-    width: 260px; padding: 9px; border-radius: 14px;
-    font-family: 'Space Grotesk', sans-serif; color: #f5eadf;
-    background: rgba(9,4,20,.72);
-    border: 1px solid rgba(245,234,223,.16);
-    backdrop-filter: blur(13px); -webkit-backdrop-filter: blur(13px);
-    box-shadow: 0 18px 50px rgba(0,0,0,.62);
-    animation: vmIn .2s cubic-bezier(.16,1,.3,1);
-  }
-  #voiceMenu.show { display: block; }
   /* the sound popover: same glass, same motion, same rows as the voice menu,
      because two popovers hanging off the same bar that look different read as
      two different apps. It anchors over the music button rather than the
@@ -1827,19 +1816,6 @@
   </div>
 </div>
 
-<div id="voiceMenu" class="ui">
-  <div class="vmhead">voice</div>
-  <div class="vmopt" data-mode="1">
-    <div class="vmicon">&#9889;</div>
-    <div class="vmtext"><b>keyword commands</b><span>say &ldquo;comet&rdquo;, &ldquo;grito&rdquo;, &ldquo;supernova&rdquo;</span></div>
-    <div class="vmdot"></div>
-  </div>
-  <div class="vmopt" data-mode="2">
-    <div class="vmicon">&#9760;</div>
-    <div class="vmtext"><b>agentic chat</b><span>talk to the art, it talks back</span></div>
-    <div class="vmdot"></div>
-  </div>
-</div>
 
 <div id="chatDock" class="ui">
   <div id="chatBar">
@@ -2234,7 +2210,7 @@ const CFG_TOGGLES = {
   trackOn:     [1, 0, 1, 1, 'music track on', 'toggle'],
   sfxOn:       [1, 0, 1, 1, 'sound effects on', 'toggle'],
   autoEvents:  [1, 0, 1, 1, 'random events', 'toggle'],
-  voiceOn:     [0, 0, 1, 1, 'voice control', 'toggle'],
+  voiceOn:     [0, 0, 1, 1, 'talk to the calavera', 'toggle'],
   beatSync:    [1, 0, 1, 1, 'sync to the beat', 'toggle'],
   skullOnTop:  [0, 0, 1, 1, 'skull always on top', 'toggle'],
   skullBreathe:[0, 0, 1, 1, 'skull breathing', 'toggle'],
@@ -6309,11 +6285,15 @@ function saidWord(hay, cue) {
   }
   return rx.test(hay);
 }
-/* ── voice: two modes behind one button ──
-   0 = off, 1 = keyword commands, 2 = agentic chat. Both modes want the same
-   microphone, so they are mutually exclusive and share one recognizer. */
+/* ── voice: the chat button IS the agentic chat ──
+   0 = off, 2 = agentic chat. Mode 1 (bare keyword commands, no model) was
+   retired 2026-08-22: the chat understood every keyword anyway and the menu
+   that chose between them was a click in the way. handleVoice() is kept
+   because the chat's own recognizer path still uses it, and the help table's
+   third column still lists the words, which is the guide people need. */
 let voiceMode = 0;
-const voiceMenu = document.getElementById('voiceMenu');
+/* stub so the old "close the mic popover" call sites stay inert */
+const voiceMenu = { classList: { remove() {}, contains() { return false; }, toggle() { return false; } }, querySelectorAll() { return []; } };
 
 function startRecog(onFinal) {
   if (!SR) return false;
@@ -6365,41 +6345,22 @@ function setVoiceMode(mode) {
   CFG.voiceOn = voiceOn ? 1 : 0;
 
   stopRecog();
-  micBtn.classList.toggle('listening', mode === 1);
-  voiceMenu.querySelectorAll('.vmopt').forEach(o => {
-    o.classList.toggle('on', +o.dataset.mode === mode);
-  });
-
-  if (mode === 1) { closeChat(); startRecog(handleVoice); }
-  else if (mode === 2) { openChat(); }
+  if (mode === 2) { openChat(); }
   else { closeChat(); }
 }
 
-/* the old single-toggle entry points (L key, config switch) mean "keyword" */
-function toggleVoice() { setVoiceMode(voiceMode ? 0 : 1); }
+/* the single-toggle entry points (L key, config switch) mean "the chat" */
+function toggleVoice() { setVoiceMode(voiceMode ? 0 : 2); }
 
 micBtn.addEventListener('click', e => {
   e.stopPropagation();
   /* one surface at a time: opening the mic closes the gear/help panels and
      the sound popover, exactly as opening them closes the mic's menu */
   const wasMin = chatOpen && chatDock.classList.contains('min');
-  const wasMenu = voiceMenu.classList.contains('show');
   dismissSurfaces();                        // (minimises the chat if open)
   if (chatOpen) { chatDock.classList.toggle('min', !wasMin); return; }
-  voiceMenu.classList.toggle('show', !wasMenu);
+  setVoiceMode(2);                          // straight into the conversation
 });
-voiceMenu.querySelectorAll('.vmopt').forEach(o => {
-  o.addEventListener('click', e => {
-    e.stopPropagation();
-    setVoiceMode(+o.dataset.mode);
-    if (voiceMode !== 1) voiceMenu.classList.remove('show');
-  });
-});
-addEventListener('pointerdown', e => {
-  if (!voiceMenu.classList.contains('show')) return;
-  if (e.target.closest && e.target.closest('#voiceMenu, #mic')) return;
-  voiceMenu.classList.remove('show');
-}, true);
 
 /* ── agentic chat ──
    The model proposes; this validates. Every action is checked against
@@ -8782,10 +8743,8 @@ const HELP_ROWS = [
   [['J'], 'spawn more skulls (hold to flood)', '"skulls"', 'j'],
   [['\u21e7J'], 'clear the skull flood', '', '\u21e7j'],
   [['\u21e7Q'], 'clear the sky', '', '\u21e7q'],
-  [['L'], 'keyword voice on / off', '', 'l'],
-  [['\u21e7L'], 'agentic chat on / off', '', '\u21e7l'],
+  [['L'], 'talk to the calavera on / off', '', 'l'],
   [['.'], 'hold to talk, release to send', '', ''],
-  [['💬'], 'pick keyword or agentic chat', '', ''],
   [['D'], 'fps / quality monitor', '', 'd'],
   [['C'], 'settings + presets', '', 'c'],
   [['H', '?'], 'this menu', '', 'h'],
@@ -10007,8 +9966,7 @@ addEventListener('keydown', e => {
   else if (k === 'z') toggleText();
   else if (k === 'd') { CFG.hudOn = CFG.hudOn ? 0 : 1; applyToggles({ skipVoice: true }); }
   else if (k === 'l') {
-    if (e.shiftKey) { setVoiceMode(voiceMode === 2 ? 0 : 2); }   // agentic chat
-    else { CFG.voiceOn = voiceOn ? 0 : 1; toggleVoice(); syncToggleUI(); }
+    CFG.voiceOn = voiceOn ? 0 : 1; toggleVoice(); syncToggleUI();
   }
   else if (k === '.') { if (!e.repeat) pttStart(); }
   else if (k === 'o') {

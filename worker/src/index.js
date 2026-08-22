@@ -44,7 +44,7 @@ const LIMITS = {
   boneHue: [-180, 180, 'bone hue'], boneSat: [0, 2, 'bone saturation'],
   nebulaHue: [-180, 180, 'smoke hue shift'], nebulaSat: [0, 2, 'smoke saturation'], bgBright: [0.2, 2, 'smoke brightness'], vignette: [0, 1.2, 'vignette'],
   flickForce: [0.2, 3, 'flick strength'], socketGlow: [0, 2.5, 'eye socket glow'], auraSize: [0, 2.5, 'skull aura'], petalCount: [4, 20, 'eye petals'],
-  textOn: [0, 1, 'show text'], musicOn: [0, 1, 'all sound on'], trackOn: [0, 1, 'music track on'], sfxOn: [0, 1, 'sound effects on'], autoEvents: [0, 1, 'random events'], voiceOn: [0, 1, 'voice control'], beatSync: [0, 1, 'sync to the beat'], hudOn: [0, 1, 'fps monitor'], cursorStyle: [0, 8, 'mouse cursor style'], skullOnTop: [0, 1, 'skull always on top'], skullBreathe: [0, 1, 'skull breathing'], thirdEye: [0, 1, 'third eye'], eyeRings: [0, 1, 'eye rings'], cheekRings: [0, 1, 'cheek rings'], flowerCrown: [0, 1, 'flower crown'], crownBlooms: [3, 12, 'crown flowers'], sombrero: [0, 1, 'sombrero'],
+  textOn: [0, 1, 'show text'], musicOn: [0, 1, 'all sound on'], trackOn: [0, 1, 'music track on'], sfxOn: [0, 1, 'sound effects on'], autoEvents: [0, 1, 'random events'], voiceOn: [0, 1, 'talk to the calavera'], beatSync: [0, 1, 'sync to the beat'], hudOn: [0, 1, 'fps monitor'], cursorStyle: [0, 8, 'mouse cursor style'], skullOnTop: [0, 1, 'skull always on top'], skullBreathe: [0, 1, 'skull breathing'], thirdEye: [0, 1, 'third eye'], eyeRings: [0, 1, 'eye rings'], cheekRings: [0, 1, 'cheek rings'], flowerCrown: [0, 1, 'flower crown'], crownBlooms: [3, 12, 'crown flowers'], sombrero: [0, 1, 'sombrero'],
 };
 
 /* Deliberately blunt list: slurs and profanity roots. Matching happens after
