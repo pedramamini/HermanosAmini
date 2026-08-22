@@ -20,6 +20,9 @@ const ALLOWED_ORIGINS = [
 /* Config keys the page is allowed to persist, with hard numeric bounds.
    Anything not on this list is dropped, so a hostile client cannot smuggle
    arbitrary JSON into other people's browsers. */
+/* Aura-2-es male speakers: sirio+javier es-MX, aquila es-419, nestor+alvaro es-ES. */
+const AURA2ES_MEN = ['sirio', 'javier', 'aquila', 'nestor', 'alvaro'];
+
 const LIMITS = {
   tunnelSpeed: [0.005, 0.12, 'tunnel zoom speed'], tunnelBassBoost: [0, 3, 'tunnel bass boost'], tunnelBreath: [0, 0.3, 'tunnel beat breath'],
   skullSpinMax: [0, 2, 'skull spin max'], beatSensitivity: [1.05, 2, 'beat sensitivity'], beatDecay: [1, 15, 'beat pulse decay'],
@@ -537,7 +540,7 @@ export default {
          POST /api/tts { text, voice } -> audio/mpeg, or 204 when the kill switch is off
 
          THE KILL SWITCH IS A WRANGLER VAR, NOT A CLIENT SETTING. `TTS_SOURCE` in
-         wrangler.toml is one of "browser" | "melotts" | "aura". The client asks
+         wrangler.toml is one of "browser" | "melotts" | "aura" | "aura2es". The client asks
          /api/tts/config on load and obeys; it cannot choose an engine, only
          tune whatever is enabled. Flipping to "browser" costs zero neurons and
          needs nothing but a redeploy, which is the whole point: if Aura turns
@@ -545,25 +548,31 @@ export default {
          the page.
 
          COST CONTROL. Same per-network hourly quota the chat uses, because a
-         TTS call without a chat call is almost always a script. Text is capped
+         TTS call without a chat call is almost always a script.
+
+         "aura2es" IS THE ON-BRAND ONE (2026-08-22). Deepgram's Spanish Aura-2
+         speakers read English with a Mexican / Latin accent, which is the
+         calavera's voice. Men only, per the artists: the setting says "his
+         voice". Pure-English text through them runs ~35% longer than the
+         native English model; that is the accent, not a bug. Text is capped
          at 400 chars: a reply longer than that is a paragraph, and paragraphs
          are exactly the thing Aura bills by. Cache by (source, voice, text)
          hash for a day, so the tuning modal's "say it again" and repeated
          canned lines ("sent to the artists") cost nothing after the first. */
       if (request.method === 'GET' && path === '/api/tts/config') {
-        const source = ['melotts', 'aura'].includes(env.TTS_SOURCE) ? env.TTS_SOURCE : 'browser';
+        const source = ['melotts', 'aura', 'aura2es'].includes(env.TTS_SOURCE) ? env.TTS_SOURCE : 'browser';
         return json({
           source,
           /* what the client may tune for THIS source. Browser voices are
              enumerated client-side, so only the server engines list here. */
-          voices: source === 'aura'
+          voices: source === 'aura2es' ? AURA2ES_MEN : source === 'aura'
             ? ['angus', 'asteria', 'arcas', 'orion', 'orpheus', 'athena', 'luna', 'zeus', 'perseus', 'helios', 'hera', 'stella']
             : source === 'melotts' ? ['en', 'es', 'fr', 'zh', 'jp', 'kr'] : [],
           cache: 86400,
         }, 200, request);
       }
       if (request.method === 'POST' && path === '/api/tts') {
-        const source = ['melotts', 'aura'].includes(env.TTS_SOURCE) ? env.TTS_SOURCE : 'browser';
+        const source = ['melotts', 'aura', 'aura2es'].includes(env.TTS_SOURCE) ? env.TTS_SOURCE : 'browser';
         if (source === 'browser') return new Response(null, { status: 204, headers: cors(request) });
         const body = await request.json().catch(() => null);
         const text = String((body && body.text) || '').trim().slice(0, 400);
@@ -600,7 +609,12 @@ export default {
 
         let audio;
         try {
-          if (source === 'aura') {
+          if (source === 'aura2es') {
+            const resp = await env.AI.run('@cf/deepgram/aura-2-es',
+              { text, speaker: AURA2ES_MEN.includes(voice) ? voice : 'sirio', encoding: 'mp3' },
+              { returnRawResponse: true });
+            audio = await resp.arrayBuffer();
+          } else if (source === 'aura') {
             const AURA = ['angus', 'asteria', 'arcas', 'orion', 'orpheus', 'athena', 'luna', 'zeus', 'perseus', 'helios', 'hera', 'stella'];
             const resp = await env.AI.run('@cf/deepgram/aura-1',
               { text, speaker: AURA.includes(voice) ? voice : 'angus', encoding: 'mp3' },

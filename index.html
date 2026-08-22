@@ -1805,7 +1805,7 @@
       <input id="smVolSfx" type="range" min="0" max="1" step="0.05" data-key="sfxVolume" aria-label="sound effects volume"><b></b></label>
     <label class="smvrow"><span>gritos</span>
       <input id="smVolGrito" type="range" min="0" max="1" step="0.05" data-key="gritoVolume" aria-label="grito volume"><b></b></label>
-    <label class="smvrow"><span>her voice</span>
+    <label class="smvrow"><span>his voice</span>
       <input id="smVolVoice" type="range" min="0" max="1" step="0.05" data-key="voiceVolume" aria-label="voice volume"><b></b></label>
   </div>
   <div class="smsep"></div>
@@ -1846,14 +1846,14 @@
     <div class="cdglyph">&#9760;</div>
     <div class="cdtitle">la calavera<span id="chatPeek"></span></div>
     <div class="cdacts">
-      <button id="chatCfg" title="her voice" aria-expanded="false" aria-controls="chatConf">&#9881;</button>
+      <button id="chatCfg" title="his voice" aria-expanded="false" aria-controls="chatConf">&#9881;</button>
       <button id="chatMute" title="mute the voice">&#128266;</button>
       <button id="chatMin" title="minimize">&#9866;</button>
       <button id="chatEnd" title="end chat">&#10005;</button>
     </div>
   </div>
   <div id="chatConf" hidden>
-    <div class="ccrow ccsrc"><span>her voice</span><span id="smVoiceSrc" class="smsrc"></span></div>
+    <div class="ccrow ccsrc"><span>his voice</span><span id="smVoiceSrc" class="smsrc"></span></div>
     <label class="ccrow"><span>voice</span>
       <select id="smVoicePick" aria-label="voice"></select></label>
     <label class="ccrow"><span>speed</span>
@@ -1861,7 +1861,7 @@
     <label class="ccrow" id="smVoicePitchRow"><span>pitch</span>
       <input id="smVoicePitch" type="range" min="0.5" max="1.6" step="0.02" aria-label="pitch"><b id="smVoicePitchV"></b></label>
     <div class="ccacts">
-      <div class="smact" id="smVoiceTry" role="button" tabindex="0">hear her</div>
+      <div class="smact" id="smVoiceTry" role="button" tabindex="0">hear him</div>
       <div class="smact" id="smVoiceReset" role="button" tabindex="0">reset voice</div>
     </div>
   </div>
@@ -2147,7 +2147,7 @@ const CFG_SCHEMA = {
   musicVolume:    [0.9,   0,     1,    0.05,  'music volume'],
   musicSeek:      [0,     0,     100,  0.1,   'start at (% of track)'],
   gritoVolume:    [1.0,   0,     1,    0.05,  'grito volume'],
-  voiceVolume:    [1.0,   0,     1,    0.05,  'her voice volume'],
+  voiceVolume:    [1.0,   0,     1,    0.05,  'his voice volume'],
   sfxVolume:      [0.55,  0,     1,    0.05,  'gesture sfx volume'],
   /* ── color ── */
   palette:        [0,     0,     7,    1,     'palette (0-7)'],
@@ -6460,7 +6460,10 @@ const VOICE = Object.assign({
 }, (() => { try { return JSON.parse(localStorage.getItem(VOICE_STORE) || '{}'); } catch (_) { return {}; } })());
 function voiceSave() { try { localStorage.setItem(VOICE_STORE, JSON.stringify(VOICE)); } catch (_) {} }
 
-const ttsCfg = { source: 'browser', voices: [], loaded: false };
+/* sessionVoice: picked once per page load from the server roster when the
+   user has not chosen one (serverVoice === ''). Deliberately NOT saved, so a
+   fresh load can bring a different man to the mic. */
+const ttsCfg = { source: 'browser', voices: [], loaded: false, sessionVoice: '' };
 /* Deferred to a load event rather than run here: GALLERY_API is a const
    declared ~2000 lines further down, so a module-level call from this spot
    would be a temporal-dead-zone throw that kills the whole script (invariant
@@ -6468,7 +6471,8 @@ const ttsCfg = { source: 'browser', voices: [], loaded: false };
 addEventListener('load', () => {
   fetch(GALLERY_API.replace('/presets', '/tts/config'))
     .then(r => r.ok ? r.json() : null)
-    .then(d => { if (d && d.source) { ttsCfg.source = d.source; ttsCfg.voices = d.voices || []; } })
+    .then(d => { if (d && d.source) { ttsCfg.source = d.source; ttsCfg.voices = d.voices || [];
+      if (ttsCfg.voices.length) ttsCfg.sessionVoice = ttsCfg.voices[Math.floor(Math.random() * ttsCfg.voices.length)]; } })
     .catch(() => {})
     .finally(() => { ttsCfg.loaded = true; syncVoiceUI(); });
 });
@@ -6515,7 +6519,7 @@ async function speakServer(text, seq) {
   try {
     const r = await fetch(GALLERY_API.replace('/presets', '/tts'), {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: text.slice(0, 400), voice: VOICE.serverVoice }),
+      body: JSON.stringify({ text: text.slice(0, 400), voice: VOICE.serverVoice || ttsCfg.sessionVoice }),
     });
     if (r.status !== 200) return false;          // 204 = switched off, 429 = quota, 502 = model
     const blob = await r.blob();
@@ -8194,7 +8198,7 @@ function syncVoiceUI() {
   pick.textContent = '';
   if (server) {
     const d = document.createElement('option');
-    d.value = ''; d.textContent = 'default (' + (ttsCfg.voices[0] || 'server') + ')';
+    d.value = ''; d.textContent = 'random each load' + (ttsCfg.sessionVoice ? ' (now ' + ttsCfg.sessionVoice + ')' : '');
     pick.appendChild(d);
     for (const v of ttsCfg.voices) {
       const o = document.createElement('option'); o.value = v; o.textContent = v; pick.appendChild(o);
@@ -8242,7 +8246,7 @@ document.getElementById('smVoicePitch').addEventListener('input', e => {
   document.getElementById('smVoicePitchV').textContent = VOICE.pitch.toFixed(2);
   voiceSave();
 });
-/* "hear her" cycles the sample lines so repeated presses compare the same
+/* "hear him" cycles the sample lines so repeated presses compare the same
    voice on different sentences rather than replaying one */
 let sampleIdx = 0;
 document.getElementById('smVoiceTry').addEventListener('click', () => {
@@ -9187,8 +9191,8 @@ function palBuild() {
     ['browse the gallery', 'panel', '\u{1F5BC}️', () => document.getElementById('galBrowse').click()],
     ['get the macOS screensaver', 'download', '\u{1F5B5}️', () => document.getElementById('saverBtn').click()],
     ['open the sound menu', 'panel', '♫', () => { if (!soundMenu.classList.contains('show')) muteBtn.click(); }],
-    ['tune her voice', 'panel', '\u{1F5E3}️', () => { if (!chatDock.classList.contains('show')) setVoiceMode(2); if (chatConf.hidden) chatCfgB.click(); setTimeout(() => document.getElementById('smVoicePick').focus(), 80); }],
-    ['hear her voice', 'voice', '\u{1F50A}', () => document.getElementById('smVoiceTry').click()],
+    ['tune his voice', 'panel', '\u{1F5E3}️', () => { if (!chatDock.classList.contains('show')) setVoiceMode(2); if (chatConf.hidden) chatCfgB.click(); setTimeout(() => document.getElementById('smVoicePick').focus(), 80); }],
+    ['hear his voice', 'voice', '\u{1F50A}', () => document.getElementById('smVoiceTry').click()],
     ['copy a link to this board', 'share', '\u{1F517}', () => { if (!cfgPanel.classList.contains('show')) togglePanel(cfgPanel); document.getElementById('cfgLink').click(); }],
     ['save this board to my browser', 'save', '\u{1F4BE}', () => document.getElementById('cfgSave').click()],
     ['restore my saved board', 'save', '↺', () => document.getElementById('cfgLoad').click()],
