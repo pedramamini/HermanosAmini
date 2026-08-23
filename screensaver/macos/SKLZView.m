@@ -96,6 +96,37 @@ static NSURL *saverURL(void) {
   self.wantsLayer = YES;
   self.layer.backgroundColor = NSColor.blackColor.CGColor;
 
+  _statusLabel = [[NSTextField alloc] initWithFrame:
+      NSMakeRect(24, 20, NSWidth(self.bounds) - 48, 22)];
+  _statusLabel.autoresizingMask = NSViewWidthSizable | NSViewMaxYMargin;
+  _statusLabel.bezeled = NO;
+  _statusLabel.editable = NO;
+  _statusLabel.selectable = NO;
+  _statusLabel.drawsBackground = NO;
+  _statusLabel.font = [NSFont monospacedSystemFontOfSize:13 weight:NSFontWeightRegular];
+  _statusLabel.textColor = [NSColor colorWithCalibratedRed:1 green:0.70 blue:0.28 alpha:0.9];
+  _statusLabel.stringValue = @"SKLZ " @SKLZ_BUILD @"  ·  starting";
+  [self addSubview:_statusLabel];
+
+  /* NOTHING is loaded here. See startAnimation. */
+  return self;
+}
+
+/* ── the web view's whole life fits between startAnimation and stopAnimation ──
+   It used to be built and loaded right here in the initialiser and never torn
+   down, which is a real bug and not a stylistic one: legacyScreenSaver.appex
+   stays RESIDENT after the screensaver leaves the screen, so the WKWebView it
+   is holding stays resident too, with a live WebGL page and a live connection
+   to hermanosamini.com behind it. Measured on 2026-08-22: one host up 2d23h
+   had burned 28.3 CPU-hours across its four processes, about 40% of a
+   performance core continuously, rendering frames to a screen nobody was
+   looking at, with the WebKit GPU process grown to 1.6 GB resident.
+
+   ScreenSaverView already provides exactly the two hooks this needs. The fix
+   is to actually use them. */
+- (void)buildWeb {
+  if (self.web) return;
+
   WKWebViewConfiguration *cfg = [WKWebViewConfiguration new];
   /* A screensaver is silent. Requiring a user gesture for audible playback
      means the web view itself refuses to make noise, no matter what the page
@@ -114,33 +145,53 @@ static NSURL *saverURL(void) {
                           forMainFrameOnly:YES];
   [cfg.userContentController addUserScript:kiosk];
 
-  _web = [[WKWebView alloc] initWithFrame:self.bounds configuration:cfg];
-  _web.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
-  _web.navigationDelegate = self;
-  _web.wantsLayer = YES;
+  WKWebView *w = [[WKWebView alloc] initWithFrame:self.bounds configuration:cfg];
+  w.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+  w.navigationDelegate = self;
+  w.wantsLayer = YES;
   /* Transparent, not black: if WebKit never presents a frame in the sandboxed
      screensaver host, a black web view would hide the status text behind an
      identical-looking black rectangle. Let the view's own layer show through
      until the art is confirmed drawing. */
-  _web.layer.backgroundColor = NSColor.clearColor.CGColor;
-  [_web setValue:@NO forKey:@"drawsBackground"];   // KVC: the API is private
-  [self addSubview:_web];
+  w.layer.backgroundColor = NSColor.clearColor.CGColor;
+  [w setValue:@NO forKey:@"drawsBackground"];      // KVC: the API is private
+  /* BELOW the status label, which was added first this time round, so the
+     diagnostics still composite on top of the art. */
+  [self addSubview:w positioned:NSWindowBelow relativeTo:self.statusLabel];
+  self.web = w;
+}
 
-  /* Added AFTER the web view, so it composites on top of it. */
-  _statusLabel = [[NSTextField alloc] initWithFrame:
-      NSMakeRect(24, 20, NSWidth(self.bounds) - 48, 22)];
-  _statusLabel.autoresizingMask = NSViewWidthSizable | NSViewMaxYMargin;
-  _statusLabel.bezeled = NO;
-  _statusLabel.editable = NO;
-  _statusLabel.selectable = NO;
-  _statusLabel.drawsBackground = NO;
-  _statusLabel.font = [NSFont monospacedSystemFontOfSize:13 weight:NSFontWeightRegular];
-  _statusLabel.textColor = [NSColor colorWithCalibratedRed:1 green:0.70 blue:0.28 alpha:0.9];
-  _statusLabel.stringValue = @"SKLZ " @SKLZ_BUILD @"  ·  starting";
-  [self addSubview:_statusLabel];
+/* Tear the web view all the way down rather than merely hiding or pausing it.
+   Hiding leaves the page's requestAnimationFrame loop running (WebKit's own
+   occlusion signal is exactly what this host gets wrong, which is why
+   animateOneFrame has to drive SKLZ_TICK by hand in the first place), and
+   pausing leaves the WebContent, Networking and GPU XPC children alive. The
+   only thing that reliably ends all four is releasing the view. */
+- (void)teardownWeb {
+  WKWebView *w = self.web;
+  if (!w) return;
+  self.web = nil;                        // before anything can call back in
+  w.navigationDelegate = nil;
+  [w stopLoading];
+  [w loadHTMLString:@"" baseURL:nil];    // drop the page and its GL contexts
+  [w removeFromSuperview];
 
+  self.painted = NO;
+  self.loadError = nil;
+  self.statusLabel.hidden = NO;
+  self.statusLabel.stringValue = @"SKLZ " @SKLZ_BUILD @"  ·  stopped";
+}
+
+- (void)startAnimation {
+  [super startAnimation];        // this is what flips isAnimating to YES
+  [self buildWeb];
   [self load];
-  return self;
+}
+
+- (void)dealloc {
+  [_retryTimer invalidate];
+  _web.navigationDelegate = nil;
+  [_web stopLoading];
 }
 
 - (void)say:(NSString *)msg {
@@ -153,6 +204,11 @@ static NSURL *saverURL(void) {
 }
 
 - (void)load {
+  /* A retry timer, a dead web process, or the configure sheet can all reach
+     this after the screensaver has left the screen. Refuse, or the teardown
+     is undone by its own callbacks. */
+  if (!self.isAnimating) return;
+  [self buildWeb];
   [self say:@"connecting to hermanosamini.com"];
   [self.web loadRequest:[NSURLRequest requestWithURL:saverURL()]];
 }
@@ -231,6 +287,7 @@ static NSURL *saverURL(void) {
 - (void)webViewWebContentProcessDidTerminate:(WKWebView *)w {
   self.painted = NO;
   self.statusLabel.hidden = NO;
+  if (!self.isAnimating) return;         // it died because we killed it
   [self say:@"web process died, reloading"];
   [self load];
 }
@@ -239,6 +296,7 @@ static NSURL *saverURL(void) {
    the only job here is to keep asking whether it really is. */
 - (void)animateOneFrame {
   static int tick = 0;
+  if (!self.isAnimating || !self.web) return;
   /* drive the page's clock every tick; ask whether it is painting every ~2s */
   [self.web evaluateJavaScript:@"window.SKLZ_TICK && SKLZ_TICK()"
              completionHandler:nil];
@@ -246,9 +304,14 @@ static NSURL *saverURL(void) {
 }
 
 - (void)stopAnimation {
+  [super stopAnimation];         // isAnimating goes NO here, and it must go
+                                 // first: releasing the web view kills the
+                                 // WebContent process, which fires the
+                                 // did-terminate delegate, whose entire job is
+                                 // to reload. The flag is what stops it.
   [self.retryTimer invalidate];
   self.retryTimer = nil;
-  [super stopAnimation];
+  [self teardownWeb];
 }
 
 - (void)drawRect:(NSRect)rect {
