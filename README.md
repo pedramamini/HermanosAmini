@@ -347,8 +347,20 @@ double-click, and System Settings offers to install it. No Gatekeeper warning:
 it carries a stapled Apple notarization ticket. Or build it yourself:
 
 ```bash
-cd screensaver/macos && ./build.sh    # needs Xcode command line tools
+cd screensaver/macos && ./build.sh           # needs Xcode command line tools
+cd screensaver/macos && ./lifecycle-test.sh  # asserts it stops when it stops
 ```
+
+`lifecycle-test.sh` exists because of a real bug, fixed 2026-08-22, that no
+amount of looking at the screen could have found. The web view was built in
+the view's initialiser and never torn down, so the art kept rendering after the
+screensaver left the screen: one host measured 28.3 CPU-hours over 71.5 wall
+hours, about 40% of a core continuously, drawing frames nobody was looking at.
+The test loads the bundle the way the screensaver engine does, confirms the
+page reaches "painting", then calls `stopAnimation` and measures whether the
+CPU actually goes away. It asserts on a work RATE rather than a process count,
+because WebKit's GPU and Networking services are per-process-pool singletons
+that outlive the web view on purpose.
 
 **Windows** (`SKLZ.scr`): download from the
 [latest release](https://github.com/pedramamini/HermanosAmini/releases/latest), right-click the `.scr`,
