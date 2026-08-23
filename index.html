@@ -1150,8 +1150,24 @@
     padding-right: 34px;
   }
   .saverlede { font-size: 13.5px; line-height: 1.55; color: rgba(245,234,223,.82); }
+  .saveros {
+    display: flex; gap: 6px; margin-top: 16px;
+    padding: 4px; border-radius: 10px;
+    background: rgba(245,234,223,.06); border: 1px solid rgba(245,234,223,.1);
+  }
+  .saveros button {
+    flex: 1; padding: 8px 0; border: 0; border-radius: 7px; cursor: pointer;
+    font: inherit; font-size: 12.5px; letter-spacing: .02em;
+    color: rgba(245,234,223,.55); background: transparent;
+    transition: background .15s, color .15s;
+  }
+  .saveros button:hover { color: rgba(245,234,223,.85); }
+  .saveros button.on {
+    color: #fff; background: rgba(145,70,255,.35);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.14);
+  }
   .saverbtn {
-    display: block; margin: 18px 0 6px; padding: 13px 0;
+    display: block; margin: 12px 0 6px; padding: 13px 0;
     text-align: center; text-decoration: none; cursor: pointer;
     font-size: 14.5px; font-weight: 500; color: #fff;
     background: linear-gradient(180deg, rgba(145,70,255,.95), rgba(110,45,210,.95));
@@ -1683,15 +1699,19 @@
   <div id="saverCard">
     <div class="saverclose" role="button" tabindex="0" aria-label="close">&#10005;</div>
     <h3>Take it home</h3>
-    <p class="saverlede">The macOS screensaver runs this exact piece, live. It is
+    <p class="saverlede">The screensaver runs this exact piece, live. It is
       not a recording: it pulls the art from the web, so it updates itself as
       new things ship. Silent by design, and it fills every display you have.</p>
+    <div class="saveros" role="tablist" aria-label="operating system">
+      <button type="button" role="tab" data-os="mac">macOS</button>
+      <button type="button" role="tab" data-os="win">Windows</button>
+    </div>
     <a id="saverDl" class="saverbtn" href="https://github.com/pedramamini/HermanosAmini/releases/latest"
        target="_blank" rel="noopener noreferrer">
-      <span id="saverDlText">download for macOS</span>
+      <span id="saverDlText">download</span>
     </a>
     <div id="saverVer"></div>
-    <ol class="saversteps">
+    <ol class="saversteps" data-os="mac">
       <li>Unzip it. You get <code>SKLZ.saver</code>.</li>
       <li>Double-click it. macOS asks whether to install for you or for
         everyone; either is fine.</li>
@@ -1700,9 +1720,21 @@
         mode (a new look every 3 minutes), or one specific board from a share
         link you made.</li>
     </ol>
-    <p class="saverfine">Signed and notarized by Apple, so it installs without a
-      Gatekeeper warning. Windows users: there is a <code>.scr</code> on the same
-      release page, still untested on real hardware.</p>
+    <ol class="saversteps" data-os="win" hidden>
+      <li>Unzip it. You get <code>SKLZ.scr</code>.</li>
+      <li>Right-click it and choose <b>Install</b>. Windows opens Screen Saver
+        Settings with SKLZ selected.</li>
+      <li>Or copy it into <code>C:\Windows\System32</code> to make it available
+        for every user.</li>
+      <li>It needs the Edge WebView2 runtime, which Windows 10 and 11 already
+        ship.</li>
+    </ol>
+    <p class="saverfine" data-os="mac">Signed and notarized by Apple, so it
+      installs without a Gatekeeper warning.</p>
+    <p class="saverfine" data-os="win" hidden>Not code-signed, so SmartScreen
+      will object the first time: click <b>More info</b>, then <b>Run
+      anyway</b>. The source is in the repo if you would rather build it
+      yourself.</p>
   </div>
 </div>
 <div id="eyebrow" class="ui">los que amamos nunca mueren</div>
@@ -10316,25 +10348,46 @@ ideaSend.addEventListener('click', async () => {
   if (!btn || !modal) return;
   let resolved = false;
 
+  /* Two builds, one modal. The OS is auto-detected and the tab is a manual
+     override; the release API is fetched once and the asset for the CHOSEN
+     tab is picked by name (`macos` / `windows`), never by position. */
+  const OS = {
+    mac: { label: 'macOS',   match: a => /macos/i.test(a.name) && /\.zip$/i.test(a.name),   fine: 'signed + notarized' },
+    win: { label: 'Windows', match: a => /windows/i.test(a.name) && /\.zip$/i.test(a.name), fine: 'unsigned' },
+  };
+  const ua = navigator.userAgent || '';
+  let os = /windows/i.test(ua) ? 'win' : 'mac';
+  let release = null;
+  const tabs = modal.querySelectorAll('.saveros button');
+
+  function paint() {
+    tabs.forEach(b => { b.classList.toggle('on', b.dataset.os === os); b.setAttribute('aria-selected', b.dataset.os === os); });
+    modal.querySelectorAll('[data-os]:not(button)').forEach(el => { el.hidden = el.dataset.os !== os; });
+    const asset = release && (release.assets || []).find(OS[os].match);
+    if (asset && asset.browser_download_url) {
+      dl.href = asset.browser_download_url;
+      dl.removeAttribute('target');        // a direct file download, not a page
+      const kb = asset.size ? ' · ' + (asset.size / 1024).toFixed(0) + ' KB' : '';
+      dlText.textContent = 'download for ' + OS[os].label + kb;
+      ver.textContent = release.tag_name + ' · ' + OS[os].fine;
+    } else {
+      /* no resolved asset for this OS: fall back to the release page, which
+         GitHub renders server-side and always lists everything */
+      dl.href = 'https://github.com/pedramamini/HermanosAmini/releases/latest';
+      dl.setAttribute('target', '_blank');
+      dlText.textContent = 'download for ' + OS[os].label;
+      ver.textContent = release && release.tag_name ? release.tag_name + ' · ' + OS[os].fine : '';
+    }
+  }
+  tabs.forEach(b => b.addEventListener('click', () => { os = b.dataset.os; paint(); }));
+  paint();
+
   function resolveLatest() {
     if (resolved) return;
     resolved = true;                       // one call per page, not per open
     fetch('https://api.github.com/repos/pedramamini/HermanosAmini/releases/latest')
       .then(r => r.ok ? r.json() : null)
-      .then(d => {
-        if (!d) return;
-        if (d.tag_name) ver.textContent = d.tag_name + ' · signed + notarized';
-        /* find the macOS asset by NAME rather than by position: the release
-           carries a Windows .scr too, and assets[0] is whichever was uploaded
-           first, which is not a promise anyone made. */
-        const mac = (d.assets || []).find(a => /macos/i.test(a.name) && /\.zip$/i.test(a.name));
-        if (mac && mac.browser_download_url) {
-          dl.href = mac.browser_download_url;
-          dl.removeAttribute('target');     // a direct file download, not a page
-          const mb = mac.size ? ' · ' + (mac.size / 1024).toFixed(0) + ' KB' : '';
-          dlText.textContent = 'download for macOS' + mb;
-        }
-      })
+      .then(d => { if (d) { release = d; paint(); } })
       .catch(() => {});                    // the hard-coded href still works
   }
 
