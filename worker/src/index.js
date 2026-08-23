@@ -418,6 +418,10 @@ export default {
 
         const text = String(body.request || '').trim();
         if (text.length < 8) return json({ error: 'say a little more' }, 400, request);
+        /* Lockstep: the page mirrors this number as REQ_MAX and trims the
+           request line to it before sending. The two drifted once (page 600,
+           here 400) and every request in between died on an unescapable
+           "try again". Change one, change the other, in the same commit. */
         if (text.length > 400) return json({ error: 'keep it under 400 characters' }, 400, request);
         /* same PG bar as preset names: this becomes a public issue */
         if (nameProblem(text.slice(0, 28)) === 'keep it PG' ||

@@ -10094,10 +10094,30 @@ function paintTurns(el, turns) {
   }
 }
 
+/* Cut at a word boundary, never mid-word, and only when it is really too long.
+   The ellipsis is the tell that there is more; the full wording travels with
+   the request as its detail, so nothing the viewer said is thrown away. */
+function trimToWords(s, max) {
+  if (s.length <= max) return s;
+  const cut = s.slice(0, max - 1);
+  const sp = cut.lastIndexOf(' ');
+  return (sp > max * 0.6 ? cut.slice(0, sp) : cut).replace(/[\s,;:.]+$/, '') + '\u2026';
+}
+
+/* The Worker hard-rejects a request line longer than REQ_MAX. This modal is fed
+   by the chat and the voice listener, which compose their own prose, and it
+   used to hold up to 600 characters and hand the Worker something it could
+   never accept: the send failed, the button said "try again", and no amount of
+   trying could ever work because the quote is not editable from here. Anything
+   between 401 and 600 characters was an unescapable dead end. Keep this number
+   in lockstep with the `request` cap in worker/src/index.js. */
+const REQ_MAX = 400;
+let ideaFullText = '';        // the untrimmed wording, filed as the detail
 let ideaFromChat = null;      // {spec, transcript} when the chat ran the interview
 function captureIdea(text, fromChat) {
   if (!text || ideaModal.classList.contains('show')) return;
-  ideaPending = text.slice(0, 600);
+  ideaFullText = text.slice(0, 1500).trim();
+  ideaPending = trimToWords(ideaFullText, REQ_MAX);
   ideaFromChat = fromChat && fromChat.spec ? fromChat : null;
   ideaQuote.textContent = '\u201c' + ideaPending + '\u201d';
   ideaEmail.value = localStorage.getItem('sklz.email.v1') || '';
@@ -10164,7 +10184,7 @@ function closeIdea() {
   ideaFromChat = null;
   ideaDetail.hidden = false;
   ideaModal.classList.remove('show');
-  ideaPending = ''; ideaQuestion = ''; ideaTurns = [];
+  ideaPending = ''; ideaFullText = ''; ideaQuestion = ''; ideaTurns = [];
   ideaProbe.hidden = true; ideaDetail.value = '';
   paintTurns(ideaThread, ideaTurns);
 }
@@ -10179,28 +10199,41 @@ ideaSend.addEventListener('click', async () => {
     ideaEmail.focus(); ideaEmail.style.borderColor = '#ff2fa0'; return;
   }
   const body = ideaPending;
+  /* Whatever the trim took off the request line still has to reach the artist.
+     The chat path already carries a written spec, so use the full wording when
+     it is the longer of the two; otherwise it rides along as the detail. */
+  const trimmed = !!ideaFullText && ideaFullText !== body;
   ideaSend.textContent = 'sending...'; ideaSend.disabled = true;
   try {
-    const r = await fetch(GALLERY_API.replace('/presets', '/requests'), {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+    const payload = { request: body, email, config: galConfigPayload() };
+    if (ideaFromChat) {
+      /* the chat interview: the model's spec plus the spoken exchange */
+      const spec = trimmed && ideaFullText.length > (ideaFromChat.spec || '').length
+        ? ideaFullText : ideaFromChat.spec;
+      payload.chat = { spec, transcript: ideaFromChat.transcript };
+    } else {
       /* Bank whatever is in the box on the way out. Someone who typed an
          answer and hit "send it" rather than "answer" clearly meant to
          include it, and silently dropping it is the rudest thing this form
          could do. */
-      body: JSON.stringify(ideaFromChat
-        /* the chat interview: the model's spec plus the spoken exchange */
-        ? { request: body, email, config: galConfigPayload(),
-            chat: { spec: ideaFromChat.spec, transcript: ideaFromChat.transcript } }
-        : { request: body, email, config: galConfigPayload(),
-            turns: ideaTurns.concat(
-              ideaQuestion && (ideaDetail.value || '').trim()
-                ? [{ q: ideaQuestion, a: ideaDetail.value.trim() }] : []) })
+      payload.turns = ideaTurns.concat(
+        ideaQuestion && (ideaDetail.value || '').trim()
+          ? [{ q: ideaQuestion, a: ideaDetail.value.trim() }] : []);
+      if (trimmed && !payload.turns.length) payload.detail = ideaFullText;
+    }
+    const r = await fetch(GALLERY_API.replace('/presets', '/requests'), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
     });
-    if (!r.ok) throw new Error('rejected');
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || 'could not send');
     if (email) { try { localStorage.setItem('sklz.email.v1', email); } catch (_) {} }
     ideaSend.textContent = email ? 'sent \u2713 check your mail' : 'sent \u2713';
     setTimeout(() => { closeIdea(); ideaSend.textContent = 'send it'; ideaSend.disabled = false; }, 1400);
-  } catch (_) {
+  } catch (e) {
+    /* Say WHY it failed. A bare "try again" on something the Worker will never
+       accept is a dead end wearing a retry button. */
+    ideaRounds.textContent = String((e && e.message) || 'could not send');
     ideaSend.textContent = 'try again'; ideaSend.disabled = false;
   }
 });
