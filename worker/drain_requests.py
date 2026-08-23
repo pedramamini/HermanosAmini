@@ -390,7 +390,7 @@ def main():
     sent = 0
     if pending_mail:
         print(f"\n{len(pending_mail)} filed request(s) owe a 'we got it' email:")
-        sent, _ = mail_rows(pending_mail, "open", apply)
+        sent, _ = mail_rows(pending_mail, "open", a.apply)
 
     if a.apply:
         # close_sweep's mail used to be INVISIBLE here: this line only counted
