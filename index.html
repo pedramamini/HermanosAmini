@@ -7842,12 +7842,14 @@ async function checkVersion() {
     const v = await r.json();
     if (v.build && BUILD_ID !== '__BUILD_' + 'ID__' && v.build !== BUILD_ID) {
       updatePending = true;
-      stashResume();
       /* let the current bar finish, then take the new build. Keep the query
-         string: dropping it would strand ?kiosk=1 displays at the gate. */
+         string: dropping it would strand ?kiosk=1 displays at the gate.
+         The stash is taken INSIDE the timeout, at the instant of leaving:
+         taken here it would be 1.5 s stale, and a wall that updates every
+         few days would slide that far back into the mix on every push. */
       const u = new URL(location.href);
       u.searchParams.set('v', v.build);
-      setTimeout(() => location.replace(u), 1500);
+      setTimeout(() => { stashResume(); location.replace(u); }, 1500);
     }
   } catch (_) {}                                    // offline: try again later
 }
@@ -7986,7 +7988,12 @@ function autoResume() {
   gate.classList.add('gone');
   gateGone = true;
   const go = () => {
-    try { music.currentTime = s.time || 0; } catch (_) {}
+    /* The track kept playing in the viewer's head while the page reloaded.
+       Add the wall-clock gap so the resume lands where the song IS, not
+       where it WAS, wrapped for a mix that looped during the reload. */
+    let at = (s.time || 0) + (s.playing ? (Date.now() - s.at) / 1000 : 0);
+    if (isFinite(music.duration) && music.duration > 0) at %= music.duration;
+    try { music.currentTime = at; } catch (_) {}
     if (s.playing) {
       startMusic();
       music.play().catch(() => {                 // autoplay refused: show the gate again
