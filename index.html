@@ -2133,6 +2133,11 @@ const CFG_SCHEMA = {
   smokeStir:      [0.6,   0,     4,    0.1,   'smoke cursor stir'],
   smokeDecay:     [0.3,   0.05,  3,    0.05,  'smoke stir fade rate'],
   skullSize:      [1.0,   0.5,   1.8,  0.05,  'hero skull size'],
+  /* the flood's random-size WINDOW. Equal min and max = one fixed size.
+     Skulls carry a 0..1 draw `u`, so moving either end resizes the living
+     population instantly; nothing has to respawn. */
+  swarmSizeMin:   [0.30,  0.05,  2,    0.05,  'flood skull smallest'],
+  swarmSizeMax:   [1.15,  0.05,  2,    0.05,  'flood skull largest'],
   breatheRate:    [8,     2,     40,   1,     'breathing pace (per min)'],
   rayLength:      [1.0,   0.3,   2.5,  0.05,  'sunbeam length'],
   rayCount:       [14,    6,     28,   2,     'sunbeam count'],
@@ -2152,9 +2157,11 @@ const CFG_SCHEMA = {
   eventMaxGap:    [20,    2,     60,   1,     'event gap max (s)'],
   liquidFill:     [11,    2,     30,   1,     'logo travel time (s)'],
   liquidRest:     [6,     0,     20,   1,     'logo dwell max (s)'],
-  musicVolume:    [0.9,   0,     1,    0.05,  'music volume'],
+  /* the LADDER: his voice must always be heard over everything, then the
+     grito, then gesture sfx, then the bed of music. 1.0 > .8 > .55 > .5. */
+  musicVolume:    [0.5,   0,     1,    0.05,  'music volume'],
   musicSeek:      [0,     0,     100,  0.1,   'start at (% of track)'],
-  gritoVolume:    [1.0,   0,     1,    0.05,  'grito volume'],
+  gritoVolume:    [0.8,   0,     1,    0.05,  'grito volume'],
   voiceVolume:    [1.0,   0,     1,    0.05,  'his voice volume'],
   sfxVolume:      [0.55,  0,     1,    0.05,  'gesture sfx volume'],
   /* ── color ── */
@@ -2209,7 +2216,8 @@ const CFG_CATEGORY = {
   skull: ['skullSize', 'socketGlow', 'auraSize', 'petalCount', 'rayLength',
           'rayCount', 'flickForce', 'skullOnTop', 'skullBreathe', 'floodRate', 'crownMetal', 'crownPeaks',
           'sombrero', 'bigote', 'bigoteStyle', 'bigoteColor',
-          'flowerCrown', 'crownBlooms', 'thirdEye', 'eyeRings', 'cheekRings'],
+          'flowerCrown', 'crownBlooms', 'thirdEye', 'eyeRings', 'cheekRings',
+          'swarmSizeMin', 'swarmSizeMax'],
   sky: ['tunnelCount', 'starDensity', 'dustCount', 'smokeScale', 'smokeStir',
         'smokeDecay', 'eventMinGap', 'eventMaxGap', 'autoEvents'],
   sound: ['musicVolume', 'musicSeek', 'gritoVolume', 'sfxVolume', 'voiceVolume', 'musicOn',
@@ -2252,7 +2260,7 @@ const CFG_TOGGLES = {
   eyeRings:    [1, 0, 1, 1, 'eye rings', 'toggle'],
   cheekRings:  [1, 0, 1, 1, 'cheek rings', 'toggle'],
   flowerCrown: [0, 0, 1, 1, 'flower crown', 'toggle'],
-  sombrero:    [0, 0, 1, 1, 'sombrero', 'toggle'],
+  sombrero:    [0, 0, 1, 1, 'sombrero de vaquero', 'toggle'],
   bigote:      [0, 0, 1, 1, 'mustache', 'toggle'],
   hudOn:       [0, 0, 1, 1, 'fps monitor', 'toggle'],
 };
@@ -4572,7 +4580,8 @@ function spawnSkull(n, ttl) {
     }
     swarm.push({
       x, y, vx, vy,
-      scale: (0.30 + Math.random() * 0.85) * TUN_SCALE,
+      u: Math.random(),                       // 0..1 position inside the size window
+      scale: 1,                                 // derived every frame in stepSwarm
       rot: Math.random() * Math.PI * 2,
       vr: (Math.random() < 0.5 ? -1 : 1) * (0.15 + Math.random() * 0.75),
       v: Math.floor(Math.random() * Math.max(1, VARIANTS.length)),
@@ -4604,8 +4613,30 @@ function stepSwarm(dt) {
   const skip = q >= 4 ? 3 : q === 3 ? 2 : 1;
   tctx.save();
   tctx.scale(DPR, DPR);
-  for (let i = 0; i < swarm.length; i++) {
+  const szLo = Math.min(CFG.swarmSizeMin, CFG.swarmSizeMax);
+  const szHi = Math.max(CFG.swarmSizeMin, CFG.swarmSizeMax);
+  for (let i = swarm.length - 1; i >= 0; i--) {
     const k = swarm[i];
+    k.scale = (szLo + (k.u === undefined ? 0.5 : k.u) * (szHi - szLo)) * TUN_SCALE;
+    /* captured by the hole: it spirals, stretches and goes. No wrap, no
+       velocity of its own any more. */
+    if (k.eat !== undefined) {
+      if (stepSwallow(k, dt)) { swarm.splice(i, 1); continue; }
+      const spr2 = pool[k.v % pool.length];
+      const px2 = spr2.width * k.scale * 0.5;
+      const ang = Math.atan2(hole.y - k.y, hole.x - k.x);
+      tctx.save();
+      tctx.translate(k.x, k.y);
+      tctx.rotate(ang);
+      tctx.scale(1 + 2.6 * k.eat, Math.max(0.12, 1 - 0.8 * k.eat));  // spaghetti
+      tctx.rotate(-ang + k.rot);
+      tctx.globalAlpha = 0.82 * (1 - k.eat * k.eat);
+      tctx.filter = 'brightness(' + (1 - 0.85 * k.eat).toFixed(2) + ')';
+      tctx.drawImage(spr2, -px2 / 2, -px2 / 2, px2, px2);
+      tctx.filter = 'none';
+      tctx.restore();
+      continue;
+    }
     k.x += k.vx * dt; k.y += k.vy * dt;
     k.rot += k.vr * dt * CFG.skullSpinMax * 2.2;
     /* wrap instead of despawning: a flood you have to watch drain is a chore,
@@ -4633,6 +4664,7 @@ function stepSwarm(dt) {
 }
 
 function stepHole(dt) {
+  swallowKnocks = 0;
   if (!hole.live) { hole.str = Math.max(0, hole.str - dt * 1.1); return; }
   const age = t - hole.born;
   if (age > hole.max) { hole.live = false; return; }
@@ -4729,6 +4761,13 @@ function stepHole(dt) {
     if (u.eat !== undefined) continue;
     if (pullHeavy(u)) holeSwallow(u);
   }
+  /* The flood is matter too. Every free skull gets the same capture field
+     and the same death; only the knock is rationed, or a dense flood turns
+     the fall into a drum roll. */
+  for (const k of swarm) {
+    if (k.eat !== undefined) continue;
+    if (pullHeavy(k)) holeSwallow(k, swallowKnocks++ > 0);
+  }
   /* the dragon is a spark, but it is a HEAVY spark: give it the capture
      field too, on top of the ember pull it already got above */
   for (const sp of sparks) {
@@ -4743,13 +4782,14 @@ function stepHole(dt) {
    leaves its list. `eat` is the 0..1 progress and doubles as the "already
    falling" flag the pull loops check, so the field stops fighting the spiral.
    `ea` is the angle on the way in; `er` the radius, which decays to zero. */
-function holeSwallow(o) {
+let swallowKnocks = 0;                 // reset each frame in stepHole
+function holeSwallow(o, quiet) {
   o.eat = 0;
   o.ea = Math.atan2(o.y - hole.y, o.x - hole.x);
   o.er = Math.hypot(o.x - hole.x, o.y - hole.y);
   o.vx = 0; o.vy = 0;
   if (o.kind === 'alebrije') o.max = o.life + 1.2;   // let its own envelope fade the body
-  SFX.knock();
+  if (!quiet) SFX.knock();
 }
 /* One step of a swallow. Returns true when the object is gone and the caller
    should remove it. Shared by UFOs and dragons so the death looks the same. */
@@ -5947,6 +5987,8 @@ function fxRestyle() {
      once and reads as noise. One flourish per roll. */
   const R = (lo, hi) => +(lo + Math.random() * (hi - lo)).toFixed(2);
   CFG.skullSize    = R(0.85, 1.35);
+  CFG.swarmSizeMin = R(0.15, 0.6);
+  CFG.swarmSizeMax = R(CFG.swarmSizeMin + 0.25, 1.7);
   CFG.tunnelCount  = Math.round(R(28, 56));
   CFG.tunnelSpeed  = R(0.012, 0.055);
   CFG.rayCount     = Math.round(R(8, 24));
@@ -8783,7 +8825,7 @@ const HELP_ROWS = [
   [['O'], 'surprise me with a new look', '"restyle"', 'o'],
   [['\u21e7O'], 'demo mode: reroll everything every 3 min', '', '\u21e7o'],
   [['\u21e7C'], 'crown on / off', '"crown"', '\u21e7c'],
-  [['\u21e7S'], 'sombrero on / off', '"sombrero"', '\u21e7s'],
+  [['\u21e7S'], 'sombrero de vaquero on / off', '"sombrero"', '\u21e7s'],
   [['\u21e7M'], 'mustache: charro / handlebar / herradura', '"mustache"', '\u21e7m'],
   [['\u21e7B'], 'skull breathing on / off', '', '\u21e7b'],
   [['\u21e7T'], 'mute / unmute the music only', '', '\u21e7t'],
@@ -9451,21 +9493,20 @@ const DEMO_KEEP = new Set([
   'perfMode',                                 // rolling "lite" would degrade a wall
   'beatSync',                                 // asked for permanently engaged
   'autoEvents',                               // the drifting artifacts ARE the demo
-  /* ACCESSORIES: the same rule the dice follows. What you put ON the skull is
-     the one choice that is yours, so a wall display left in demo mode reskins
-     the world around your calavera without ever undressing it. Behaviours of
-     the skull (breathing, on-top) are NOT accessories and still roll. */
-  'flowerCrown', 'crownMetal', 'crownPeaks', 'crownBlooms',
-  'sombrero',
-  'bigote', 'bigoteStyle', 'bigoteColor',
 ]);
+/* Headwear DOES roll in demo mode (asked 2026-08-22): the point of the wall
+   is showing everything off, crown and hat included. It rolls as ONE choice
+   after the dial loop, because the two are exclusive and independent rolls
+   would stack them. The mustache rolls on its own; it coexists. */
 
 /* A couple of dials can take the picture to nearly black, which on a wall
    reads as "it broke" rather than "it changed". Keep them watchable. */
 const DEMO_CLAMP = { bgBright: [0.7, 2], vignette: [0, 0.9], skullSize: [0.6, 1.5] };
 
 function demoRandomize() {
+  const wear = Math.random();                     // one draw: none / crown / hat
   for (const k in CFG_SCHEMA) {
+    if (k === 'flowerCrown' || k === 'sombrero') continue;   // set below, exclusively
     if (DEMO_KEEP.has(k)) continue;
     let [, min, max, step] = CFG_SCHEMA[k];
     const cl = DEMO_CLAMP[k];
@@ -9481,6 +9522,13 @@ function demoRandomize() {
   if (CFG.eventMinGap > CFG.eventMaxGap) {
     const a = CFG.eventMinGap; CFG.eventMinGap = CFG.eventMaxGap; CFG.eventMaxGap = a;
   }
+  /* same rule for the flood's size window */
+  if (CFG.swarmSizeMin > CFG.swarmSizeMax) {
+    const a = CFG.swarmSizeMin; CFG.swarmSizeMin = CFG.swarmSizeMax; CFG.swarmSizeMax = a;
+  }
+  /* headwear: one exclusive draw. A third of demo looks are bare-headed. */
+  CFG.flowerCrown = wear < 1 / 3 ? 1 : 0;
+  CFG.sombrero = wear >= 2 / 3 ? 1 : 0;
   applyPalette();
   schedulePaletteRebuild();
   syncSlidersSafe();                          // also runs applyToggles + resize

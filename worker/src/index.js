@@ -28,7 +28,7 @@ const LIMITS = {
   skullSpinMax: [0, 2, 'skull spin max'], beatSensitivity: [1.05, 2, 'beat sensitivity'], beatDecay: [1, 15, 'beat pulse decay'],
   ringSpeed: [0, 1, 'eye ring speed'], ringBeatKick: [0, 6, 'ring beat kick'], spiralSpeed: [0, 1, 'cheek spiral speed'], raySpeed: [0, 0.4, 'sunbeam speed'],
   nosePulse: [0, 1, 'nose beat thump'], teethClack: [0, 0.5, 'teeth beat clack'], pupilBeat: [0, 0.6, 'pupil beat snap'],
-  smokeStir: [0, 4, 'smoke cursor stir'], smokeDecay: [0.05, 3, 'smoke stir fade rate'], skullSize: [0.5, 1.8, 'hero skull size'], breatheRate: [2, 40, 'breathing pace (per min)'],
+  smokeStir: [0, 4, 'smoke cursor stir'], smokeDecay: [0.05, 3, 'smoke stir fade rate'], skullSize: [0.5, 1.8, 'hero skull size'], swarmSizeMin: [0.05, 2, 'flood skull smallest'], swarmSizeMax: [0.05, 2, 'flood skull largest'], breatheRate: [2, 40, 'breathing pace (per min)'],
   rayLength: [0.3, 2.5, 'starburst length'], rayCount: [6, 28, 'starburst rays'], smokeScale: [0.4, 3, 'smoke marble size'], floodRate: [0, 40, 'skull flood rate (/min)'], crownMetal: [0, 5, 'crown metal: 0 gold 1 silver 2 copper 3 rose 4 obsidian 5 palette'], bigoteStyle: [0, 2, 'mustache: 0 charro 1 handlebar 2 herradura'], bigoteColor: [0, 5, 'mustache colour: 0 black 1 dark brown 2 chestnut 3 salt-and-pepper 4 silver 5 palette'], bigote: [0, 1, 'mustache'], crownPeaks: [3, 7, 'crown points'],
   smokeDrift: [0.1, 4, 'smoke drift speed'], tunnelCount: [12, 56, 'tunnel skull count'], starDensity: [0.2, 2.5, 'star density'],
   dustCount: [0.2, 2, 'dust particles'], gazeRange: [0.3, 2, 'pupil travel range'], wanderPace: [0.3, 3, 'eye wander pace'],
@@ -44,7 +44,7 @@ const LIMITS = {
   boneHue: [-180, 180, 'bone hue'], boneSat: [0, 2, 'bone saturation'],
   nebulaHue: [-180, 180, 'smoke hue shift'], nebulaSat: [0, 2, 'smoke saturation'], bgBright: [0.2, 2, 'smoke brightness'], vignette: [0, 1.2, 'vignette'],
   flickForce: [0.2, 3, 'flick strength'], socketGlow: [0, 2.5, 'eye socket glow'], auraSize: [0, 2.5, 'skull aura'], petalCount: [4, 20, 'eye petals'],
-  textOn: [0, 1, 'show text'], musicOn: [0, 1, 'all sound on'], trackOn: [0, 1, 'music track on'], sfxOn: [0, 1, 'sound effects on'], autoEvents: [0, 1, 'random events'], voiceOn: [0, 1, 'talk to the calavera'], beatSync: [0, 1, 'sync to the beat'], hudOn: [0, 1, 'fps monitor'], cursorStyle: [0, 8, 'mouse cursor style'], skullOnTop: [0, 1, 'skull always on top'], skullBreathe: [0, 1, 'skull breathing'], thirdEye: [0, 1, 'third eye'], eyeRings: [0, 1, 'eye rings'], cheekRings: [0, 1, 'cheek rings'], flowerCrown: [0, 1, 'flower crown'], crownBlooms: [3, 12, 'crown flowers'], sombrero: [0, 1, 'sombrero'],
+  textOn: [0, 1, 'show text'], musicOn: [0, 1, 'all sound on'], trackOn: [0, 1, 'music track on'], sfxOn: [0, 1, 'sound effects on'], autoEvents: [0, 1, 'random events'], voiceOn: [0, 1, 'talk to the calavera'], beatSync: [0, 1, 'sync to the beat'], hudOn: [0, 1, 'fps monitor'], cursorStyle: [0, 8, 'mouse cursor style'], skullOnTop: [0, 1, 'skull always on top'], skullBreathe: [0, 1, 'skull breathing'], thirdEye: [0, 1, 'third eye'], eyeRings: [0, 1, 'eye rings'], cheekRings: [0, 1, 'cheek rings'], flowerCrown: [0, 1, 'flower crown'], crownBlooms: [3, 12, 'crown flowers'], sombrero: [0, 1, 'sombrero de vaquero'],
 };
 
 /* Deliberately blunt list: slurs and profanity roots. Matching happens after
@@ -768,6 +768,8 @@ export default {
           '"from this bit", set musicSeek and then use {"op":"share"}.',
           '',
           'FACE PARTS: thirdEye, eyeRings, cheekRings are 0/1 toggles. "take off the third eye" = set thirdEye 0.',
+          '"hat", "cowboy hat", "sombrero de vaquero" all mean the `sombrero` key.',
+          'Background skull sizes: swarmSizeMin/swarmSizeMax are a window; equal = one size.',
           'HEADWEAR IS EXCLUSIVE. The crown (flowerCrown) and the sombrero occupy the',
           'same place, so setting either to 1 turns the other off automatically; you',
           'do NOT need a second action to remove the one being replaced. "Swap the',
