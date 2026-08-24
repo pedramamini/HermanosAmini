@@ -64,3 +64,4 @@ bridge.log
 # scratch harness: index.html + an inline test script, written by agents
 _shot.html
 interceptor-screenshot-*.png
+worker/concierge_log.md
