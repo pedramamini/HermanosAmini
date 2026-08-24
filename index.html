@@ -4640,9 +4640,16 @@ function stepSwarm(dt) {
     k.x += k.vx * dt; k.y += k.vy * dt;
     k.rot += k.vr * dt * CFG.skullSpinMax * 2.2;
     /* wrap instead of despawning: a flood you have to watch drain is a chore,
-       and wrapping keeps the population exactly what the viewer asked for */
-    if (k.x < -m) k.x = W + m; else if (k.x > W + m) k.x = -m;
-    if (k.y < -m) k.y = H + m; else if (k.y > H + m) k.y = -m;
+       and wrapping keeps the population exactly what the viewer asked for.
+       NOT while a hole has hold of it, though: wrapping teleports a captured
+       skull to the far side of the screen, which is an escape hatch dressed
+       up as physics. */
+    const held = hole.str > 0.01 &&
+                 Math.hypot(hole.x - k.x, hole.y - k.y) < H * 0.9;
+    if (!held) {
+      if (k.x < -m) k.x = W + m; else if (k.x > W + m) k.x = -m;
+      if (k.y < -m) k.y = H + m; else if (k.y > H + m) k.y = -m;
+    }
 
     if (skip > 1 && i % skip !== 0) continue;     // thinned, but still moving
     const spr = pool[k.v % pool.length];
@@ -4727,11 +4734,17 @@ function stepHole(dt) {
      does everything. This is 1/d, clamped, so the grab is felt across the
      whole frame and tightens smoothly into the horizon. REACH is the radius
      inside which the hole is in charge of the object's fate. */
-  const REACH = H * 0.9, GH = 14000 * hole.str;
+  const REACH = H * 0.9, GH = 26000 * hole.str;
+  /* THE POINT OF NO RETURN. A real hole has an innermost stable orbit: inside
+     it no trajectory escapes, whatever your speed or heading. Without one, a
+     fast object with a sideways component gets bent and slung back out, which
+     is what "the skulls are escaping, just getting redirected" looked like.
+     EAT alone was 0.071H and easy to miss. Cross PONR and you are gone. */
+  const PONR = holePONR();
   const pullHeavy = (o) => {
     const dx = hole.x - o.x, dy = hole.y - o.y;
     const d = Math.hypot(dx, dy) + 1e-3;
-    if (d < EAT) return true;                    // caller swallows
+    if (d < PONR) return true;                   // caller swallows: no escape
     if (d > REACH) return false;
     const a = Math.min(520, GH / Math.max(d, 80));
     o.vx += (dx / d) * a * dt;
@@ -4752,6 +4765,17 @@ function stepHole(dt) {
     const keep = 1 - 1.4 * dt;
     o.vx = (dx / d) * Math.max(vr, vr * keep) + tx * keep;
     o.vy = (dy / d) * Math.max(vr, vr * keep) + ty * keep;
+    /* Close in, kill the sideways component outright rather than only
+       damping it. An object that keeps its tangential speed near the horizon
+       is an object in orbit, and an orbit is an escape the viewer watches
+       happen in slow motion. */
+    if (d < PONR * 2.2) {
+      const f = 1 - (1 - d / (PONR * 2.2)) * 3.2 * dt;
+      const vr2 = (o.vx * dx + o.vy * dy) / d;
+      const tx2 = o.vx - (dx / d) * vr2, ty2 = o.vy - (dy / d) * vr2;
+      o.vx = (dx / d) * vr2 + tx2 * Math.max(0, f);
+      o.vy = (dy / d) * vr2 + ty2 * Math.max(0, f);
+    }
     const v = Math.hypot(o.vx, o.vy), VMAX = 300;
     if (v > VMAX) { o.vx *= VMAX / v; o.vy *= VMAX / v; }
     return false;
@@ -4874,6 +4898,10 @@ addEventListener('pointerdown', e => {
    Shared by the tunnel and the swarm so both skull populations warp the
    same way. Pure function of position and hole.str; nothing persists, so
    when the hole dies the tunnel is exactly what it was. */
+/* The point of no return, in screen px. One definition, used by the physics
+   in stepHole AND by the tunnel, so the two populations cannot disagree
+   about where the horizon is. */
+function holePONR() { return H * 0.115 * 2.4; }
 function holeLens(sx, sy) {
   if (hole.str <= 0.001) return null;
   const hdx = hole.x - sx, hdy = hole.y - sy;
@@ -4904,6 +4932,14 @@ function holeLensApply(ctx, L) {
   if (L.dim < 1) ctx.filter = 'brightness(' + (0.06 + 0.94 * L.dim).toFixed(2) + ')';
 }
 
+/* Lattice skulls that have crossed the horizon. Keyed by tunnel index; the
+   value is a swallow object driven by the same stepSwallow() the flood and
+   the saucers use, so every population dies identically. The index is NOT
+   removed from the tunnel: it is hidden until its slot recycles (d wraps past
+   1), which is the lattice's own respawn and costs nothing. */
+const tunFall = new Map();
+const tunPrevD = new Float32Array(N_SKULLS);
+
 function drawTunnel(dt) {
   tctx.clearRect(0, 0, W * DPR, H * DPR);
   tctx.save();
@@ -4930,6 +4966,12 @@ function drawTunnel(dt) {
 
   skullPos.fill(null);
   for (const [d, i] of order) {
+    /* the slot wrapped from the near plane back to the far one: whatever
+       happened to it, it is a new skull now */
+    if (tunFall.has(i) && (d < tunPrevD[i] || (d < 0.14 && hole.str <= 0.01))) {
+      tunFall.delete(i);                      // wrapped, or far enough out to
+    }                                         // fade back in unnoticed
+    tunPrevD[i] = d;
     const ang = i * GOLDEN + rot + Math.sin(i * 3.7) * 0.35;
     const ease = d * d * d;                     // exponential approach
     const R = 60 + ease * maxR;
@@ -4969,13 +5011,46 @@ function drawTunnel(dt) {
     const lite = isLite() || px0 < 110;
     const spr = (lite ? VARIANTS_STATIC : VARIANTS)[i % VARIANTS.length];
     const px = spr.width * s * beatS;
+    /* THE HORIZON IS REAL FOR THE LATTICE TOO. Warping alone meant a tunnel
+       skull sailed in, stretched, and came out the far side, which reads as
+       escaping by way of a detour.
+       Test the DRAWN position, not the lattice position. The lens displaces a
+       skull up to 70% of the way toward the centre, so a skull the viewer sees
+       well inside the horizon can still be "outside" by its untouched orbit
+       coordinates. Measured before this fix: 1055 frames of one skull or more
+       painted inside the point of no return and living to tell it. */
+    const Lc = holeLens(W / 2 + x, H / 2 + y);
+    const dxs = (W / 2 + x + (Lc ? Lc.dx : 0)), dys = (H / 2 + y + (Lc ? Lc.dy : 0));
+    if (hole.str > 0.01 && !tunFall.has(i) &&
+        Math.hypot(hole.x - dxs, hole.y - dys) < holePONR()) {
+      const o = { x: dxs, y: dys, rot: skullSpin[i] };
+      holeSwallow(o, swallowKnocks++ > 0);
+      tunFall.set(i, o);
+      skullFx.delete(i);                      // a flicked skull loses its throw
+    }
+    const fall = tunFall.get(i);
+    if (fall) {
+      if (fall.eat < 1) {
+        stepSwallow(fall, dt);
+        const fang = Math.atan2(hole.y - fall.y, hole.x - fall.x);
+        tctx.save();
+        tctx.translate(fall.x - W / 2, fall.y - H / 2);
+        tctx.rotate(fang);
+        tctx.scale(1 + 2.6 * fall.eat, Math.max(0.12, 1 - 0.8 * fall.eat));
+        tctx.rotate(-fang);
+        tctx.globalAlpha = alpha * (1 - fall.eat * fall.eat);
+        tctx.filter = 'brightness(' + (1 - 0.85 * fall.eat).toFixed(2) + ')';
+        const fspr = VARIANTS_STATIC[i % VARIANTS.length];
+        const fpx = fspr.width * s * (1 + beatPulse * CFG.tunnelBreath);
+        tctx.drawImage(fspr, -fpx / 2, -fpx / 2, fpx, fpx);
+        tctx.filter = 'none';
+        tctx.restore();
+      }
+      continue;                               // eaten, or gone: never drawn normally
+    }
     tctx.save();
-    /* SPAGHETTIFICATION. The tunnel skulls are the piece's structure on a
-       fixed recycling orbit, so the hole does not EAT them (a skull that left
-       the list would leave a gap forever). It warps them, which is what a
-       real hole does to light: pulled toward it, stretched along the radial
-       axis into a streak, darkened into the horizon, and back out the far
-       side as the tunnel carries them on. See holeLens(). */
+    /* Outside the horizon the hole only BENDS it: pulled toward the centre,
+       stretched along the radial axis, darkened. See holeLens(). */
     const L = holeLens(W / 2 + x, H / 2 + y);
     if (L) { x += L.dx; y += L.dy; }
     skullPos[i] = { x: W / 2 + x, y: H / 2 + y, r: px * 0.34, d };   // after the pull, so clicks land
