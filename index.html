@@ -4142,9 +4142,9 @@ function crownDrop(best) {
        or the interaction has no payoff. */
     sparks.push({
       kind: 'crownbit', behind: false, x: best.x, y: best.y,
-      vx: (Math.random() - 0.5) * 90,
-      vy: -108 - Math.random() * 54,             // pops UP first, so you see it detach
-      life: 0, max: 6.5, hue: Math.random(),
+      vx: (Math.random() - 0.5) * 60,
+      vy: -95 - Math.random() * 45,              // pops UP first, so you see it detach
+      life: 0, max: 22, hue: Math.random(),      // long: the fall owns the pace, see below
       rot: 0, vr: (Math.random() < 0.5 ? -1 : 1) * (0.7 + Math.random() * 1.1),
       r: best.r * 0.70,
       idx: parseInt(best.id.slice(1), 10) || 0,
@@ -7496,21 +7496,31 @@ function drawDust(dt) {
       dctx.fillStyle = gg;
       dctx.beginPath(); dctx.arc(sp.x, sp.y, 14, 0, Math.PI * 2); dctx.fill();
     } else if (sp.kind === 'crownbit') {
-      /* A flower knocked out of the crown. It does NOT fall like a rock: the
-         ask was that it float down slowly, so gravity is gentle and a
-         sideways sway makes it drift the way a real bloom sheds.
+      /* A flower knocked out of the crown, falling like a petal on the wind
+         (asked for twice: v1.6x wanted "slowly", 2026-08-24 wanted slower
+         still and wind-borne). This is the falling-leaf model: a light flat
+         thing does not descend at constant speed, it SLIDES sideways, stalls,
+         swings back the other way, and sheds height mostly during the
+         slides. So the sway is the primary motion and vertical speed
+         breathes WITH it: fastest mid-swing, nearly hovering at the turn.
 
-         My first numbers were so slow the flower never left the crown it fell
-         off, which reads as a rendering glitch rather than an event. It has
-         to clear the frame inside its lifetime or the interaction has no
-         follow-through. */
-      sp.vy += 190 * dt;
-      sp.vy = Math.min(sp.vy, 290);              // terminal velocity: it FLOATS
-      sp.x += Math.sin(t * 2.6 + sp.hue * 7) * 96 * dt;
-      sp.rot += sp.vr * dt;
-      /* fade only over the last third, so it stays solid for most of the fall
-         instead of dissolving the moment it leaves the crown */
-      const cf = Math.min(1, (sp.max - sp.life) / (sp.max * 0.34));
+         Pace: ~65px/s average descent, so a 1080p frame takes ~17s to cross.
+         max=22 is only the safety net; the real exit is the bottom edge,
+         and history says do not slow it further without watching one land:
+         the first float was so slow it read as a rendering glitch. */
+      const ph = t * (0.9 + sp.hue * 0.5) + sp.hue * 31;   // per-flower rhythm
+      const swing = Math.sin(ph);
+      sp.vy += 60 * dt;
+      const vterm = 52 + 46 * swing * swing;     // stalls at the turn, slides mid-swing
+      sp.vy = Math.min(sp.vy, vterm);
+      sp.x += (swing * 120 + Math.sin(ph * 0.31) * 26) * dt;  // sway + slow wander
+      /* the bloom banks INTO the slide like a shed leaf, instead of
+         tumbling on a constant spin */
+      sp.rot += (swing * 0.85 - sp.rot) * 1.6 * dt + sp.vr * dt * 0.22;
+      /* solid the whole way down: it dies by leaving the frame, not by
+         dissolving mid-air. The fade only covers the safety-net timeout. */
+      if (sp.y > H + 40) sp.life = sp.max + 1;   // off the bottom: done
+      const cf = Math.min(1, (sp.max - sp.life) / 2.2);
       const cr = sp.r;
       dctx.save();
       /* The spark layer runs in 'lighter' because everything else on it is a
