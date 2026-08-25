@@ -4624,14 +4624,15 @@ function stepSwarm(dt) {
       if (stepSwallow(k, dt)) { swarm.splice(i, 1); continue; }
       const spr2 = pool[k.v % pool.length];
       const px2 = spr2.width * k.scale * 0.5;
-      const ang = Math.atan2(hole.y - k.y, hole.x - k.x);
+      const sm = k.sm || { rad: 1, tan: 1, bright: 1, alpha: 1 };
       tctx.save();
       tctx.translate(k.x, k.y);
-      tctx.rotate(ang);
-      tctx.scale(1 + 2.6 * k.eat, Math.max(0.12, 1 - 0.8 * k.eat));  // spaghetti
-      tctx.rotate(-ang + k.rot);
-      tctx.globalAlpha = 0.82 * (1 - k.eat * k.eat);
-      tctx.filter = 'brightness(' + (1 - 0.85 * k.eat).toFixed(2) + ')';
+      /* x-axis radial, y tangential: the smear wraps AROUND the rim */
+      tctx.rotate(k.ea);
+      tctx.scale(sm.rad, sm.tan);
+      tctx.rotate(k.rot * Math.max(0, 1 - k.eat * 3));  // tumble dies as the smear takes over
+      tctx.globalAlpha = 0.82 * sm.alpha;
+      tctx.filter = 'brightness(' + sm.bright.toFixed(2) + ')';
       tctx.drawImage(spr2, -px2 / 2, -px2 / 2, px2, px2);
       tctx.filter = 'none';
       tctx.restore();
@@ -4812,16 +4813,45 @@ function holeSwallow(o, quiet) {
   o.ea = Math.atan2(o.y - hole.y, o.x - hole.x);
   o.er = Math.hypot(o.x - hole.x, o.y - hole.y);
   o.vx = 0; o.vy = 0;
-  if (o.kind === 'alebrije') o.max = o.life + 1.2;   // let its own envelope fade the body
+  if (o.kind === 'alebrije') o.max = o.life + 2.8;   // envelope must outlive the 2.6s rim ride
   if (!quiet) SFX.knock();
 }
 /* One step of a swallow. Returns true when the object is gone and the caller
    should remove it. Shared by UFOs and dragons so the death looks the same. */
 function stepSwallow(o, dt) {
-  o.eat = Math.min(1, o.eat + dt / 0.9);
-  const k = 1 - o.eat;
-  o.ea += dt * (5 + 9 * o.eat);                       // spin faster as it falls
-  const r = o.er * k * k;                             // quadratic: slow, then a plunge
+  /* What a DISTANT observer sees at a Schwarzschild horizon, in order:
+     1. the grab: a genuine radial plunge (quadratic, 0.8s).
+     2. time dilation: the radial approach FREEZES. r-r_ring decays like
+        exp(-t/tau), the coordinate-time asymptote of an infalling body,
+        so it visibly hangs just outside the ring instead of crossing.
+     3. conserved angular momentum: omega ~ L/r^2, so as r locks the spin
+        whips it around the rim, faster and faster.
+     4. the image smears TANGENTIALLY around the edge (the photon-ring
+        stretch), while the radial extent collapses.
+     5. gravitational redshift: brightness dies like exp(-t/tau) and the
+        smear fades to black ON the rim. That fade IS the destruction; a
+        distant observer never sees anything cross.
+     o.sm carries {rad, tan, bright, alpha} for the draw sites. */
+  o.eat = Math.min(1, o.eat + dt / 2.6);
+  const ring = H * 0.115 * 0.8;              // hangs just outside the shader's core
+  const grabT = 0.31;                        // ~0.8s of the 2.6 spent falling
+  let r;
+  if (o.eat < grabT) {
+    const pp = o.eat / grabT;
+    r = ring + (o.er - ring) * (1 - pp) * (1 - pp);
+    o.sm = { rad: 1 - 0.45 * pp, tan: 1 + 1.6 * pp,
+             bright: 1 - 0.3 * pp, alpha: 1 };
+  } else {
+    const q = (o.eat - grabT) / (1 - grabT);
+    const hug = Math.exp(-3.2 * q);          // the frozen approach
+    r = ring * (0.58 + 0.42 * hug);
+    o.sm = { rad: Math.max(0.05, 0.5 * hug + 0.05),
+             tan: 2.6 + 9 * (1 - Math.exp(-2.2 * q)),
+             bright: 0.7 * Math.exp(-3.2 * q),   // continuous with the grab's 0.7
+             alpha: Math.max(0, 1 - q * q * q * 1.4) };
+  }
+  const rn = Math.max(r / ring, 0.55);
+  o.ea += dt * 2.4 / (rn * rn);              // omega ~ 1/r^2
   o.x = hole.x + Math.cos(o.ea) * r;
   o.y = hole.y + Math.sin(o.ea) * r;
   return o.eat >= 1;
@@ -5032,14 +5062,13 @@ function drawTunnel(dt) {
     if (fall) {
       if (fall.eat < 1) {
         stepSwallow(fall, dt);
-        const fang = Math.atan2(hole.y - fall.y, hole.x - fall.x);
+        const sm = fall.sm || { rad: 1, tan: 1, bright: 1, alpha: 1 };
         tctx.save();
         tctx.translate(fall.x - W / 2, fall.y - H / 2);
-        tctx.rotate(fang);
-        tctx.scale(1 + 2.6 * fall.eat, Math.max(0.12, 1 - 0.8 * fall.eat));
-        tctx.rotate(-fang);
-        tctx.globalAlpha = alpha * (1 - fall.eat * fall.eat);
-        tctx.filter = 'brightness(' + (1 - 0.85 * fall.eat).toFixed(2) + ')';
+        tctx.rotate(fall.ea);                       // radial x, tangential y
+        tctx.scale(sm.rad, sm.tan);
+        tctx.globalAlpha = alpha * sm.alpha;
+        tctx.filter = 'brightness(' + sm.bright.toFixed(2) + ')';
         const fspr = VARIANTS_STATIC[i % VARIANTS.length];
         const fpx = fspr.width * s * (1 + beatPulse * CFG.tunnelBreath);
         tctx.drawImage(fspr, -fpx / 2, -fpx / 2, fpx, fpx);
@@ -5991,13 +6020,13 @@ function drawUfos() {
     dctx.save();
     dctx.translate(u.x, u.y);
     if (u.eat !== undefined) {
-      /* being swallowed: it tumbles, shrinks to nothing and dims, the way a
-         thing falling past an event horizon is stretched and redshifted. The
-         spin outruns the bank, so bank is dropped here. */
-      const k = 1 - u.eat;
-      dctx.rotate(u.ea * 2);
-      dctx.scale(Math.max(0.02, k), Math.max(0.02, k * (0.55 + 0.45 * k)));
-      dctx.globalAlpha *= Math.pow(k, 0.6);
+      /* being swallowed: rim-ride physics from stepSwallow. Radial squish,
+         tangential smear around the edge, redshift fade. Bank is dropped;
+         the horizon owns its orientation now. */
+      const sm = u.sm || { rad: 1, tan: 1, bright: 1, alpha: 1 };
+      dctx.rotate(u.ea);
+      dctx.scale(sm.rad, sm.tan);
+      dctx.globalAlpha *= sm.alpha * (0.25 + 0.75 * sm.bright);
     } else {
       dctx.rotate(bank);
     }
