@@ -107,6 +107,18 @@
     margin-top: 10px; font-size: clamp(9px, .8vw, 11px);
     letter-spacing: .3em; text-indent: .3em; color: rgba(245,234,223,.34);
   }
+  /* the blurb: real sentences, so no letterspacing theatrics. Sits between
+     the call to action and the tagline, reads in ~10 seconds, and the em
+     width caps the line length so it stays a column, not a banner. */
+  #gate .blurb {
+    max-width: 34em; margin-top: .4rem; padding: 0 24px;
+    font-family: 'Space Grotesk', sans-serif; font-weight: 300;
+    font-size: clamp(12px, 1.05vw, 15px); line-height: 1.75;
+    letter-spacing: .02em; text-transform: none; text-indent: 0;
+    color: rgba(245,234,223,.55); text-align: center;
+  }
+  #gate .blurb b { font-weight: 500; color: rgba(245,234,223,.8); }
+  @media (max-height: 720px) { #gate .blurb { display: none; } }
   #gate .ring {
     width: 74px; height: 74px; border-radius: 50%;
     border: 1px solid rgba(245,234,223,.35);
@@ -2002,6 +2014,14 @@
   <div class="ring"></div>
   <p>enter the other side</p>
   <p class="gatehint">click or press any key</p>
+  <p class="blurb">This is a <b>living artwork</b>, not a video. Everything you
+    see is drawn live and set to a three-hour mix, and nearly all of it is
+    yours to bend: dozens of dials, palettes, and toggles behind the gear.
+    Or skip the knobs and just <b>talk to the skull</b>. It listens in plain
+    language, turns what you ask into the scene in front of you, and when you
+    ask for something it cannot do yet, it interviews you about the idea and
+    sends it to the artists. <b>The piece grows this way.</b> Some of what you
+    are looking at began as a stranger's request.</p>
   <p class="tagline">una obra psicod&eacute;lica de los hermanos amini</p>
 </div>
 
