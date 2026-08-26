@@ -86,26 +86,24 @@
     position: fixed; inset: 0; z-index: 20;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     gap: 2.2rem; cursor: pointer;
-    background: radial-gradient(ellipse at center, rgba(6,3,15,.55) 0%, rgba(6,3,15,.92) 100%);
+    background: radial-gradient(ellipse at center, rgba(6,3,15,.78) 0%, rgba(6,3,15,.96) 100%);
     backdrop-filter: blur(2px);
     transition: opacity 1.8s ease, visibility 1.8s;
   }
   #gate.gone { opacity: 0; visibility: hidden; pointer-events: none; }
-  #gate h1 {
-    font-family: 'Anton', Impact, sans-serif; color: #f5eadf;
-    font-size: clamp(48px, 9vw, 140px); letter-spacing: .14em; text-indent: .14em;
-    text-shadow: 0 0 60px rgba(255, 47, 160, .6);
-    animation: breathe 4s ease-in-out infinite;
-  }
+  /* no wordmark on the gate (dropped 2026-08-26): the piece behind it and
+     the in-scene SKLZ wordmark carry the name; the gate's job is the ask. */
+  #gate .gatecta { text-align: center; }
+  #gate .gatecta p { white-space: nowrap; }
   #gate p {
     font-family: 'Space Grotesk', sans-serif; font-weight: 300;
-    color: rgba(245,234,223,.65); font-size: clamp(11px, 1.2vw, 15px);
+    color: rgba(245,234,223,.85); font-size: clamp(13px, 1.5vw, 19px);
     letter-spacing: .45em; text-indent: .45em; text-transform: uppercase;
   }
   /* quieter than the call to action above it: an affordance, not a headline */
   #gate p.gatehint {
-    margin-top: 10px; font-size: clamp(9px, .8vw, 11px);
-    letter-spacing: .3em; text-indent: .3em; color: rgba(245,234,223,.34);
+    margin-top: 12px; font-size: clamp(9px, .8vw, 11px);
+    letter-spacing: .3em; text-indent: .3em; color: rgba(245,234,223,.45);
   }
   /* the blurb: real sentences, so no letterspacing theatrics. Sits between
      the call to action and the tagline, reads in ~10 seconds, and the em
@@ -115,7 +113,7 @@
     font-family: 'Space Grotesk', sans-serif; font-weight: 300;
     font-size: clamp(12px, 1.05vw, 15px); line-height: 1.75;
     letter-spacing: .02em; text-transform: none; text-indent: 0;
-    color: rgba(245,234,223,.55); text-align: center;
+    color: rgba(245,234,223,.66); text-align: center;
   }
   #gate .blurb b { font-weight: 500; color: rgba(245,234,223,.8); }
   @media (max-height: 720px) { #gate .blurb { display: none; } }
@@ -2010,10 +2008,11 @@
 <div id="cfgStatus"></div>
 
 <div id="gate">
-  <h1>SKLZ</h1>
+  <div class="gatecta">
+    <p>enter the other side</p>
+    <p class="gatehint">click or press any key</p>
+  </div>
   <div class="ring"></div>
-  <p>enter the other side</p>
-  <p class="gatehint">click or press any key</p>
   <p class="blurb">This is a <b>living artwork</b>, not a video. Everything you
     see is drawn live and set to a three-hour mix, and nearly all of it is
     yours to bend: dozens of dials, palettes, and toggles behind the gear.
