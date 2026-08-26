@@ -4656,10 +4656,13 @@ function stepSwarm(dt) {
       const spr2 = pool[k.v % pool.length];
       const px2 = spr2.width * k.scale * 0.5;
       const sm = k.sm || { rad: 1, tan: 1, bright: 1, alpha: 1 };
+      drawSuckStream(tctx, k.x, k.y, hole.x, hole.y, px2 * 0.30, k.eat);
       tctx.save();
       tctx.translate(k.x, k.y);
-      /* x-axis radial, y tangential: the smear wraps AROUND the rim */
+      /* x-axis radial: the teardrop points along the infall line, and the
+         off-centre translate biases the stretch TOWARD the hole (at -x) */
       tctx.rotate(k.ea);
+      tctx.translate(-(sm.rad - 1) * px2 * 0.22, 0);
       tctx.scale(sm.rad, sm.tan);
       tctx.rotate(k.rot * Math.max(0, 1 - k.eat * 3));  // tumble dies as the smear takes over
       tctx.globalAlpha = 0.82 * sm.alpha;
@@ -4850,34 +4853,64 @@ function holeSwallow(o, quiet) {
 /* One step of a swallow. Returns true when the object is gone and the caller
    should remove it. Shared by UFOs and dragons so the death looks the same. */
 function stepSwallow(o, dt) {
-  /* Spaghettification, the tidal version (2026-08-24: "it should actually be
-     sucking them in, elongated THROUGH the black hole", which retired the
-     rim-orbit look). The near side of a falling body is pulled harder than
-     the far side, so the body stretches ALONG the line of infall: a streak
-     pointing at the centre, thinning sideways, whose head is already inside
-     while the tail is still out. So:
-       - r marches to ZERO (a real ingestion, no frozen hover),
-       - the stretch is RADIAL (sm.rad up to ~7x; after rotate(o.ea) the
-         x-axis points along the infall line), tangential thins to 6%,
-       - only a gentle spiral drift (~1 turn total), momentum, not orbit,
-       - the streak goes dark as it goes in; alpha dies as the tail
-         crosses, which is the visible end of it.
+  /* Tidal disruption, third pass (2026-08-26). The 7x body-blade of the
+     last version read as "flattened and spinning": the SPRITE was doing all
+     the elongating while it still had orbital drift, so the screen filled
+     with skull-shaped shards splayed around the rim. In the real pictures
+     (a star being shredded) the BODY stays mostly a body; what elongates
+     is a STREAM of matter pulled off its near side, flowing into the hole
+     ahead of it. So now:
+       - the body plunges nearly STRAIGHT in (a whisper of curve, ~55 deg
+         total, momentum only), r monotone to zero in 1.7s,
+       - it deforms into a modest teardrop (rad up to ~2.3x, tan to ~0.55),
+         darkening, alpha dying over the last fifth,
+       - drawSuckStream() paints the tapering luminous ribbon from the body
+         into the centre; THAT is the spaghettification, not the sprite.
      o.sm carries {rad, tan, bright, alpha} for the three draw sites. */
-  o.eat = Math.min(1, o.eat + dt / 1.9);
+  o.eat = Math.min(1, o.eat + dt / 1.7);
   const e = o.eat;
-  /* radius: quadratic grab into an exponential final approach, to zero */
-  const fall = (1 - e) * (1 - e);
-  const r = o.er * fall * Math.exp(-2.2 * e);
-  /* the stretch grows as the tide takes hold, fastest near the centre */
-  const tide = 1 - Math.exp(-3.0 * e);
-  o.sm = { rad: 1 + 6.2 * tide,
-           tan: Math.max(0.06, 1 - 0.94 * tide),
-           bright: Math.max(0.04, 1 - 1.1 * e),
-           alpha: e < 0.72 ? 1 : Math.max(0, 1 - (e - 0.72) / 0.28) };
-  o.ea += dt * (1.1 + 2.2 * e);              // drift, not whirl: ~1 turn total
+  const r = o.er * Math.pow(1 - e, 1.55);    // fast early grab, glides to zero
+  const tide = 1 - Math.exp(-2.6 * e);
+  o.sm = { rad: 1 + 1.3 * tide,
+           tan: 1 - 0.45 * tide,
+           bright: Math.max(0.05, 1 - 1.05 * e),
+           alpha: e < 0.8 ? 1 : Math.max(0, 1 - (e - 0.8) / 0.2) };
+  o.ea += dt * (0.35 + 0.55 * e);            // a nudge of curve, not an orbit
   o.x = hole.x + Math.cos(o.ea) * r;
   o.y = hole.y + Math.sin(o.ea) * r;
   return o.eat >= 1;
+}
+
+function drawSuckStream(ctx, x0, y0, x1, y1, w, e) {
+  /* The tidal stream: a tapering luminous ribbon from the falling body
+     (x0,y0) into the hole centre (x1,y1), with a slight one-sided bow.
+     Bright near the hole, transparent AT it (matter vanishing into the
+     dark), rooted softly at the body. Ramps in with e. Coordinates are in
+     whatever frame the caller's ctx is currently in. */
+  const dx = x1 - x0, dy = y1 - y0;
+  const d = Math.hypot(dx, dy);
+  if (d < 6) return;
+  const on = Math.min(1, e * 2.4);
+  if (on <= 0.03) return;
+  const px = -dy / d, py = dx / d;               // perpendicular unit
+  const bow = d * 0.14;
+  const w0 = Math.max(2.5, w * (1 - 0.55 * e));  // root width at the body
+  const mx = x0 + dx * 0.5 + px * bow, my = y0 + dy * 0.5 + py * bow;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const g = ctx.createLinearGradient(x0, y0, x1, y1);
+  g.addColorStop(0,    'rgba(245,234,223,0)');
+  g.addColorStop(0.25, 'rgba(245,234,223,' + (0.30 * on).toFixed(3) + ')');
+  g.addColorStop(0.78, 'rgba(255,214,150,' + (0.60 * on).toFixed(3) + ')');
+  g.addColorStop(1,    'rgba(255,240,200,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.moveTo(x0 + px * w0, y0 + py * w0);
+  ctx.quadraticCurveTo(mx + px * w0 * 0.35, my + py * w0 * 0.35, x1, y1);
+  ctx.quadraticCurveTo(mx - px * w0 * 0.35, my - py * w0 * 0.35, x0 - px * w0, y0 - py * w0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
 }
 
 function fxBlackHole() {
@@ -5086,9 +5119,13 @@ function drawTunnel(dt) {
       if (fall.eat < 1) {
         stepSwallow(fall, dt);
         const sm = fall.sm || { rad: 1, tan: 1, bright: 1, alpha: 1 };
+        const fw = VARIANTS_STATIC[i % VARIANTS.length].width * s;
+        drawSuckStream(tctx, fall.x - W / 2, fall.y - H / 2,
+                       hole.x - W / 2, hole.y - H / 2, fw * 0.30, fall.eat);
         tctx.save();
         tctx.translate(fall.x - W / 2, fall.y - H / 2);
-        tctx.rotate(fall.ea);                       // radial x, tangential y
+        tctx.rotate(fall.ea);                       // teardrop along infall
+        tctx.translate(-(sm.rad - 1) * fw * 0.22, 0);
         tctx.scale(sm.rad, sm.tan);
         tctx.globalAlpha = alpha * sm.alpha;
         tctx.filter = 'brightness(' + sm.bright.toFixed(2) + ')';
@@ -6043,10 +6080,11 @@ function drawUfos() {
     dctx.save();
     dctx.translate(u.x, u.y);
     if (u.eat !== undefined) {
-      /* being swallowed: rim-ride physics from stepSwallow. Radial squish,
-         tangential smear around the edge, redshift fade. Bank is dropped;
-         the horizon owns its orientation now. */
+      /* being swallowed: teardrop plunge from stepSwallow, with the tidal
+         stream flowing into the hole ahead of it. Bank is dropped; the
+         infall line owns its orientation now. */
       const sm = u.sm || { rad: 1, tan: 1, bright: 1, alpha: 1 };
+      drawSuckStream(dctx, 0, 0, hole.x - u.x, hole.y - u.y, 12, u.eat);
       dctx.rotate(u.ea);
       dctx.scale(sm.rad, sm.tan);
       dctx.globalAlpha *= sm.alpha * (0.25 + 0.75 * sm.bright);
