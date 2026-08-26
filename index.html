@@ -108,12 +108,56 @@
   /* the blurb: real sentences, so no letterspacing theatrics. Sits between
      the call to action and the tagline, reads in ~10 seconds, and the em
      width caps the line length so it stays a column, not a banner. */
+  /* The blurb sits in an ofrenda frame: a fine double rule with marigold
+     corner blooms, the same move as a picture frame on an altar. All CSS:
+     the outer border is the frame proper, an inset ::before draws the
+     second rule, and each corner carries an eight-petal flower built from
+     two layered radial gradients on the ::after strip (one element, four
+     background copies). Gold at low alpha, so it frames without shouting. */
   #gate .blurb {
-    max-width: 34em; margin-top: .4rem; padding: 0 24px;
+    position: relative;
+    max-width: 34em; margin-top: .4rem; padding: 26px 34px;
+    border: 1px solid rgba(230,180,90,.38); border-radius: 3px;
+    background: rgba(6,3,15,.45);
+    box-shadow: 0 0 34px rgba(255,47,160,.07), inset 0 0 26px rgba(0,0,0,.35);
     font-family: 'Space Grotesk', sans-serif; font-weight: 300;
     font-size: clamp(12px, 1.05vw, 15px); line-height: 1.75;
     letter-spacing: .02em; text-transform: none; text-indent: 0;
     color: rgba(245,234,223,.66); text-align: center;
+  }
+  #gate .blurb::before {
+    content: ""; position: absolute; inset: 5px;
+    border: 1px solid rgba(230,180,90,.20); border-radius: 2px;
+    pointer-events: none;
+  }
+  /* corner marigolds: each corner is ONE self-clipping bloom, a stack of
+     concentric radial stops that end at transparent, so no mask is needed
+     (the masked conic version silently rendered nothing). At this size a
+     flower is stops, not petals: gold heart, orange corolla, magenta rim. */
+  #gate .blurb::after {
+    content: ""; position: absolute; inset: -11px; pointer-events: none;
+    --bloom: radial-gradient(circle at center,
+      rgba(255,214,110,.95) 0 2.5px,
+      rgba(255,150,52,.85) 2.5px 5px,
+      rgba(214,72,150,.75) 5px 7px,
+      rgba(214,72,150,0) 7.5px);
+    --leaf: radial-gradient(circle at center,
+      rgba(120,200,150,.5) 0 2px, rgba(120,200,150,0) 2.6px);
+    background:
+      var(--bloom), var(--bloom), var(--bloom), var(--bloom),
+      var(--leaf), var(--leaf), var(--leaf), var(--leaf),
+      var(--leaf), var(--leaf), var(--leaf), var(--leaf);
+    background-size: 22px 22px, 22px 22px, 22px 22px, 22px 22px,
+      10px 10px, 10px 10px, 10px 10px, 10px 10px,
+      10px 10px, 10px 10px, 10px 10px, 10px 10px;
+    background-position:
+      left -0px top -0px, right -0px top -0px,
+      left -0px bottom -0px, right -0px bottom -0px,
+      left 18px top 6px, left 6px top 18px,
+      right 18px top 6px, right 6px top 18px,
+      left 18px bottom 6px, left 6px bottom 18px,
+      right 18px bottom 6px, right 6px bottom 18px;
+    background-repeat: no-repeat;
   }
   #gate .blurb b { font-weight: 500; color: rgba(245,234,223,.8); }
   @media (max-height: 720px) { #gate .blurb { display: none; } }
