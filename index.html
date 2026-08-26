@@ -4819,39 +4819,31 @@ function holeSwallow(o, quiet) {
 /* One step of a swallow. Returns true when the object is gone and the caller
    should remove it. Shared by UFOs and dragons so the death looks the same. */
 function stepSwallow(o, dt) {
-  /* What a DISTANT observer sees at a Schwarzschild horizon, in order:
-     1. the grab: a genuine radial plunge (quadratic, 0.8s).
-     2. time dilation: the radial approach FREEZES. r-r_ring decays like
-        exp(-t/tau), the coordinate-time asymptote of an infalling body,
-        so it visibly hangs just outside the ring instead of crossing.
-     3. conserved angular momentum: omega ~ L/r^2, so as r locks the spin
-        whips it around the rim, faster and faster.
-     4. the image smears TANGENTIALLY around the edge (the photon-ring
-        stretch), while the radial extent collapses.
-     5. gravitational redshift: brightness dies like exp(-t/tau) and the
-        smear fades to black ON the rim. That fade IS the destruction; a
-        distant observer never sees anything cross.
-     o.sm carries {rad, tan, bright, alpha} for the draw sites. */
-  o.eat = Math.min(1, o.eat + dt / 2.6);
-  const ring = H * 0.115 * 0.8;              // hangs just outside the shader's core
-  const grabT = 0.31;                        // ~0.8s of the 2.6 spent falling
-  let r;
-  if (o.eat < grabT) {
-    const pp = o.eat / grabT;
-    r = ring + (o.er - ring) * (1 - pp) * (1 - pp);
-    o.sm = { rad: 1 - 0.45 * pp, tan: 1 + 1.6 * pp,
-             bright: 1 - 0.3 * pp, alpha: 1 };
-  } else {
-    const q = (o.eat - grabT) / (1 - grabT);
-    const hug = Math.exp(-3.2 * q);          // the frozen approach
-    r = ring * (0.58 + 0.42 * hug);
-    o.sm = { rad: Math.max(0.05, 0.5 * hug + 0.05),
-             tan: 2.6 + 9 * (1 - Math.exp(-2.2 * q)),
-             bright: 0.7 * Math.exp(-3.2 * q),   // continuous with the grab's 0.7
-             alpha: Math.max(0, 1 - q * q * q * 1.4) };
-  }
-  const rn = Math.max(r / ring, 0.55);
-  o.ea += dt * 2.4 / (rn * rn);              // omega ~ 1/r^2
+  /* Spaghettification, the tidal version (2026-08-24: "it should actually be
+     sucking them in, elongated THROUGH the black hole", which retired the
+     rim-orbit look). The near side of a falling body is pulled harder than
+     the far side, so the body stretches ALONG the line of infall: a streak
+     pointing at the centre, thinning sideways, whose head is already inside
+     while the tail is still out. So:
+       - r marches to ZERO (a real ingestion, no frozen hover),
+       - the stretch is RADIAL (sm.rad up to ~7x; after rotate(o.ea) the
+         x-axis points along the infall line), tangential thins to 6%,
+       - only a gentle spiral drift (~1 turn total), momentum, not orbit,
+       - the streak goes dark as it goes in; alpha dies as the tail
+         crosses, which is the visible end of it.
+     o.sm carries {rad, tan, bright, alpha} for the three draw sites. */
+  o.eat = Math.min(1, o.eat + dt / 1.9);
+  const e = o.eat;
+  /* radius: quadratic grab into an exponential final approach, to zero */
+  const fall = (1 - e) * (1 - e);
+  const r = o.er * fall * Math.exp(-2.2 * e);
+  /* the stretch grows as the tide takes hold, fastest near the centre */
+  const tide = 1 - Math.exp(-3.0 * e);
+  o.sm = { rad: 1 + 6.2 * tide,
+           tan: Math.max(0.06, 1 - 0.94 * tide),
+           bright: Math.max(0.04, 1 - 1.1 * e),
+           alpha: e < 0.72 ? 1 : Math.max(0, 1 - (e - 0.72) / 0.28) };
+  o.ea += dt * (1.1 + 2.2 * e);              // drift, not whirl: ~1 turn total
   o.x = hole.x + Math.cos(o.ea) * r;
   o.y = hole.y + Math.sin(o.ea) * r;
   return o.eat >= 1;
