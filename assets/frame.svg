@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="360" viewBox="0 0 360 360">
+  <defs>
+    <!-- gold metals -->
+    <linearGradient id="goldV" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8a5a1f"/>
+      <stop offset=".25" stop-color="#e8b850"/>
+      <stop offset=".5" stop-color="#fdf0b0"/>
+      <stop offset=".75" stop-color="#c98f2e"/>
+      <stop offset="1" stop-color="#6e4415"/>
+    </linearGradient>
+    <linearGradient id="goldV2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5c3a10"/>
+      <stop offset=".5" stop-color="#d9a83e"/>
+      <stop offset="1" stop-color="#4a2d0c"/>
+    </linearGradient>
+    <radialGradient id="bead" cx=".35" cy=".3" r=".9">
+      <stop offset="0" stop-color="#fff3c0"/>
+      <stop offset=".5" stop-color="#d9a83e"/>
+      <stop offset="1" stop-color="#5c3a10"/>
+    </radialGradient>
+    <radialGradient id="ros" cx=".4" cy=".35" r=".85">
+      <stop offset="0" stop-color="#fdf0b0"/>
+      <stop offset=".45" stop-color="#e0b04a"/>
+      <stop offset=".8" stop-color="#8a5a1f"/>
+      <stop offset="1" stop-color="#4a2d0c"/>
+    </radialGradient>
+    <!-- crosshatch ground for the wide band -->
+    <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse">
+      <rect width="6" height="6" fill="#6e4a18"/>
+      <path d="M0 6 L6 0 M-1 1 L1 -1 M5 7 L7 5" stroke="#57390f" stroke-width="1.1"/>
+      <path d="M0 0 L6 6" stroke="#7d571f" stroke-width=".7"/>
+    </pattern>
+
+    <!-- egg-and-dart unit, 20px wide, drawn for a horizontal strip 12px tall -->
+    <g id="egg">
+      <ellipse cx="10" cy="6" rx="6.2" ry="4.6" fill="url(#bead)" stroke="#4a2d0c" stroke-width=".8"/>
+      <path d="M19.4 1.5 L19.4 10.5 L21 6 Z" fill="#c98f2e" stroke="#4a2d0c" stroke-width=".6"/>
+    </g>
+    <pattern id="eggrow" width="20" height="12" patternUnits="userSpaceOnUse">
+      <rect width="20" height="12" fill="#3a2308"/>
+      <use href="#egg"/>
+    </pattern>
+
+    <!-- acanthus scroll unit for the wide band, 44px wide, 26px tall -->
+    <g id="curl">
+      <path d="M2 20 C6 6, 20 2, 26 8 C31 13, 28 20, 22 20 C18 20, 16 16, 19 13"
+            fill="none" stroke="url(#goldV)" stroke-width="4.4" stroke-linecap="round"/>
+      <path d="M26 8 C33 3, 41 8, 42 15" fill="none" stroke="url(#goldV2)" stroke-width="3.2" stroke-linecap="round"/>
+      <circle cx="20" cy="15.5" r="2.2" fill="url(#bead)"/>
+      <path d="M4 21 C10 24, 16 24, 22 22" fill="none" stroke="#9a6b24" stroke-width="1.6" stroke-linecap="round"/>
+    </g>
+    <pattern id="scrollband" width="44" height="26" patternUnits="userSpaceOnUse">
+      <rect width="44" height="26" fill="url(#hatch)"/>
+      <use href="#curl"/>
+    </pattern>
+
+    <!-- beading row -->
+    <pattern id="beads" width="9" height="9" patternUnits="userSpaceOnUse">
+      <rect width="9" height="9" fill="#2e1c06"/>
+      <circle cx="4.5" cy="4.5" r="3.4" fill="url(#bead)"/>
+    </pattern>
+
+    <!-- one full edge strip (top), 360 wide x 60 tall, layered outside-in -->
+    <g id="edge">
+      <rect x="0" y="0" width="360" height="5" fill="url(#goldV2)"/>
+      <rect x="0" y="5" width="360" height="12" fill="url(#eggrow)"/>
+      <rect x="0" y="17" width="360" height="2" fill="#fdf0b0" opacity=".55"/>
+      <rect x="0" y="19" width="360" height="26" fill="url(#scrollband)"/>
+      <rect x="0" y="45" width="360" height="2" fill="#2e1c06"/>
+      <rect x="0" y="47" width="360" height="9" fill="url(#beads)"/>
+      <rect x="0" y="56" width="360" height="4" fill="url(#goldV)"/>
+    </g>
+
+    <!-- corner block: rosette medallion over mitred ground -->
+    <g id="corner">
+      <rect width="60" height="60" fill="url(#hatch)"/>
+      <rect width="60" height="5" fill="url(#goldV2)"/>
+      <rect width="5" height="60" fill="url(#goldV2)"/>
+      <rect x="56" y="56" width="4" height="4" fill="url(#goldV)"/>
+      <circle cx="30" cy="30" r="21" fill="url(#ros)" stroke="#4a2d0c" stroke-width="1.4"/>
+      <g stroke="#5c3a10" stroke-width="1" fill="url(#goldV)">
+        <path d="M30 11 C34 18, 34 24, 30 28 C26 24, 26 18, 30 11 Z"/>
+        <path d="M30 49 C34 42, 34 36, 30 32 C26 36, 26 42, 30 49 Z"/>
+        <path d="M11 30 C18 26, 24 26, 28 30 C24 34, 18 34, 11 30 Z"/>
+        <path d="M49 30 C42 26, 36 26, 32 30 C36 34, 42 34, 49 30 Z"/>
+        <path d="M17 17 C24 18, 27 22, 28 28 C22 27, 18 24, 17 17 Z"/>
+        <path d="M43 17 C36 18, 33 22, 32 28 C38 27, 42 24, 43 17 Z"/>
+        <path d="M17 43 C24 42, 27 38, 28 32 C22 33, 18 36, 17 43 Z"/>
+        <path d="M43 43 C36 42, 33 38, 32 32 C38 33, 42 36, 43 43 Z"/>
+      </g>
+      <circle cx="30" cy="30" r="5.5" fill="url(#bead)" stroke="#4a2d0c" stroke-width="1"/>
+    </g>
+  </defs>
+
+  <!-- four edges -->
+  <use href="#edge"/>
+  <use href="#edge" transform="rotate(180 180 180)"/>
+  <use href="#edge" transform="rotate(-90 180 180)"/>
+  <use href="#edge" transform="rotate(90 180 180)"/>
+  <!-- four corners on top -->
+  <use href="#corner"/>
+  <use href="#corner" transform="translate(360 0) rotate(90)"/>
+  <use href="#corner" transform="translate(360 360) rotate(180)"/>
+  <use href="#corner" transform="translate(0 360) rotate(270)"/>
+</svg>
