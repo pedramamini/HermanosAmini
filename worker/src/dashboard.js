@@ -232,6 +232,33 @@ export function dashboardHTML(token) {
           background:linear-gradient(180deg,var(--magenta),var(--violet)); opacity:.85}
   .days i:hover{opacity:1; outline:1px solid var(--gold)}
   code{color:var(--gold)}
+  /* ── charts ──
+     .cx sizes to its panel; the viewBox does the scaling, so a chart never
+     needs a resize listener. vector-effect keeps 2px strokes at 2px after the
+     non-uniform preserveAspectRatio="none" scale, which would otherwise
+     stretch every stroke horizontally and make the marks look sloppy.
+
+     NO BACKTICKS ANYWHERE IN THIS <style> BLOCK: it lives inside a template
+     literal, so one backtick in a comment ends the string and the build fails
+     somewhere unrelated. Cost a deploy on 2026-08-27. */
+  .cx{width:100%; height:auto; display:block; overflow:visible}
+  .cx line,.cx rect,.cx circle,.cx path{vector-effect:non-scaling-stroke}
+  .cx .hz{cursor:crosshair}
+  .cx .hz:hover{filter:brightness(1.28)}
+  /* One tooltip element for the whole page, moved and refilled on hover. A
+     tooltip per mark would be hundreds of nodes rebuilt every refresh. */
+  #tip{
+    position:fixed; z-index:50; pointer-events:none; opacity:0; transition:opacity .09s;
+    background:rgba(12,10,20,.97); border:1px solid var(--violet); border-radius:8px;
+    padding:6px 10px; font-size:11.5px; color:var(--ink); max-width:340px;
+    box-shadow:0 8px 26px rgba(0,0,0,.6); white-space:nowrap;
+  }
+  #tip.on{opacity:1}
+  .legend{display:flex; gap:14px; flex-wrap:wrap; font-size:10.5px; color:var(--dim);
+          letter-spacing:.06em; margin:8px 0 0}
+  .legend i{display:inline-block; width:10px; height:10px; border-radius:3px;
+            margin-right:5px; vertical-align:-1px}
+  .note{font-size:11px; color:var(--dim); margin:9px 0 0; line-height:1.5}
   .verdict{font-weight:700}
   .verdict.flip{color:var(--teal)}
   .verdict.keep{color:var(--dim)}
@@ -244,6 +271,7 @@ export function dashboardHTML(token) {
   ${papelSVG()}
 </header>
 <main id="app"><section class="wide"><h2>cargando</h2></section></main>
+<div id="tip"></div>
 <script>
 const TOKEN = ${JSON.stringify(token)};
 const P = new URLSearchParams(location.search);
@@ -263,32 +291,72 @@ function barTable(rows, label, cls) {
 
 function render(d) {
   const t = d.totals;
-  const dayMax = Math.max(1, ...d.byDay.map(x => x.n));
   const modeTag = m => '<span class="tag ' + (['gate','demo','signage','kiosk','subdomain'].includes(m)?m:'gate') + '">' + esc(m||'?') + '</span>';
   const cap = d.capRows || [];
 
+  /* A legend is PRESENT for every multi-series chart, always. Identity must
+     never be colour-alone: the swatch names the mode in text beside it. */
+  const legend = items => '<div class="legend">' + (items || []).map(([c, label]) =>
+    '<span><i style="background:' + esc(c) + '"></i>' + esc(label) + '</span>').join('') + '</div>';
+
+  /* The Worker renders every chart and sends the SVG as a string. C is just a
+     shorter name for that bag; a missing key renders an honest blank rather
+     than throwing, which matters because a new chart ships in two files.
+
+     NO BACKTICKS ANYWHERE BELOW THIS POINT: everything from <!doctype to the
+     end is one template literal, so a single backtick in a comment ends the
+     string and esbuild fails somewhere unrelated. Cost two deploys today. */
+  const C = d.charts || {}, L = d.legends || {};
+
   document.getElementById('app').innerHTML = [
-    '<section><h2>alcance</h2><div class="kpi">' +
+    /* ── the headline row: numbers, then the shape of the traffic ──
+       The KPI tiles answer "how much"; the area chart answers "when, and made
+       of what". Neither replaces the other, so they sit together at the top. */
+    '<section class="wide"><h2>traffic</h2>' +
+      '<div class="kpi" style="margin-bottom:10px">' +
       '<div><b>' + t.loads + '</b><span>page loads</span></div>' +
       '<div><b>' + t.sessions + '</b><span>sessions</span></div>' +
       '<div><b>' + t.ips + '</b><span>unique ips</span></div>' +
-    '</div><div class="days">' +
-      d.byDay.map(x => '<i title="' + x.d + ': ' + x.n + ' loads, ' + x.ips + ' ips" style="height:' + (x.n/dayMax*100) + '%"></i>').join('') +
-    '</div><div class="muted" style="font-size:11px;display:flex;justify-content:space-between">' +
-      '<span>' + esc(d.byDay[0]?.d||'') + '</span><span>' + esc(d.byDay.at(-1)?.d||'') + '</span></div></section>',
+      '<div><b>' + (d.funnel?.find(f => f.stage === 'touched')?.n ?? 0) + '</b><span>touched it</span></div>' +
+      '</div>' +
+      (C.traffic || '') + legend(L.traffic) + '</section>',
 
-    '<section><h2>how they arrive</h2>' +
+    /* ── the funnel: the one panel that says whether any of this works ── */
+    '<section><h2>what a visit becomes</h2>' + (C.funnel || '') +
+      '<p class="note">Each stage counts DISTINCT sessions, so a session that ' +
+      'fired forty keys counts once: this measures people, not enthusiasm. The ' +
+      'right-hand percentage is conversion from the stage above.</p></section>',
+
+    '<section><h2>how deep they go</h2>' + (C.depth || '') +
+      '<p class="note">Sessions by interaction count, not an average. ' +
+      '<b>none</b> is the bounce bar and wears the alert hue on purpose: it is the ' +
+      'one bar whose being tall is bad news.</p></section>',
+
+    '<section><h2>when they arrive</h2>' + (C.heat || '') +
+      '<p class="note">Local hour by weekday. One hue, light to dark, so ' +
+      '"more" is readable without consulting a key.</p></section>',
+
+    '<section><h2>how long they stay</h2>' + (C.dwell || '') +
+      '<p class="note">From the <code>end</code> event on page unload. Bucketed ' +
+      'rather than averaged: one wall display running for hours would drag a mean ' +
+      'somewhere no real visitor ever sat.</p></section>',
+
+    '<section><h2>what they are looking at</h2>' + (C.viewports || '') +
+      '<p class="note">Viewports snapped to a 160px grid, area-proportional. ' +
+      'A <b>ringed</b> mark reached demo or kiosk mode. A big solid mark out near ' +
+      '1080p is a display still stuck at the gate.</p></section>',
+
+    '<section><h2>arrival mode</h2>' +
       barTable(d.byMode, r => modeTag(r.mode)) +
-      '<p class="muted" style="font-size:11.5px;margin:10px 0 0">' +
-      '<b>subdomain</b> came in on demo.hermanosamini.com, which can only ever be the demo &middot; ' +
-      '<b>gate</b> landed on / and must click through &middot; <b>demo</b> typed /demo &middot; ' +
-      '<b>signage</b> a heuristic rescued it &middot; <b>kiosk</b> the screensaver</p></section>',
+      '<p class="note"><b>subdomain</b> came in on demo.hermanosamini.com, which ' +
+      'can only ever be the demo &middot; <b>gate</b> landed on / and must click ' +
+      'through &middot; <b>demo</b> typed /demo &middot; <b>signage</b> a heuristic ' +
+      'rescued it &middot; <b>kiosk</b> the screensaver</p></section>',
 
-    /* ── the capability probe ──
-       This is the panel that answers "did the Apple TV get rescued", and it is
-       the only place a SILENT failure shows up: a client that sat six seconds
-       untouched and was NOT flipped means the probe found a pointer where a
-       display should have none. */
+    /* ── one dense panel replaces five near-empty single-column tables ── */
+    '<section><h2>what they touch</h2>' + (C.touch || '') +
+      legend(L.touch) + '</section>',
+
     '<section class="wide"><h2>capability probe &middot; ¿tiene manos?</h2>' +
       (cap.length ? '<table>' +
         '<tr><th>verdict</th><th>reading</th><th class="num">seen</th><th>screen</th><th>network</th><th>last</th><th>agent</th></tr>' +
@@ -302,25 +370,12 @@ function render(d) {
           '<td class="muted">' + when(r.last) + '</td>' +
           '<td class="trunc muted">' + esc(r.ua || '') + '</td></tr>').join('') +
         '</table>' : '<p class="muted">no probe has run in this window</p>') +
-      '<p class="muted" style="font-size:11.5px;margin:10px 0 0">' +
-      'Six seconds after a load on <code>/</code>, a client with <code>hover=0</code> AND ' +
-      '<code>touch=0</code> has no pointing device at all, so the gate is a permanent black ' +
-      'screen to it and we drop it. Cancelled by the first real input. ' +
-      '<b>A <span class="verdict keep">left at the gate</span> row on a 1920&times;1080 screen ' +
-      'with no referrer is the interesting one</b>: that is a display this trigger failed to rescue.</p></section>',
-
-    '<section><h2>keys pressed</h2>' +
-      barTable(d.topKeys, r => '<span class="keycap">' + esc(KEYNAME[r.name] || r.name) + '</span>') + '</section>',
-
-    '<section><h2>dials touched</h2>' + barTable(d.topCfg, r => esc(r.name), 'w') + '</section>',
-
-    '<section><h2>screensaver downloads</h2>' + barTable(d.downloads, r => esc(r.name), 'w') + '</section>',
-
-    '<section><h2>effects fired</h2>' + barTable(d.byFx, r => esc(r.name), 't') + '</section>',
-
-    '<section><h2>panels opened</h2>' + barTable(d.byPanel, r => esc(r.name)) + '</section>',
-
-    '<section><h2>other signals</h2>' + barTable(d.misc, r => esc(r.kind), 't') + '</section>',
+      '<p class="note">Six seconds after a load on <code>/</code>, a client with ' +
+      '<code>hover=0</code> AND <code>touch=0</code> has no pointing device at all, ' +
+      'so the gate is a permanent black screen to it and we drop it. Cancelled by ' +
+      'the first real input. <b>A <span class="verdict keep">left at the gate</span> ' +
+      'row on a 1920&times;1080 screen with no referrer is the interesting one</b>: ' +
+      'that is a display this trigger failed to rescue.</p></section>',
 
     '<section class="wide"><h2>force-demo rules</h2><table>' +
       '<tr><th>pattern</th><th>note</th><th class="num">matched</th><th>last</th><th></th></tr>' +
@@ -335,9 +390,9 @@ function render(d) {
       '<input id="pat" placeholder="ip:1.2.3.4 | net:1.2.3. | asn:13335 | ref:kitcast.tv | ua:BrightSign" style="flex:1;min-width:280px">' +
       '<input id="note" placeholder="what is it" style="flex:0 1 220px">' +
       '<button id="add">add rule</button></div>' +
-      '<p class="muted" style="font-size:11.5px">A matching visitor is answered <code>{demo:true}</code> on its first ' +
-      'call and boots straight into demo mode. No page deploy needed. <code>ref:</code> tests the referrer ' +
-      'AND the framing ancestor.</p></section>',
+      '<p class="note">A matching visitor is answered <code>{demo:true}</code> on its first ' +
+      'call and boots straight into demo mode. No page deploy needed. <code>ref:</code> tests ' +
+      'the referrer AND the framing ancestor.</p></section>',
 
     '<section class="wide"><h2>visitors by network</h2><table>' +
       '<tr><th>ip</th><th>network</th><th>where</th><th class="num">loads</th><th>modes</th><th>last</th><th>referrer</th></tr>' +
@@ -370,6 +425,32 @@ function render(d) {
   document.querySelectorAll('[data-rm]').forEach(b =>
     b.onclick = () => post({ pat: b.dataset.rm, remove: 1 }));
 }
+
+/* ── the hover layer ──
+   ONE delegated listener on document, not one per mark. The charts are rebuilt
+   wholesale every 60s refresh, so per-element listeners would either leak or
+   need rebinding on every paint; delegation survives the swap for free and
+   costs a single closest() per move.
+
+   Positioned with fixed coordinates flipped near the right and bottom edges,
+   because a tooltip that runs off screen is the same as no tooltip. */
+(function hover() {
+  const tip = document.getElementById('tip');
+  document.addEventListener('mousemove', e => {
+    const m = e.target.closest && e.target.closest('[data-tip]');
+    if (!m) { tip.classList.remove('on'); return; }
+    tip.textContent = m.getAttribute('data-tip');
+    tip.classList.add('on');
+    const r = tip.getBoundingClientRect();
+    const x = e.clientX + 14 + r.width > innerWidth ? e.clientX - r.width - 14 : e.clientX + 14;
+    const y = e.clientY + 14 + r.height > innerHeight ? e.clientY - r.height - 14 : e.clientY + 14;
+    tip.style.left = x + 'px';
+    tip.style.top = y + 'px';
+  }, { passive: true });
+  /* Leaving the window entirely never fires mousemove over a non-mark, so the
+     tooltip would stick to the last thing hovered. */
+  document.addEventListener('mouseleave', () => tip.classList.remove('on'));
+})();
 
 async function post(body) {
   const r = await fetch('/adm/' + TOKEN + '/signage', {

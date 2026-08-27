@@ -2346,7 +2346,18 @@ const SIG = (function () {
        queue. It refuses bodies over ~64KB; ours is capped well under that. */
     try {
       if (final && navigator.sendBeacon) {
-        navigator.sendBeacon(API + '/api/ev', new Blob([body], { type: 'application/json' }));
+        /* text/plain, NOT application/json, and that is the whole reason the
+           `end` event ever lands. sendBeacon can only issue a SIMPLE
+           cross-origin request: application/json is not a CORS-safelisted
+           content type, so it needs a preflight, and a beacon cannot make one.
+           The browser drops it and reports nothing.
+
+           Measured 2026-08-27: ZERO `end` rows existed in the entire dataset
+           across every real session, while gate/cap/cfg events sent through
+           fetch() landed fine. The dwell chart was permanently empty and read
+           as "nobody stays", which is a conclusion, not a gap. The Worker
+           parses the body with request.json() regardless of the header. */
+        navigator.sendBeacon(API + '/api/ev', new Blob([body], { type: 'text/plain;charset=UTF-8' }));
         return;
       }
     } catch (_) {}

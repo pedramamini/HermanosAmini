@@ -26,6 +26,9 @@ const BUILTIN_SIGNAGE = [
   { pat: 'ua:BrightSign', note: 'BrightSign player (built in)' },
 ];
 
+import { trafficChart, heatChart, funnelChart, depthChart, viewportChart,
+         dwellChart, touchChart, MODE_COLOR, CHART } from './charts.js';
+
 let sigCache = null, sigCacheAt = 0;
 async function signageRules(env) {
   const now = Date.now();
@@ -156,6 +159,16 @@ export async function recordEvents(request, env, ctx, body) {
 
 const WINDOWS = { '1h': 3600e3, '24h': 86400e3, '7d': 7 * 86400e3, '30d': 30 * 86400e3, all: 3650 * 86400e3 };
 
+/* Time-bucket width per window, so the traffic chart always lands around
+   30-60 columns. A fixed bucket makes 1h a single bar and 30d a hairball. */
+const BUCKETS = { '1h': 120e3, '24h': 1800e3, '7d': 6 * 3600e3, '30d': 86400e3, all: 86400e3 };
+const bucketMs = w => BUCKETS[w] || 3600e3;
+
+/* CST. The dashboard is read from one timezone and an "arrivals by hour"
+   chart in UTC is quietly wrong by five hours, which is exactly the kind of
+   error that looks like an insight. Seconds, because strftime takes seconds. */
+const TZ_OFF = 5 * 3600;
+
 export async function adminData(env, url) {
   const win = WINDOWS[url.searchParams.get('win')] ? url.searchParams.get('win') : '7d';
   const since = Date.now() - WINDOWS[win];
@@ -163,7 +176,8 @@ export async function adminData(env, url) {
   const q = (sql, ...b) => db.prepare(sql).bind(...b).all().then(r => r.results || []).catch(() => []);
 
   const [totals, byMode, byDay, topKeys, topCfg, downloads, byFx, byPanel,
-         visitors, recent, signage, uaRows, misc, capRows] = await Promise.all([
+         visitors, recent, signage, uaRows, misc, capRows,
+         series, heat, depth, funnel, viewports, dwell] = await Promise.all([
     q(`SELECT COUNT(*) loads, COUNT(DISTINCT sid) sessions, COUNT(DISTINCT ip) ips
          FROM hits WHERE ts >= ?`, since),
     q(`SELECT mode, COUNT(*) n FROM hits WHERE ts >= ? GROUP BY mode ORDER BY n DESC`, since),
@@ -199,6 +213,77 @@ export async function adminData(env, url) {
          FROM events e LEFT JOIN hits h ON h.sid = e.sid
         WHERE e.kind = 'cap' AND e.ts >= ?
         GROUP BY e.name, e.val ORDER BY n DESC LIMIT 20`, since),
+
+    /* ── the exploration set ──
+       Every one of these is bucketed IN SQL rather than in the page. The rows
+       are small and the arithmetic is exact; shipping raw hits to the browser
+       to group them there would scale with traffic instead of with the shape
+       of the answer. */
+
+    /* Traffic over time, split by mode. The bucket width follows the window so
+       a 1h view is per-minute and a 30d view is per-day: a fixed bucket makes
+       the short windows a single bar and the long ones unreadable. */
+    /* CAST(... AS INTEGER) is LOAD-BEARING. SQLite's `/` on two integers is
+       integer division, but `ts / ?` with a bound parameter promotes to REAL,
+       so `(ts/1800000)*1800000` returned ts EXACTLY and every hit landed in
+       its own bucket. Measured: a 24h window that can hold 48 half-hour
+       buckets came back with 66 of them, one per row, and the area chart drew
+       66 one-tall stripes instead of a shape. The chart looked plausible,
+       which is why this needed the numbers to catch. */
+    q(`SELECT CAST(ts / ? AS INTEGER) * ? AS b, mode, COUNT(*) n
+         FROM hits WHERE ts >= ? GROUP BY b, mode ORDER BY b`,
+      bucketMs(win), bucketMs(win), since),
+
+    /* Local-hour x weekday. strftime works in UTC, so the offset is applied to
+       the timestamp before formatting; the dashboard is read from CST and an
+       "arrivals by hour" chart in UTC would be quietly wrong by five hours. */
+    q(`SELECT CAST(strftime('%w', (ts/1000) - ?, 'unixepoch') AS INTEGER) dow,
+              CAST(strftime('%H', (ts/1000) - ?, 'unixepoch') AS INTEGER) hr,
+              COUNT(*) n
+         FROM hits WHERE ts >= ? GROUP BY dow, hr`, TZ_OFF, TZ_OFF, since),
+
+    /* Session depth: how many interactions each session produced. This is the
+       bounce question, and it is the one number that says whether anyone
+       actually TOUCHES the piece rather than glancing at it. */
+    q(`SELECT k, COUNT(*) sessions FROM (
+         SELECT h.sid, (SELECT COUNT(*) FROM events e WHERE e.sid = h.sid) k
+           FROM hits h WHERE h.ts >= ? GROUP BY h.sid
+       ) GROUP BY k ORDER BY k`, since),
+
+    /* The funnel, widest to narrowest. Each stage is a DISTINCT sid, so a
+       session that fired forty keys counts once: this measures people, not
+       enthusiasm. */
+    q(`SELECT 'loaded' stage, COUNT(DISTINCT sid) n FROM hits WHERE ts >= ?
+       UNION ALL SELECT 'entered', COUNT(DISTINCT sid) FROM events
+         WHERE kind='gate' AND ts >= ?
+       UNION ALL SELECT 'touched', COUNT(DISTINCT sid) FROM events
+         WHERE kind IN ('key','fx','panel','cfg') AND ts >= ?
+       UNION ALL SELECT 'tuned', COUNT(DISTINCT sid) FROM events
+         WHERE kind IN ('cfg','preset','share') AND ts >= ?
+       UNION ALL SELECT 'kept', COUNT(DISTINCT sid) FROM events
+         WHERE kind IN ('dl','share','photo') AND ts >= ?`,
+      since, since, since, since, since),
+
+    /* Viewports, snapped to a 160px grid so a thousand near-identical laptops
+       land on one mark instead of a smear. `mode` comes along because the
+       whole point is spotting a 1920x1080 that is NOT in demo mode. */
+    q(`SELECT (vw/160)*160 w, (vh/160)*160 h, COUNT(*) n,
+              SUM(CASE WHEN mode IN ('demo','signage','subdomain','kiosk') THEN 1 ELSE 0 END) big
+         FROM hits WHERE ts >= ? AND vw > 0 AND vh > 0
+        GROUP BY w, h ORDER BY n DESC LIMIT 60`, since),
+
+    /* Dwell: the `end` event carries seconds-on-page in `name`. Bucketed into
+       human spans rather than a mean, because one wall display running for
+       hours would drag an average somewhere no real visitor ever sat. */
+    q(`SELECT CASE
+           WHEN CAST(name AS INTEGER) < 10  THEN '0-10s'
+           WHEN CAST(name AS INTEGER) < 30  THEN '10-30s'
+           WHEN CAST(name AS INTEGER) < 60  THEN '30-60s'
+           WHEN CAST(name AS INTEGER) < 300 THEN '1-5m'
+           WHEN CAST(name AS INTEGER) < 1800 THEN '5-30m'
+           ELSE '30m+' END bucket,
+           COUNT(*) n, MAX(CAST(name AS INTEGER)) longest
+         FROM events WHERE kind='end' AND ts >= ? GROUP BY bucket`, since),
   ]);
 
   return {
@@ -206,6 +291,37 @@ export async function adminData(env, url) {
     totals: totals[0] || { loads: 0, sessions: 0, ips: 0 },
     byMode, byDay, topKeys, topCfg, downloads, byFx, byPanel,
     visitors, recent, signage, uaRows, misc, capRows,
+    funnel,
+    /* The raw series ships too. It is small, and without it there is no way to
+       check a chart's numbers against its picture from outside the browser,
+       which is how the x-axis label bug below was found. */
+    series, heat, depth, viewports, dwell, bucket: bucketMs(win),
+    /* ── charts are rendered HERE, in the Worker, not in the page ──
+       charts.js is a Worker module, so its exports exist in this scope and
+       NOT in the browser's. Shipping the functions to the page would mean a
+       second copy of every chart to keep in lockstep, which is exactly the
+       CFG_SCHEMA/LIMITS drift that cost every gallery preset its colours.
+       One implementation, rendered once per refresh, sent as SVG strings.
+       Found the hard way: the first cut imported them into dashboard.js and
+       the page threw `trafficChart is not defined` on load. */
+    charts: {
+      traffic: trafficChart(series, bucketMs(win), since),
+      heat: heatChart(heat),
+      funnel: funnelChart(funnel),
+      depth: depthChart(depth),
+      viewports: viewportChart(viewports),
+      dwell: dwellChart(dwell),
+      touch: touchChart({ key: topKeys, cfg: topCfg, fx: byFx,
+                          panel: byPanel, dl: downloads }),
+    },
+    /* Legends travel with the data so identity is never colour-alone, and so
+       the page never has to know the palette. */
+    legends: {
+      traffic: [...new Set(series.map(r => r.mode))]
+        .map(m => [MODE_COLOR[m] || CHART[3], m]),
+      touch: [[CHART[3], 'key'], [CHART[1], 'dial / download'],
+              [CHART[2], 'effect'], [CHART[0], 'panel']],
+    },
     builtin: BUILTIN_SIGNAGE,
   };
 }
