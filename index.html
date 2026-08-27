@@ -2840,45 +2840,61 @@ const SFX = {
     noiseHit(t0, 0.05, 900, 1.4, 0.1);
   },
   /* third eye: a struck bell, three detuned partials ringing out */
-  /* Picking a flower off the crown. A bell was wrong for it: a bell is a
-     STRUCK metal sound and this is a soft snap of a stem, so the old cue said
-     "you hit the crown" when the event is "you took a flower from it".
+  /* Cutting a flower off the crown. Two earlier passes got this wrong in
+     the same direction: a bell said "you hit the crown", and the snap-plus-
+     bent-triangle that replaced it still had a PITCH, so it read as a pop.
+     Pedram, 2026-08-27: "just make it like a cutting noise, as if we're
+     cutting the flower."
 
-     Two parts, which is what makes it read as organic rather than as a beep:
-     a very short filtered noise transient (the snap), and a triangle that
-     bends DOWN a minor third and dies fast (the release). Pitch rises a
-     little with each pick so a run of them sounds like a phrase instead of a
-     stuck key. Synthesized, per the no-audio-files rule. */
-  pluck(step) {
-    if (!sfxReady() || !sfxThrottle('pluck', 55)) return;
+     A cut has no pitch. It is two hard edges passing each other, and the
+     only tonal part is the tiny ring the blades leave behind. So:
+
+       1. two noise chirps 14ms apart (the blades, one per edge), each a
+          steep highpass sweep DOWNWARD, which is what a shear sounds like:
+          bright at the moment of contact, dulling as the material parts;
+       2. a 4ms metallic tick well above the chirps, quiet enough to be
+          texture rather than a note.
+
+     `step` still walks the tick up a scale so a run of cuts is a phrase and
+     not a stuck key, but the chirps do not move: the scissors are the same
+     scissors every time. Synthesized, per the no-audio-files rule. */
+  snip(step) {
+    if (!sfxReady() || !sfxThrottle('snip', 55)) return;
     const t0 = actx.currentTime;
-    const base = 392 * Math.pow(2, ((step || 0) % 5) / 12);
 
-    /* the snap: 18ms of bandpassed noise */
-    const n = actx.createBufferSource();
-    const buf = actx.createBuffer(1, 1024, actx.sampleRate);
-    const d = buf.getChannelData(0);
-    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
-    n.buffer = buf;
-    const bp = actx.createBiquadFilter();
-    bp.type = 'bandpass'; bp.frequency.value = base * 3.2; bp.Q.value = 1.4;
-    const ng = actx.createGain();
-    ng.gain.setValueAtTime(0.16, t0);
-    ng.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.05);
-    n.connect(bp); bp.connect(ng); ng.connect(sfxBus);
-    n.start(t0); n.stop(t0 + 0.06);
+    /* one blade: filtered white noise with a falling cutoff */
+    const blade = (at, gain, from, to) => {
+      const n = actx.createBufferSource();
+      const len = Math.floor(actx.sampleRate * 0.05);
+      const buf = actx.createBuffer(1, len, actx.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+      n.buffer = buf;
+      const hp = actx.createBiquadFilter();
+      hp.type = 'bandpass'; hp.Q.value = 0.9;
+      hp.frequency.setValueAtTime(from, at);
+      hp.frequency.exponentialRampToValueAtTime(to, at + 0.035);
+      const g = actx.createGain();
+      g.gain.setValueAtTime(0.0001, at);
+      g.gain.exponentialRampToValueAtTime(gain, at + 0.003);
+      g.gain.exponentialRampToValueAtTime(0.0001, at + 0.04);
+      n.connect(hp); hp.connect(g); g.connect(sfxBus);
+      n.start(at); n.stop(at + 0.05);
+    };
+    blade(t0, 0.17, 5200, 1500);
+    blade(t0 + 0.014, 0.12, 4200, 1200);
 
-    /* the release: a short bent tone */
+    /* the blades ringing, barely. Sine, not triangle: a triangle up here
+       still has enough harmonic content to read as a musical note. */
     const o = actx.createOscillator();
-    o.type = 'triangle';
-    o.frequency.setValueAtTime(base * 1.19, t0);          // a minor third up
-    o.frequency.exponentialRampToValueAtTime(base, t0 + 0.09);
+    o.type = 'sine';
+    o.frequency.value = 2350 * Math.pow(2, ((step || 0) % 5) / 12);
     const g = actx.createGain();
-    g.gain.setValueAtTime(0.0001, t0);
-    g.gain.exponentialRampToValueAtTime(0.13, t0 + 0.008);
-    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.42);
+    g.gain.setValueAtTime(0.0001, t0 + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.045, t0 + 0.016);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.10);
     o.connect(g); g.connect(sfxBus);
-    o.start(t0); o.stop(t0 + 0.45);
+    o.start(t0 + 0.012); o.stop(t0 + 0.11);
   },
   bell() {
     if (!sfxReady() || !sfxThrottle('bell', 160)) return;
@@ -3651,7 +3667,40 @@ const crownPos = [];
    only its scale animates. That also keeps the layout stable, instead of the
    crown reflowing every time someone picks a flower. */
 const crownOut = new Map();
-let pluckSeq = 0;                                // walks the pick sound up a scale
+/* How many times each setting has been cut. Bumped in crownDrop; read by the
+   crown, by the falling piece, and by nothing else. Cleared with crownOut
+   whenever the crown itself goes away, so a hat and back does not hand you a
+   crown of colours you never chose. */
+const crownTint = new Map();
+const bloomTint = id => crownTint.get(id) || 0;
+let cutSeq = 0;                                  // walks the cut's ring up a scale
+
+/* THE ONE PLACE A MARIGOLD'S COLOURS ARE DECIDED. Six ordered pairs rather
+   than the old three, because "always a new colour" is only true if the
+   viewer can SEE the difference: with three pairs, two cuts of the same
+   setting brought the original straight back. Two call sites read this (the
+   crown and the piece falling off it), and they must agree or the flower
+   changes colour in the act of detaching. */
+const BLOOM_PAIRS = [
+  ['gold',    'magenta'],
+  ['magenta', 'gold'   ],
+  ['violet',  'teal'   ],
+  ['teal',    'gold'   ],
+  ['magenta', 'violet' ],
+  ['gold',    'teal'   ],
+  ['violet',  'magenta'],
+];
+/* SEVEN entries and a step of THREE, and both numbers are load-bearing. The
+   step has to be coprime with the length or the slot never reaches most of
+   the table: a 6-long list stepped by 2 visits three pairs and comes back to
+   where it started. Seven is prime, so EVERY step is coprime with it, and 3
+   lands a third of the way around rather than on the neighbour, which is the
+   change hardest to see. */
+const BLOOM_STEP = 3;
+function bloomColors(n) {
+  const p = BLOOM_PAIRS[((n % BLOOM_PAIRS.length) + BLOOM_PAIRS.length) % BLOOM_PAIRS.length];
+  return [PAL[p[0]], PAL[p[1]]];
+}
 const CROWN_REGROW = 2.6;                       // seconds of bare metal
 const CROWN_GROW   = 1.9;                       // seconds to swell back
 
@@ -3863,7 +3912,7 @@ function drawRoyalCrown() {
     hctx.save();
     hctx.translate(jx, jy);
     /* a slow turn so a crown of flowers is alive rather than stamped */
-    drawBloom(jr * 0.86 * k, j, t * 0.11 * (j % 2 ? 1 : -1) + j * 1.7, PET, false);
+    drawBloom(jr * 0.86 * k, j + bloomTint('j' + j), t * 0.11 * (j % 2 ? 1 : -1) + j * 1.7, PET, false);
     hctx.restore();
   }
 
@@ -3887,8 +3936,7 @@ function drawRoyalCrown() {
    of the same twenty lines is how one ornament ends up looking like three
    different species. */
 function drawBloom(r, idx, spin, petals, shade) {
-  const c1 = idx % 3 === 0 ? PAL.gold : idx % 3 === 1 ? PAL.magenta : PAL.violet;
-  const c2 = idx % 3 === 0 ? PAL.magenta : idx % 3 === 1 ? PAL.gold : PAL.teal;
+  const [c1, c2] = bloomColors(idx);
   if (shade !== false) {
     hctx.beginPath();
     hctx.arc(0, r * 0.12, r * 1.06, 0, Math.PI * 2);
@@ -4245,8 +4293,8 @@ function drawCrownInner() {
      third eye is drawn AFTER this function, so a hat painted here had a
      glowing eye shining straight through its brim. It is drawn last instead,
      from drawHero's tail. See drawSombrero's call site. */
-  if (CFG.sombrero) { crownOut.clear(); return; }
-  if (!CFG.flowerCrown) { crownOut.clear(); return; }
+  if (CFG.sombrero) { crownOut.clear(); crownTint.clear(); return; }
+  if (!CFG.flowerCrown) { crownOut.clear(); crownTint.clear(); return; }
   drawRoyalCrown();
 }
 
@@ -4280,6 +4328,15 @@ function crownAutoDrop() {
 
 function crownDrop(best) {
   crownOut.set(best.id, t + CROWN_REGROW);
+  /* THE FLOWER THAT GROWS BACK IS A DIFFERENT COLOUR (2026-08-27). Before
+     this the bloom's two colours came straight from its slot index, so the
+     replacement was identical to the one you had just cut and the whole
+     interaction read as a texture flickering rather than as a new flower.
+     See BLOOM_PAIRS for why the step is what it is. The falling piece
+     captures the OLD tint at spawn, so what drifts away keeps the colour it
+     wore on the crown and only the replacement is new. */
+  const wasTint = bloomTint(best.id);
+  crownTint.set(best.id, wasTint + BLOOM_STEP);
   if (canSpawn('crownbit')) {
     /* Falls in FRONT of the skull. `behind` is a spawn roll for most sparks,
        but a piece the viewer just knocked off the crown has to stay visible
@@ -4291,10 +4348,10 @@ function crownDrop(best) {
       life: 0, max: 22, hue: Math.random(),      // long: the fall owns the pace, see below
       rot: 0, vr: (Math.random() < 0.5 ? -1 : 1) * (0.7 + Math.random() * 1.1),
       r: best.r * 0.70,
-      idx: parseInt(best.id.slice(1), 10) || 0,
+      tint: wasTint,                             // the colour it wore on the crown
     });
   }
-  SFX.pluck(pluckSeq++);
+  SFX.snip(cutSeq++);
 }
 
 function drawEyeAssembly(side) {
@@ -4819,7 +4876,6 @@ function stepSwarm(dt) {
 }
 
 function stepHole(dt) {
-  swallowKnocks = 0;
   if (!hole.live) { hole.str = Math.max(0, hole.str - dt * 1.1); return; }
   const age = t - hole.born;
   if (age > hole.max) { hole.live = false; return; }
@@ -4934,11 +4990,10 @@ function stepHole(dt) {
     if (pullHeavy(u)) holeSwallow(u);
   }
   /* The flood is matter too. Every free skull gets the same capture field
-     and the same death; only the knock is rationed, or a dense flood turns
-     the fall into a drum roll. */
+     and the same death, and all of it happens in silence. */
   for (const k of swarm) {
     if (k.eat !== undefined) continue;
-    if (pullHeavy(k)) holeSwallow(k, swallowKnocks++ > 0);
+    if (pullHeavy(k)) holeSwallow(k);
   }
   /* the dragon is a spark, but it is a HEAVY spark: give it the capture
      field too, on top of the ember pull it already got above */
@@ -4954,14 +5009,21 @@ function stepHole(dt) {
    leaves its list. `eat` is the 0..1 progress and doubles as the "already
    falling" flag the pull loops check, so the field stops fighting the spiral.
    `ea` is the angle on the way in; `er` the radius, which decays to zero. */
-let swallowKnocks = 0;                 // reset each frame in stepHole
-function holeSwallow(o, quiet) {
+/* THE SWALLOW IS SILENT, and that is deliberate (2026-08-27). It used to
+   fire SFX.knock() on every capture, rationed to one per frame. The knock is
+   the sound of a VIEWER flicking a skull, and hearing it play itself while
+   the hole ate the flood turned the piece's best moment into a woodblock
+   solo: Pedram called it "the sound effect of the black hole" and it was
+   never meant to be one. The knock is now strictly interactive, fired only
+   where a human aimed: the click path in flickAt's caller, the 'f' key, and
+   the shift-clears. Do not reintroduce a sound here; if the hole ever wants
+   a voice it needs its OWN sound, not a borrowed hand gesture. */
+function holeSwallow(o) {
   o.eat = 0;
   o.ea = Math.atan2(o.y - hole.y, o.x - hole.x);
   o.er = Math.hypot(o.x - hole.x, o.y - hole.y);
   o.vx = 0; o.vy = 0;
   if (o.kind === 'alebrije') o.max = o.life + 2.8;   // envelope must outlive the 2.6s rim ride
-  if (!quiet) SFX.knock();
 }
 /* One step of a swallow. Returns true when the object is gone and the caller
    should remove it. Shared by UFOs and dragons so the death looks the same. */
@@ -5223,7 +5285,7 @@ function drawTunnel(dt) {
     if (hole.str > 0.01 && !tunFall.has(i) &&
         Math.hypot(hole.x - dxs, hole.y - dys) < holePONR()) {
       const o = { x: dxs, y: dys, rot: skullSpin[i] };
-      holeSwallow(o, swallowKnocks++ > 0);
+      holeSwallow(o);
       tunFall.set(i, o);
       skullFx.delete(i);                      // a flicked skull loses its throw
     }
@@ -7284,7 +7346,19 @@ function drawDust(dt) {
     sp.life += dt;
     if (sp.life < 0) continue;                       // staggered entry (meteor shower)
     if (sp.life > sp.max) { sparks.splice(k, 1); continue; }
-    dctx = (sp.behind || CFG.skullOnTop) ? tctx : DUST_CTX;  // depth: spawn roll, or forced behind
+    /* Depth: the spawn roll, or forced behind by skullOnTop. A CUT FLOWER IS
+       EXEMPT, and that exemption is the whole fix for "the flowers just
+       vanish" (2026-08-27). skullOnTop is a rollable dial, so the dice and
+       demo mode turn it on by themselves; when it was on, this line sent the
+       falling bloom to the tunnel layer, UNDER the hero. The crown sits on
+       top of the head, so the flower's entire fall is down the front of the
+       face and the skull occluded every frame of it. Measured before the
+       fix: 0 visible pixels across the whole descent with skullOnTop=1,
+       against ~455 with it off. It detached, made a noise, and was never
+       drawn once, which is exactly what "vanished with a pop" describes.
+       The rule this belongs to: a thing the viewer just did with their own
+       hand has to be visible, and no ambient dial may overrule that. */
+    dctx = (sp.kind === 'crownbit' ? false : (sp.behind || CFG.skullOnTop)) ? tctx : DUST_CTX;
     const fade = 1 - sp.life / sp.max;
     if (sp.eat !== undefined) {
       /* past the horizon: the head rides the spiral, and because the dragon
@@ -7712,8 +7786,7 @@ function drawDust(dt) {
       dctx.translate(sp.x, sp.y);
       dctx.rotate(sp.rot);
       dctx.globalAlpha = cf;
-      const c1 = sp.idx % 3 === 0 ? PAL.gold : sp.idx % 3 === 1 ? PAL.magenta : PAL.violet;
-      const c2 = sp.idx % 3 === 0 ? PAL.magenta : sp.idx % 3 === 1 ? PAL.gold : PAL.teal;
+      const [c1, c2] = bloomColors(sp.tint || 0);
       for (let p = 0; p < 8; p++) {
         dctx.save();
         dctx.rotate((p / 8) * Math.PI * 2);
