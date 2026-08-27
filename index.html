@@ -2328,7 +2328,7 @@ const SIG = (function () {
   /* Every method the module exposes has to be here too. A stub missing one
      is a ReferenceError on localhost and in any fork, in the one
      environment nobody tests. */
-  const OFF = { hit(){}, ev(){}, evThrottled(){}, key(){}, onSignage(){} };
+  const OFF = { hit(){}, ev(){}, evThrottled(){}, evNow(){}, key(){}, onSignage(){} };
   /* localhost and file:// are development, and a screenshot harness is not a
      visitor. Only the real origins report. */
   if (!/(^|\.)hermanosamini\.com$/i.test(location.hostname)) return OFF;
@@ -2378,6 +2378,13 @@ const SIG = (function () {
 
   return {
     ev, evThrottled,
+    /* Queue and send in the same breath. For the capability probe only: it
+       fires ONCE per session, it is the diagnostic for a display that may be
+       power-cycled or re-rendered before the 20s interval ever comes round,
+       and a batch that never leaves is indistinguishable from a probe that
+       never ran. Measured 2026-08-27: three headless probes produced zero
+       rows because the process exited inside the flush window. */
+    evNow(kind, name, val) { ev(kind, name, val); flush(false); },
     /* The load ping, and the signage question. */
     hit(mode) {
       let framed = false, ancestor = '';
@@ -10072,8 +10079,8 @@ function toggleDemo() { setDemo(!demoTimer); }
          flipped is the interesting row: it says the capability probe saw a
          pointer where a display should have none, which is the only way this
          trigger can fail silently on hardware I cannot hold. */
-      SIG.ev('cap', noHover && noTouch ? 'flip' : 'keep',
-             'hover=' + (noHover ? 0 : 1) + ' touch=' + (navigator.maxTouchPoints || 0));
+      SIG.evNow('cap', noHover && noTouch ? 'flip' : 'keep',
+                'hover=' + (noHover ? 0 : 1) + ' touch=' + (navigator.maxTouchPoints || 0));
       if (noHover && noTouch) goDemo('nopointer');
     }, 6000);
     return;

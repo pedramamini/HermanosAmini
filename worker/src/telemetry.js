@@ -163,7 +163,7 @@ export async function adminData(env, url) {
   const q = (sql, ...b) => db.prepare(sql).bind(...b).all().then(r => r.results || []).catch(() => []);
 
   const [totals, byMode, byDay, topKeys, topCfg, downloads, byFx, byPanel,
-         visitors, recent, signage, uaRows, misc] = await Promise.all([
+         visitors, recent, signage, uaRows, misc, capRows] = await Promise.all([
     q(`SELECT COUNT(*) loads, COUNT(DISTINCT sid) sessions, COUNT(DISTINCT ip) ips
          FROM hits WHERE ts >= ?`, since),
     q(`SELECT mode, COUNT(*) n FROM hits WHERE ts >= ? GROUP BY mode ORDER BY n DESC`, since),
@@ -189,13 +189,23 @@ export async function adminData(env, url) {
     q(`SELECT ua, COUNT(*) n FROM hits WHERE ts >= ? GROUP BY ua ORDER BY n DESC LIMIT 25`, since),
     q(`SELECT kind, COUNT(*) n FROM events WHERE ts >= ? AND kind IN
          ('chat','share','photo','preset','voice','gate','end') GROUP BY kind ORDER BY n DESC`, since),
+    /* The capability probe. `name` is flip|keep, `val` carries the raw
+       hover/touch reading, and the JOIN pulls the UA and viewport of the load
+       that produced it: a row that says `keep` on a 1920x1080 screen with no
+       referrer is a display this trigger FAILED to rescue, which is the only
+       way it can go wrong on hardware I cannot hold. */
+    q(`SELECT e.name, e.val, COUNT(*) n, MAX(e.ts) last,
+              MAX(h.vw) vw, MAX(h.vh) vh, MAX(h.ua) ua, MAX(h.org) org
+         FROM events e LEFT JOIN hits h ON h.sid = e.sid
+        WHERE e.kind = 'cap' AND e.ts >= ?
+        GROUP BY e.name, e.val ORDER BY n DESC LIMIT 20`, since),
   ]);
 
   return {
     win, since,
     totals: totals[0] || { loads: 0, sessions: 0, ips: 0 },
     byMode, byDay, topKeys, topCfg, downloads, byFx, byPanel,
-    visitors, recent, signage, uaRows, misc,
+    visitors, recent, signage, uaRows, misc, capRows,
     builtin: BUILTIN_SIGNAGE,
   };
 }
