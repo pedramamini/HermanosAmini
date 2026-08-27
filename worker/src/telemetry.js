@@ -59,7 +59,15 @@ function matchSignage(rules, v) {
     if (kind === 'ip'  && v.ip === val) return p;
     if (kind === 'net' && v.ip && v.ip.startsWith(val)) return p;
     if (kind === 'asn' && String(v.asn) === val) return p;
-    if (kind === 'ref' && v.ref && v.ref.toLowerCase().includes(val.toLowerCase())) return p;
+    /* `ref:` tests the referrer AND the framing ancestor. A parent page can
+       suppress document.referrer with a referrer policy, and it cannot
+       suppress location.ancestorOrigins, so a player that tightened its
+       policy would otherwise go invisible to this rule while still being
+       plainly identifiable. Found 2026-08-27 while testing why a display
+       still saw the gate: the LOCAL trigger already had this backstop and
+       the remote one did not. */
+    if (kind === 'ref' && ((v.ref && v.ref.toLowerCase().includes(val.toLowerCase())) ||
+                           (v.anc && v.anc.toLowerCase().includes(val.toLowerCase())))) return p;
     if (kind === 'ua'  && v.ua  && v.ua.toLowerCase().includes(val.toLowerCase())) return p;
   }
   return '';
@@ -88,6 +96,7 @@ export async function recordHit(request, env, ctx, body) {
     asn: cf.asn || null,
     ua: request.headers.get('User-Agent') || '',
     ref: s(body.ref, 300) || '',
+    anc: s(body.ancestor, 120) || '',
   };
   const rules = await signageRules(env);
   const hit = matchSignage(rules, v);
