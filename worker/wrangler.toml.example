@@ -19,3 +19,7 @@ TTS_SOURCE = "aura2es"
 
 [ai]
 binding = "AI"
+# Hidden admin dashboard at /adm/<ADMIN_TOKEN>. 20+ url-safe chars:
+#   openssl rand -base64 36 | tr '+/' '-_' | tr -d '='
+# Secret-link protection only; treat the URL as the password.
+ADMIN_TOKEN = "change-me-openssl-rand-base64-36"

@@ -2304,6 +2304,117 @@ for (const k in CFG_SCHEMA) CFG[k] = CFG_SCHEMA[k][0];
    clamped to range) so a stale or hand-edited entry can never break the art. */
 const CFG_STORE = 'sklz.cfg.v1';
 const BUILD_ID = '__BUILD_ID__';       /* stamped by deploy.sh on every push */
+
+/* ── SIG: signals ──
+   Two jobs, and the second one is the reason this exists at all.
+
+   1. Tell the Worker a page loaded, and batch what the viewer then DOES with
+      it (keys, dials, downloads) so `/adm/<token>` can show which parts of the
+      piece people actually touch. Counts and names only: never the text of a
+      chat message, never the contents of a search field. The key recorder
+      refuses outright while focus is in an input, because "log every keypress"
+      and "log what someone typed" are one careless line apart.
+
+   2. Ask "am I a bulletin board?". A signage player cannot click through the
+      gate and cannot tell us what it is either, so the only party that can
+      recognise one is the Worker, which sees the real IP, the network, and
+      the referrer. It answers {demo:true} and the page boots into demo mode.
+      See `signage` in worker/schema.sql; rules are D1 rows, not code, so
+      adding a display never needs a deploy.
+
+   Nothing here is load-bearing for the art. Every call is wrapped, the queue
+   is capped, and a dead Worker costs one failed fetch and nothing else. */
+const SIG = (function () {
+  /* Every method the module exposes has to be here too. A stub missing one
+     is a ReferenceError on localhost and in any fork, in the one
+     environment nobody tests. */
+  const OFF = { hit(){}, ev(){}, evThrottled(){}, key(){}, onSignage(){} };
+  /* localhost and file:// are development, and a screenshot harness is not a
+     visitor. Only the real origins report. */
+  if (!/(^|\.)hermanosamini\.com$/i.test(location.hostname)) return OFF;
+
+  const API = 'https://sklz-presets.smashlabs.workers.dev';
+  const sid = (Math.random().toString(36).slice(2) + Date.now().toString(36)).slice(0, 20);
+  let q = [], sent = 0, waiting = [];
+  const CAP = 400;                       // per session, hard stop
+
+  function flush(final) {
+    if (!q.length) return;
+    const body = JSON.stringify({ sid, e: q.splice(0, 80) });
+    /* sendBeacon is the only thing that survives a page being closed, which is
+       exactly when the last and most interesting batch is sitting in the
+       queue. It refuses bodies over ~64KB; ours is capped well under that. */
+    try {
+      if (final && navigator.sendBeacon) {
+        navigator.sendBeacon(API + '/api/ev', new Blob([body], { type: 'application/json' }));
+        return;
+      }
+    } catch (_) {}
+    fetch(API + '/api/ev', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                             body, keepalive: true }).catch(() => {});
+  }
+
+  setInterval(() => flush(false), 20000);
+  addEventListener('pagehide', () => { ev('end', String(Math.round(performance.now() / 1000))); flush(true); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) flush(true); });
+
+  function ev(kind, name, val) {
+    if (sent >= CAP) return;
+    sent++;
+    q.push({ k: kind, n: name == null ? '' : String(name).slice(0, 48),
+             v: val == null ? '' : String(val).slice(0, 64) });
+    if (q.length >= 60) flush(false);
+  }
+
+  /* One dial can fire `input` sixty times in a drag. Collapse a run on the
+     same key so "someone played with hueShift" is one row, not sixty. */
+  const last = {};
+  function evThrottled(kind, name, val, ms) {
+    const k = kind + ':' + name, now = Date.now();
+    if (last[k] && now - last[k] < (ms || 1500)) return;
+    last[k] = now;
+    ev(kind, name, val);
+  }
+
+  return {
+    ev, evThrottled,
+    /* The load ping, and the signage question. */
+    hit(mode) {
+      let framed = false, ancestor = '';
+      try {
+        framed = window.top !== window.self;
+        /* ancestorOrigins is the honest answer to "who framed me" and, unlike
+           document.referrer, a parent page cannot suppress it with a referrer
+           policy. Safari-and-Chrome only; the referrer is the fallback. */
+        if (framed) ancestor = (location.ancestorOrigins && location.ancestorOrigins[0]) || '';
+      } catch (_) { framed = true; }
+      const body = {
+        sid, mode, path: location.pathname, ref: document.referrer || '',
+        vw: innerWidth, vh: innerHeight, dpr: devicePixelRatio || 1,
+        framed, ancestor, build: BUILD_ID,
+      };
+      fetch(API + '/api/hit', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(body) })
+        .then(r => r.json())
+        .then(d => { if (d && d.demo) waiting.splice(0).forEach(fn => { try { fn(d.why); } catch (_) {} }); })
+        .catch(() => {});                 // offline: the art still runs
+    },
+    /* Called by demoPath() to say "if the Worker decides I am a display, do
+       this". Registered rather than called directly so SIG can live at the top
+       of the file without reaching forward into setDemo()'s dead zone. */
+    onSignage(fn) { waiting.push(fn); },
+    /* NEVER record a key while focus is in a field. That single guard is the
+       difference between counting hotkeys and keylogging a chat message. */
+    key(e) {
+      const el = document.activeElement;
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const k = e.key;
+      if (!k || (k.length > 1 && !/^(Arrow|Enter|Escape|Tab|Backspace|Space)/.test(k))) return;
+      ev('key', k.length === 1 ? k.toLowerCase() : k);
+    },
+  };
+})();
 function cfgApply(obj) {
   let n = 0;
   for (const k in obj) {
@@ -2335,6 +2446,7 @@ function cfgApply(obj) {
    tripped correctly through D1, and repopulated the slider correctly. It just
    never moved the music. */
 function cfgAdopt(obj) {
+  SIG.ev('preset', 'adopt');
   const n = cfgApply(obj);
   /* A board that carries BOTH headwear flags predates the one-head-one-hat
      rule. Resolve it the way the drawing layer always rendered it (hat over
@@ -2417,6 +2529,7 @@ function cfgFromShareString(str) {
    URL, never rejects: if the Worker is slow or down, the long `?c=` form
    needs nothing but this page. */
 async function mintShareLink() {
+  SIG.ev('share', 'mint');
   const q = cfgShareString();
   const long = location.origin + '/' + (q ? '?c=' + q : '');
   if (!q) return long;                      // default board: nothing to shorten
@@ -6425,6 +6538,7 @@ function stopClip() { if (rec && rec.state === 'recording') rec.stop(); }
 function toggleClip() { rec ? stopClip() : startClip(); }
 
 function savePhoto() {
+  SIG.ev('photo', 'save');
   const c = document.createElement('canvas');
   c.width = W * DPR; c.height = H * DPR;
   const x = c.getContext('2d');
@@ -6744,6 +6858,7 @@ function duck(on) {
   if (sfxBus) sfxBus.gain.value = CFG.sfxVolume * voiceDuck;
 }
 function speak(text) {
+  SIG.ev('voice', 'speak');
   if (chatMuted) return;
   const useServer = ttsCfg.source !== 'browser';
   const seq = ++ttsSeq;
@@ -6917,6 +7032,7 @@ function applyActions(actions) {
 function syncSlidersSafe() { try { syncSliders(); } catch (_) {} }
 
 async function chatSend(text) {
+  SIG.ev('chat', 'send');              // the count only: never the words
   text = (text || '').trim();
   if (!text || chatBusy) return;
   chatBusy = true;
@@ -8146,6 +8262,7 @@ function fmtTime(s) {
    path and the click path can both fire on the same interaction. */
 function enterGate() {
   if (gate.classList.contains('gone')) return false;
+  SIG.ev('gate', 'enter');
   startMusic();
   /* Honour a shared start position, but only on the way IN. Doing it inside
      startMusic would re-seek on every autoplay retry and on the pointerdown
@@ -8252,6 +8369,7 @@ window.SKLZ = {
     mouse.str = Math.min(1.5, mouse.str + (s === undefined ? 0.5 : s));
   },
   effect(name) {
+    SIG.ev('fx', name);
     const m = { star: fxShootingStar, petals: fxPetalBurst, comet: fxComet,
       meteor: fxMeteorShower, nova: fxSupernova, aurora: fxAurora, ufo: fxUfo,
       alebrije: fxAlebrije, blackhole: fxBlackHole, grito: grito,
@@ -8549,6 +8667,7 @@ document.querySelectorAll('#soundMenu .smvrow input[data-key]').forEach(r => {
   r.addEventListener('input', () => {
     const k = r.dataset.key, v = +r.value;
     CFG[k] = v;
+    SIG.evThrottled('cfg', k, v);
     r.nextElementSibling.textContent = Math.round(v * 100) + '%';
     if (k === 'musicVolume') music.volume = musicVol();
     if (k === 'sfxVolume' && sfxBus) sfxBus.gain.value = v * voiceDuck;
@@ -8770,6 +8889,7 @@ function dismissSurfaces() {
 }
 function togglePanel(p) {
   const was = p.classList.contains('show');
+  if (!was) SIG.ev('panel', p.id);
   dismissSurfaces();
   if (!was) p.classList.add('show');
   /* The controls sheet opens READY TO TYPE, so cmd+/ then a word is the whole
@@ -9790,8 +9910,56 @@ function toggleDemo() { setDemo(!demoTimer); }
 (function demoPath() {
   const q = new URLSearchParams(location.search);
   const path = location.pathname.replace(/\/+$/, '');   // /demo/ and /demo alike
-  if (!q.has('demo') && !/\/demo$/i.test(path)) return;
   if (document.body.classList.contains('kiosk')) return;  // kiosk already owns the boot
+
+  /* ── the signage escape hatch ──
+     A digital-signage player has no pointer and no keyboard, so a gate is a
+     permanent black screen to it. Kitcast in particular kept being pointed at
+     "/" instead of "/demo" and nobody on that end could find the setting.
+     Rather than keep asking, recognise the player and do the right thing.
+
+     Two triggers, deliberately independent:
+
+       LOCAL, instant, no network. Every kitcast request in the origin log on
+       2026-08-27 carried Referer https://player.next.kitcast.tv/ while its
+       Cloudflare-facing address moved across eight edge PoPs, so the referrer
+       is the reliable signal and the IP is not. ancestorOrigins is checked
+       too: a parent CAN suppress the referrer with a policy header, and it
+       cannot suppress that.
+
+       REMOTE, one round trip. The Worker sees the real client IP, the ASN and
+       the network's own name, none of which the page can read. Its rules live
+       in D1 (`signage`), so adding a display is an INSERT, not a deploy.
+
+     Whoever gets there first wins; `started` makes the second one a no-op. */
+  const SIGNAGE_REF = /\b(kitcast\.tv|screencloud\.com|optisigns\.com|yodeck\.com|rise\.vision|xibo\.org\.uk)\b/i;
+  let started = false;
+  function goDemo(why) {
+    if (started || document.body.classList.contains('kiosk')) return;
+    started = true;
+    if (why) {
+      /* Recorded on the body so the load ping can report mode "signage"
+         rather than "demo", which is the difference between "a display is
+         configured right" and "a display was rescued". Also visible in
+         devtools, which is the cheapest possible way to answer "did the rule
+         fire?" while standing in front of the screen. */
+      document.body.dataset.signage = why;
+      /* Make the address bar agree with reality. If their player reloads the
+         frame it now asks for /demo directly, and anyone debugging on that
+         end sees the URL they were supposed to configure. */
+      try { history.replaceState(null, '', '/demo' + location.search); } catch (_) {}
+    }
+    enterGate();
+    setTimeout(() => { setDemo(true); demoFlash(); }, 0);
+  }
+
+  if (!q.has('demo') && !/\/demo$/i.test(path)) {
+    let anc = '';
+    try { anc = (window.top !== window.self && location.ancestorOrigins && location.ancestorOrigins[0]) || ''; } catch (_) {}
+    if (SIGNAGE_REF.test(document.referrer || '') || SIGNAGE_REF.test(anc)) goDemo('ref');
+    else SIG.onSignage(w => goDemo(w || 'rule'));
+    return;
+  }
 
   /* Through the gate. The music will very likely be REFUSED here: no browser
      starts audio without a gesture, and there has not been one. That is fine
@@ -9801,15 +9969,13 @@ function toggleDemo() { setDemo(!demoTimer); }
      display that nobody touches is silent and a display someone walks up to
      is not. Faking a gesture is not possible and pretending otherwise would
      just move the failure somewhere harder to see. */
-  enterGate();
+  /* Typed /demo or ?demo=1. Same boot, no signage marker: this display is
+     configured correctly and should be counted that way.
 
-  /* After the current frame, so CFG restore and syncSliders have run: rolling
-     the dials first and then having a restore overwrite them would show one
-     board and claim another. */
-  setTimeout(() => {
-    setDemo(true);
-    demoFlash();
-  }, 0);
+     The demo boot is deferred a frame inside goDemo() so CFG restore and
+     syncSliders have run first: rolling the dials and then having a restore
+     overwrite them would show one board and claim another. */
+  goDemo('');
 })();
 
 /* The on-screen tell, for a path with no gate press behind it.
@@ -9968,6 +10134,7 @@ let syncSliders = () => {};   // real one is assigned inside buildCfg below
     r.addEventListener('input', () => {
       CFG[k] = parseFloat(r.value);
       v.textContent = r.value;
+      SIG.evThrottled('cfg', k, r.value);
       if (k === 'musicVolume') music.volume = musicVol();
       if (k === 'musicSeek') { applySeek(CFG.musicSeek); seekReadout(); }
       if (k === 'perfMode') resize();
@@ -10071,6 +10238,7 @@ let syncSliders = () => {};   // real one is assigned inside buildCfg below
    KEYBOARD
    ───────────────────────────────────────────── */
 addEventListener('keydown', e => {
+  SIG.key(e);                          // counts hotkeys; refuses while focus is in a field
   /* cmd+/ (ctrl+/ off a Mac) is the one chord that reaches the controls sheet
      from ANYWHERE, including out of a text field, and lands the caret in the
      keyword box. It is checked before the typing guard below for that reason:
@@ -10645,6 +10813,10 @@ ideaSend.addEventListener('click', async () => {
     }
   }
   tabs.forEach(b => b.addEventListener('click', () => { os = b.dataset.os; paint(); }));
+  /* One listener on the anchor, reading the tab that is live at click time.
+     paint() rewrites the href on every tab switch, so anything bound per-paint
+     would either stack up or go stale. */
+  dl.addEventListener('click', () => SIG.ev('dl', os, dl.href.slice(-60)));
   paint();
 
   function resolveLatest() {
@@ -10755,6 +10927,26 @@ addEventListener('pointerdown', e => {
   };
   const retry = () => { setTimeout(connect, delay); delay = Math.min(60000, delay * 2); };
   connect();
+})();
+
+/* The load ping. Reports the mode the page resolved for ITSELF, so the
+   dashboard can tell a display that was configured correctly (demo) from one
+   that landed on a gate it can never click (gate) from one the signage rules
+   rescued (signage). Read from the URL rather than from body classes because
+   the demo boot is deferred a frame and has not run yet at this line.
+
+   Sits second-to-last, immediately above autoResume(), which stays LAST
+   (invariant 3): it touches bindings declared further down and moving it is a
+   temporal-dead-zone error that only fires on a live display's first
+   auto-update. */
+(function loadPing() {
+  const q = new URLSearchParams(location.search);
+  SIG.hit(
+    document.body.classList.contains('kiosk') ? 'kiosk'
+    : document.body.dataset.signage ? 'signage'
+    : (q.has('demo') || /\/demo\/?$/i.test(location.pathname)) ? 'demo'
+    : 'gate'
+  );
 })();
 
 autoResume();                        // last: every binding it touches is initialized by now

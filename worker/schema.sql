@@ -53,3 +53,62 @@ CREATE TABLE IF NOT EXISTS shorts (
   author_hash TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_shorts_hash ON shorts (hash);
+
+/* ── telemetry ──
+   One row per page LOAD in `hits`, one row per interaction in `events`.
+   Read only by the admin dashboard at /adm/<ADMIN_TOKEN>. Raw client IPs are
+   stored deliberately: the whole reason this exists is to recognise a signage
+   player that cannot tell us who it is, and a salted hash cannot answer
+   "which network is that". Retention is 60 days, swept on write. */
+CREATE TABLE IF NOT EXISTS hits (
+  id       INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts       INTEGER NOT NULL,
+  sid      TEXT NOT NULL,        -- random per page load, never persisted client-side
+  ip       TEXT,
+  asn      INTEGER,
+  org      TEXT,                 -- cf.asOrganization: the network's own name
+  country  TEXT,
+  city     TEXT,
+  colo     TEXT,
+  ua       TEXT,
+  path     TEXT,
+  ref      TEXT,                 -- document.referrer as the PAGE saw it
+  mode     TEXT,                 -- gate | demo | kiosk | signage
+  vw       INTEGER,
+  vh       INTEGER,
+  dpr      REAL,
+  framed   INTEGER NOT NULL DEFAULT 0,
+  ancestor TEXT,                 -- top-level origin when framed
+  build    TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_hits_ts ON hits (ts DESC);
+CREATE INDEX IF NOT EXISTS idx_hits_ip ON hits (ip, ts DESC);
+CREATE INDEX IF NOT EXISTS idx_hits_sid ON hits (sid);
+
+CREATE TABLE IF NOT EXISTS events (
+  id   INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts   INTEGER NOT NULL,
+  sid  TEXT NOT NULL,
+  kind TEXT NOT NULL,           -- key | cfg | dl | fx | panel | chat | share | photo | preset | voice | end
+  name TEXT,                    -- the key char, the CFG dial, 'macos'/'windows', the effect...
+  val  TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_ev_ts ON events (ts DESC);
+CREATE INDEX IF NOT EXISTS idx_ev_kind ON events (kind, name);
+CREATE INDEX IF NOT EXISTS idx_ev_sid ON events (sid);
+
+/* Rules that force a viewer into demo mode: a bulletin board cannot click
+   through a gate. `pat` is one of
+     ip:1.2.3.4        exact client IP
+     net:1.2.3.        IP prefix (plain string prefix match, so pick the dots)
+     asn:13335         whole network
+     ref:kitcast.tv    substring of the referrer the page reports
+     ua:BrightSign     substring of the user agent
+   Editable with one D1 INSERT, so adding a display never needs a page deploy. */
+CREATE TABLE IF NOT EXISTS signage (
+  pat      TEXT PRIMARY KEY,
+  note     TEXT,
+  added_at INTEGER NOT NULL,
+  hits     INTEGER NOT NULL DEFAULT 0,
+  last_at  INTEGER
+);

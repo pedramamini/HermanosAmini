@@ -11,6 +11,9 @@
  * cap, and a per-IP hourly write quota.
  */
 
+import { recordHit, recordEvents, adminData, signageWrite } from './telemetry.js';
+import { dashboardHTML } from './dashboard.js';
+
 const ALLOWED_ORIGINS = [
   'https://hermanosamini.com',
   'https://www.hermanosamini.com',
@@ -159,6 +162,17 @@ async function hashIp(ip, salt) {
   return [...new Uint8Array(buf)].slice(0, 10).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
+/* Constant-time-ish compare for the admin token. A length-leaking `===` on
+   the one secret guarding the dashboard is not good enough. */
+function tokenOk(given, want) {
+  if (!want || want.length < 20) return false;
+  const enc = new TextEncoder();
+  const a = enc.encode(given || ''), b = enc.encode(want);
+  let diff = a.length ^ b.length;
+  for (let i = 0; i < Math.max(a.length, b.length); i++) diff |= (a[i] || 0) ^ (b[i] || 0);
+  return diff === 0;
+}
+
 function cors(request) {
   const origin = request.headers.get('Origin') || '';
   const ok = ALLOWED_ORIGINS.includes(origin) || /^http:\/\/localhost(:\d+)?$/.test(origin);
@@ -190,6 +204,42 @@ export default {
     }
 
     try {
+      /* ── telemetry + the hidden admin dashboard ──
+         These go FIRST because /api/hit is on the page's critical path: it is
+         what tells a bulletin board it is a bulletin board, and every
+         millisecond of that answer is a millisecond the display sits on a
+         gate it can never click. */
+      if (request.method === 'POST' && path === '/api/hit') {
+        const body = await request.json().catch(() => ({}));
+        return json(await recordHit(request, env, ctx, body || {}), 200, request);
+      }
+      if (request.method === 'POST' && path === '/api/ev') {
+        const body = await request.json().catch(() => ({}));
+        return json(await recordEvents(request, env, ctx, body || {}), 200, request);
+      }
+
+      const adm = path.match(/^\/adm\/([A-Za-z0-9_-]{20,80})(\/data|\/signage)?$/);
+      if (adm) {
+        /* A wrong token and a missing token are the SAME answer. Anything that
+           distinguishes them turns an unguessable URL into a guessable one. */
+        if (!tokenOk(adm[1], env.ADMIN_TOKEN)) {
+          return new Response('Not Found', { status: 404, headers: { 'Content-Type': 'text/plain' } });
+        }
+        const secret = { 'Cache-Control': 'no-store, private', 'X-Robots-Tag': 'noindex, nofollow, noarchive' };
+        if (adm[2] === '/data') {
+          return new Response(JSON.stringify(await adminData(env, url)), {
+            headers: { 'Content-Type': 'application/json', ...secret } });
+        }
+        if (adm[2] === '/signage') {
+          if (request.method !== 'POST') return json({ error: 'POST only' }, 405, request);
+          const body = await request.json().catch(() => ({}));
+          return new Response(JSON.stringify(await signageWrite(env, body || {})), {
+            headers: { 'Content-Type': 'application/json', ...secret } });
+        }
+        return new Response(dashboardHTML(adm[1]), {
+          headers: { 'Content-Type': 'text/html; charset=utf-8', ...secret } });
+      }
+
       /* ── list ── */
       if (request.method === 'GET' && path === '/api/presets') {
         const sort = url.searchParams.get('sort') === 'new' ? 'new' : 'top';
