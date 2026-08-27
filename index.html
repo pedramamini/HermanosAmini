@@ -4656,9 +4656,8 @@ function stepSwarm(dt) {
       const spr2 = pool[k.v % pool.length];
       const px2 = spr2.width * k.scale * 0.5;
       const sm = k.sm || { rad: 1, tan: 1, bright: 1, alpha: 1 };
-      tctx.save();
-      clipHorizon(tctx, hole.x, hole.y);
       drawSuckStream(tctx, k.x, k.y, hole.x, hole.y, px2 * 0.30, k.eat);
+      tctx.save();
       tctx.translate(k.x, k.y);
       /* x-axis radial: the teardrop points along the infall line, and the
          off-centre translate biases the stretch TOWARD the hole (at -x) */
@@ -4880,22 +4879,6 @@ function stepSwallow(o, dt) {
   o.x = hole.x + Math.cos(o.ea) * r;
   o.y = hole.y + Math.sin(o.ea) * r;
   return o.eat >= 1;
-}
-
-function clipHorizon(ctx, hx, hy) {
-  /* THE HORIZON IS ONE-WAY (2026-08-26: "anything that passes the event
-     horizon will never come back out of it"). The swallow sprite is drawn
-     whole, translated and scaled, so without this a stretched flank could
-     be painted OVER the dark disc and slide back off it: matter visibly
-     exiting the horizon. This clip is the plane MINUS the horizon disc
-     (rect one winding, arc the other): pixels past the rim simply never
-     paint, so the body is eaten edge-first and nothing re-emerges. The
-     radius matches the shader's dark core (0.115, height-relative).
-     Callers must wrap in save/restore; coordinates are the CALLER's frame. */
-  ctx.beginPath();
-  ctx.rect(-W * 2, -H * 2, W * 5, H * 5);
-  ctx.arc(hx, hy, H * 0.115, 0, Math.PI * 2, true);
-  ctx.clip();
 }
 
 function drawSuckStream(ctx, x0, y0, x1, y1, w, e) {
@@ -5137,10 +5120,9 @@ function drawTunnel(dt) {
         stepSwallow(fall, dt);
         const sm = fall.sm || { rad: 1, tan: 1, bright: 1, alpha: 1 };
         const fw = VARIANTS_STATIC[i % VARIANTS.length].width * s;
-        tctx.save();
-        clipHorizon(tctx, hole.x - W / 2, hole.y - H / 2);
         drawSuckStream(tctx, fall.x - W / 2, fall.y - H / 2,
                        hole.x - W / 2, hole.y - H / 2, fw * 0.30, fall.eat);
+        tctx.save();
         tctx.translate(fall.x - W / 2, fall.y - H / 2);
         tctx.rotate(fall.ea);                       // teardrop along infall
         tctx.translate(-(sm.rad - 1) * fw * 0.22, 0);
@@ -6104,7 +6086,6 @@ function drawUfos() {
          stream flowing into the hole ahead of it. Bank is dropped; the
          infall line owns its orientation now. */
       const sm = u.sm || { rad: 1, tan: 1, bright: 1, alpha: 1 };
-      clipHorizon(dctx, hole.x - u.x, hole.y - u.y);
       drawSuckStream(dctx, 0, 0, hole.x - u.x, hole.y - u.y, 12, u.eat);
       dctx.rotate(u.ea);
       dctx.scale(sm.rad, sm.tan);
@@ -7251,11 +7232,6 @@ function drawDust(dt) {
     } else if (sp.kind === 'alebrije') {
       /* spirit dragon: a ribbon body following a true spine path, patterned
          skin, layered feather wings, horned head, streamer tail */
-      if (sp.eat !== undefined) {
-        /* being hauled in: same one-way horizon as every other victim, or
-           the spine drags visibly across the dark disc as segments follow */
-        dctx.save(); sp.hClip = true; clipHorizon(dctx, hole.x, hole.y);
-      }
       const env = Math.min(1, Math.min(sp.life / 1.5, (sp.max - sp.life) / 1.5));
       const dir = sp.vx > 0 ? 1 : -1;
       const hue0 = sp.hue * 360, hue1 = (hue0 + 55) % 360;    // analogous iridescence
@@ -7461,7 +7437,6 @@ function drawDust(dt) {
                         life: 0, max: 0.7 + Math.random() * 0.6, hue: Math.random() });
         }
       }
-      if (sp.hClip) { dctx.restore(); sp.hClip = false; }
     } else if (sp.kind === 'ember') {
       sp.vy += 90 * dt;
       const col = sp.hue < 0.4 ? '255,179,71' : sp.hue < 0.7 ? '255,120,80' : '255,230,150';
