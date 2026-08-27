@@ -132,7 +132,7 @@ export async function recordHit(request, env, ctx, body) {
 }
 
 const EV_KINDS = new Set(['key', 'cfg', 'dl', 'fx', 'panel', 'chat', 'share',
-                          'photo', 'preset', 'voice', 'gate', 'end']);
+                          'photo', 'preset', 'voice', 'gate', 'end', 'cap']);
 
 export async function recordEvents(request, env, ctx, body) {
   const list = Array.isArray(body.e) ? body.e.slice(0, 80) : [];

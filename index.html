@@ -10029,8 +10029,53 @@ function toggleDemo() { setDemo(!demoTimer); }
   if (!q.has('demo') && !/\/demo$/i.test(path)) {
     let anc = '';
     try { anc = (window.top !== window.self && location.ancestorOrigins && location.ancestorOrigins[0]) || ''; } catch (_) {}
-    if (SIGNAGE_REF.test(document.referrer || '') || SIGNAGE_REF.test(anc)) goDemo('ref');
-    else SIG.onSignage(w => goDemo(w || 'rule'));
+    if (SIGNAGE_REF.test(document.referrer || '') || SIGNAGE_REF.test(anc)) { goDemo('ref'); return; }
+    SIG.onSignage(w => goDemo(w || 'rule'));
+
+    /* ── THE CAPABILITY TRIGGER: no input device exists, so nobody can ever
+       open this gate ──
+       Added 2026-08-27 after the two identity triggers above failed to help a
+       real Apple TV. Both of them ask WHO the client is, and the answer only
+       arrives when the vendor cooperates: kitcast's referrer is present on
+       their SERVER-SIDE renderer and absent from the device, and the D1 rules
+       need an IP or a UA somebody has to look up first. This one asks a
+       question the client always answers honestly, about ITSELF:
+
+         (hover: none)              nothing can hover, so no mouse or trackpad
+         navigator.maxTouchPoints   0, so no finger either
+
+       Both true means there is NO pointing device of any kind attached. A
+       desktop has hover. A phone or tablet has touch points. A TV, a set-top
+       box, a projector and a headless renderer have neither, and for them the
+       gate is not a prompt, it is a permanent black screen.
+
+       Deliberately NOT keyboard-aware: the gate says "click or press any key"
+       and a TV remote can send a key, but a signage app never forwards one.
+       Capability, not identity, is the whole point; anything that has to be
+       taught about a vendor will be wrong about the next vendor.
+
+       The 6s wait plus the interaction bail is the safety net. If anything at
+       all moves, types or touches before it fires, a human is present and the
+       gate is theirs. On a display 6 seconds of gate costs nothing; on the one
+       misdetected desktop in a thousand it costs the viewer nothing either,
+       because they have already cancelled it by then. */
+    let touched = false;
+    const cancel = () => { touched = true; };
+    for (const ev of ['pointermove', 'pointerdown', 'keydown', 'touchstart', 'wheel']) {
+      addEventListener(ev, cancel, { once: true, passive: true });
+    }
+    setTimeout(() => {
+      if (touched || started) return;
+      const noHover = matchMedia('(hover: none)').matches;
+      const noTouch = (navigator.maxTouchPoints || 0) === 0;
+      /* Recorded either way. A client that sat 6s untouched and was NOT
+         flipped is the interesting row: it says the capability probe saw a
+         pointer where a display should have none, which is the only way this
+         trigger can fail silently on hardware I cannot hold. */
+      SIG.ev('cap', noHover && noTouch ? 'flip' : 'keep',
+             'hover=' + (noHover ? 0 : 1) + ' touch=' + (navigator.maxTouchPoints || 0));
+      if (noHover && noTouch) goDemo('nopointer');
+    }, 6000);
     return;
   }
 
