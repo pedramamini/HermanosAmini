@@ -16,6 +16,10 @@ workers_dev = true
 # cloud) DNS record for the hostname.
 # routes = [
 #   { pattern = "example.com/adm/*", zone_name = "example.com" },
+#   # A signage domain whose ROOT is the demo, for players that accept a bare
+#   # domain and nothing else. custom_domain lets Cloudflare provision and own
+#   # the DNS record, so this needs workers_routes:write and NOT dns_records.
+#   { pattern = "demo.example.com", custom_domain = true },
 # ]
 
 [[d1_databases]]

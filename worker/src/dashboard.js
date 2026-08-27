@@ -217,6 +217,7 @@ export function dashboardHTML(token) {
   .tag.demo{background:rgba(47,232,208,.16); color:var(--teal); box-shadow:inset 0 0 0 1px rgba(47,232,208,.38)}
   .tag.signage{background:rgba(255,179,71,.18); color:var(--gold); box-shadow:inset 0 0 0 1px rgba(255,179,71,.42)}
   .tag.kiosk{background:rgba(255,47,160,.16); color:#ff8ac8; box-shadow:inset 0 0 0 1px rgba(255,47,160,.38)}
+  .tag.subdomain{background:rgba(47,232,208,.26); color:#eafffb; box-shadow:inset 0 0 0 1px var(--teal)}
   .keycap{display:inline-block; min-width:24px; text-align:center; padding:1px 6px;
     border:1px solid var(--line); border-bottom-width:3px; border-radius:5px;
     background:linear-gradient(180deg,#2a2038,#1d1729); color:var(--bone)}
@@ -263,7 +264,7 @@ function barTable(rows, label, cls) {
 function render(d) {
   const t = d.totals;
   const dayMax = Math.max(1, ...d.byDay.map(x => x.n));
-  const modeTag = m => '<span class="tag ' + (['gate','demo','signage','kiosk'].includes(m)?m:'gate') + '">' + esc(m||'?') + '</span>';
+  const modeTag = m => '<span class="tag ' + (['gate','demo','signage','kiosk','subdomain'].includes(m)?m:'gate') + '">' + esc(m||'?') + '</span>';
   const cap = d.capRows || [];
 
   document.getElementById('app').innerHTML = [
@@ -279,8 +280,9 @@ function render(d) {
     '<section><h2>how they arrive</h2>' +
       barTable(d.byMode, r => modeTag(r.mode)) +
       '<p class="muted" style="font-size:11.5px;margin:10px 0 0">' +
+      '<b>subdomain</b> came in on demo.hermanosamini.com, which can only ever be the demo &middot; ' +
       '<b>gate</b> landed on / and must click through &middot; <b>demo</b> typed /demo &middot; ' +
-      '<b>signage</b> matched a force-demo rule &middot; <b>kiosk</b> the screensaver</p></section>',
+      '<b>signage</b> a heuristic rescued it &middot; <b>kiosk</b> the screensaver</p></section>',
 
     /* ── the capability probe ──
        This is the panel that answers "did the Apple TV get rescued", and it is

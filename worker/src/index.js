@@ -13,10 +13,19 @@
 
 import { recordHit, recordEvents, adminData, signageWrite } from './telemetry.js';
 import { dashboardHTML } from './dashboard.js';
+import { serveSignage } from './signage.js';
 
 const ALLOWED_ORIGINS = [
   'https://hermanosamini.com',
   'https://www.hermanosamini.com',
+  /* The signage domain. Every API call the page makes is cross-origin from
+     here, so leaving it off this list silently killed ALL telemetry from the
+     one client type this whole feature exists for: the art rendered perfectly
+     in demo mode and the dashboard showed nothing, which reads exactly like a
+     display that never loaded. Found 2026-08-27 by noticing a load with no
+     row, not by any error, because a blocked preflight is invisible to the
+     page. Any NEW hostname this art is served from must be added here. */
+  'https://demo.hermanosamini.com',
   'https://pedramamini.com',
 ];
 
@@ -204,6 +213,15 @@ export default {
     }
 
     try {
+      /* ── the signage domain ──
+         demo.hermanosamini.com serves the art in demo mode and nothing else.
+         Checked FIRST because it owns every path on that hostname; it returns
+         null for /api and /adm so those still reach the handlers below. */
+      if (url.hostname === 'demo.hermanosamini.com') {
+        const r = await serveSignage(request, url);
+        if (r) return r;
+      }
+
       /* ── telemetry + the hidden admin dashboard ──
          These go FIRST because /api/hit is on the page's critical path: it is
          what tells a bulletin board it is a bulletin board, and every

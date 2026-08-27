@@ -10033,6 +10033,17 @@ function toggleDemo() { setDemo(!demoTimer); }
     setTimeout(() => { setDemo(true); demoFlash(); }, 0);
   }
 
+  /* THE SIGNAGE DOMAIN. demo.hermanosamini.com serves this page through the
+     Worker with `window.SKLZ_DEMO_HOST` injected into <head>, so the whole
+     hostname IS the demo and there is no heuristic left to get wrong. It
+     exists because a signage player accepts a bare domain and nothing else:
+     Kitcast's Apple TV could not be pointed at /demo by anybody, and on tvOS
+     it renders the page somewhere we never see, which is why the referrer and
+     capability triggers could both be correct and still never fire.
+     Checked BEFORE the identity triggers because it is certain and they are
+     guesses. No history.replaceState here: the URL is already right. */
+  if (window.SKLZ_DEMO_HOST) { goDemo(''); return; }
+
   if (!q.has('demo') && !/\/demo$/i.test(path)) {
     let anc = '';
     try { anc = (window.top !== window.self && location.ancestorOrigins && location.ancestorOrigins[0]) || ''; } catch (_) {}
@@ -11068,6 +11079,12 @@ addEventListener('pointerdown', e => {
   const q = new URLSearchParams(location.search);
   SIG.hit(
     document.body.classList.contains('kiosk') ? 'kiosk'
+    /* The signage domain gets its OWN mode rather than folding into `signage`.
+       They answer different questions: `subdomain` means a display is pointed
+       at demo.hermanosamini.com and is structurally correct, `signage` means a
+       heuristic had to rescue one that was not. Collapsing them would hide
+       exactly the fact this whole exercise was about. */
+    : window.SKLZ_DEMO_HOST ? 'subdomain'
     : document.body.dataset.signage ? 'signage'
     : (q.has('demo') || /\/demo\/?$/i.test(location.pathname)) ? 'demo'
     : 'gate'
