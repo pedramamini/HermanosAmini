@@ -3,6 +3,21 @@ main = "src/index.js"
 compatibility_date = "2026-08-01"
 workers_dev = true
 
+# Optional: serve the admin dashboard from your own domain instead of the
+# workers.dev URL. Only this prefix is routed to the Worker, so every other
+# path on the zone still goes to your normal origin.
+#
+# Use TWO path segments. A bare /<code> is a bad idea for this project: the
+# shipped .htaccess rewrites any 4-12 character base62 path to index.html as a
+# share link, so a short admin code would be indistinguishable from a shared
+# board and would burn a code out of that namespace.
+#
+# Needs a Cloudflare token with workers_routes:write and a PROXIED (orange
+# cloud) DNS record for the hostname.
+# routes = [
+#   { pattern = "example.com/adm/*", zone_name = "example.com" },
+# ]
+
 [[d1_databases]]
 binding = "sklz_presets"
 database_name = "sklz-presets"
