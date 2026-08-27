@@ -5684,7 +5684,9 @@ function fxSupernova() {
 function fxAurora() {
   if (!canSpawn('aurora')) return;
   sparks.push({
-    kind: 'aurora', behind: pickDepth(),
+    /* always behind: an aurora is sky, and a full-width ribbon crossing the
+       face reads as a smear on the artwork rather than weather behind it */
+    kind: 'aurora', behind: true,
     x: 0, y: H * (0.04 + Math.random() * 0.55),
     vx: 0, vy: 0, life: 0, max: 12, hue: Math.random(), ph: Math.random() * 7
   });
