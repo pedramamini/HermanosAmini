@@ -9079,7 +9079,21 @@ function dismissSurfaces() {
   if (typeof chatOpen !== 'undefined' && chatOpen) chatDock.classList.add('min');
   for (const f of lateClosers) f();
 }
-function togglePanel(p) {
+/* `ev` is the keydown that asked for this panel, when there was one. It is
+   optional and every mouse caller omits it.
+
+   THE RULE: a keydown that moves focus into a text field MUST preventDefault,
+   or the browser inserts that key's character into the field it just focused.
+   The default action runs AFTER the handlers and targets whatever is focused
+   at that moment, not what was focused when the key went down. Measured
+   2026-08-28 with real CDP key events: pressing `?` opened the panel and left
+   "?" sitting in the search box; `h` left "h". `cmd+/` was clean the whole
+   time, because that branch already called preventDefault for its own reasons.
+
+   The suppression lives HERE rather than at the call site because the FOCUS
+   lives here. A future key that opens this panel gets it for free; a fix in
+   the `h`/`?` branch alone would have regressed the moment anyone added one. */
+function togglePanel(p, ev) {
   const was = p.classList.contains('show');
   if (!was) SIG.ev('panel', p.id);
   dismissSurfaces();
@@ -9094,7 +9108,10 @@ function togglePanel(p) {
        backgrounded tab, and a screensaver host is not the only place that
        bites: the focus simply never happened. The class flip above is enough
        for the field to be focusable by the time this line runs. */
-    if (s) { s.focus(); s.select(); }
+    if (s) {
+      if (ev && ev.preventDefault) ev.preventDefault();
+      s.focus(); s.select();
+    }
   }
   /* phones hide the floating controls behind an open sheet */
   document.body.classList.toggle('sheet-open', !!document.querySelector('.panel.show'));
@@ -10751,7 +10768,10 @@ addEventListener('keydown', e => {
       cfgStatusSay(CFG.flowerCrown ? (took ? 'crown on, sombrero off' : 'crown on') : 'crown off');
     } else togglePanel(cfgPanel);
   }
-  else if (k === 'h' || k === '?') togglePanel(helpPanel);
+  /* `e` is passed so togglePanel can suppress this key's own text insertion:
+     it focuses the search field, and without it the "?" or "h" you pressed
+     lands in the box you were about to type a query into. */
+  else if (k === 'h' || k === '?') togglePanel(helpPanel, e);
 });
 
 applyToggles({ skipVoice: true });   // restored toggles take effect (voice needs a gesture)
