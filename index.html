@@ -5217,6 +5217,13 @@ addEventListener('pointerdown', e => {
   if (!gateGone) return;
   if (e.target.closest && e.target.closest('.panel, .ctl')) return;  // UI clicks stay UI clicks
   face.gazeX = e.clientX; face.gazeY = e.clientY; face.gazeUntil = t + 2.2;  // eyes snap to the click
+  /* And the mean mug BREAKS. The pupil override above is enough to make the
+     eyes dart, but the angry brows would stay slammed down over them, which
+     reads as the skull glaring at you while its eyes wander: worse than
+     either state alone. Ending the stare lets `stare.k` ease back out through
+     its normal envelope, so the brows lift over ~0.4s rather than popping.
+     Never touches `stare.next`, so the next scheduled one is unaffected. */
+  if (t < stare.until) stare.until = t;
   /* Crown first. It overlaps the top of the cranium, so testing the face
      before it would let the third eye swallow clicks aimed at a bloom. */
   if (crownPluck(e.clientX, e.clientY)) return;
@@ -5489,9 +5496,18 @@ function drawHero(dt) {
   const gk = Math.min(1, dt * (t < face.gazeUntil ? 16 : 4));
   face.curX += (tgtX - face.curX) * gk;
   face.curY += (tgtY - face.curY) * gk;
-  /* staring: pupils snap dead center, straight at the viewer */
-  face.curX *= (1 - stare.k);
-  face.curY *= (1 - stare.k);
+  /* Staring: pupils snap dead centre, straight at the viewer.
+     UNLESS A HAND IS AIMING THEM. `face.gazeUntil` is only in the future
+     because someone clicked (or a sensor rig is driving the gaze), and this
+     multiply is what made a click during a stare do nothing: measured
+     2026-08-28, a click at 92% screen width moved curX from -227 to 588 in
+     12 frames normally, and to 4.9 during a stare. The eyes simply refused.
+     Same rule as the cut flower: a thing the viewer just did with their own
+     hand has to be visible, and no ambient behaviour may overrule it. */
+  const handOnTheEyes = t < face.gazeUntil;
+  const lock = handOnTheEyes ? 0 : stare.k;
+  face.curX *= (1 - lock);
+  face.curY *= (1 - lock);
 
   /* the hero chatters on his own, often */
   if (gateGone && t > face.nextChatter) {
@@ -7360,9 +7376,24 @@ const EVENTS = [
   [0.6, fxGrito],
   [0.5, fxAlebrije],
   [0.4, fxBlackHole],
-  /* these three were missing from the table entirely: reachable from a key or
-     the chat, but the random engine could never produce them */
-  [0.9, () => { stare.until = t + 3.2; }],     // the mean mug
+  /* THE STARE IS NOT IN THIS TABLE, and that is deliberate (2026-08-28).
+     It was added here with weight 0.9 alongside spawnSkull and fxAlebrije,
+     under a comment saying all three "were missing from the table entirely".
+     That was right about the other two and wrong about this one: the stare is
+     the ONLY effect in the catalogue that already has its own scheduler, the
+     fourth-wall timer in drawHero on a designed 5-10 minute cadence. Adding it
+     here gave one behaviour TWO independent sources, and independent rates add.
+
+     Measured: the table is 25.6 total weight, so 0.9 is a 3.5% share. At the
+     default 7-20s event gap that is a random stare every 6.6 min ON TOP of the
+     scheduler's 7.5, for a combined 3.5 min: 2.1x too often. In DEMO mode it
+     is far worse, because demoRandomize rolls eventMinGap/eventMaxGap
+     unclamped over their full 1-30 / 2-60 range, and a 1-2s roll puts the
+     stare at every 42 SECONDS, 11x the design.
+
+     The rule: an effect with its own scheduler must never also be in the
+     random table. Adding one here is adding a second rate, not a second
+     chance. spawnSkull and fxAlebrije have no scheduler and belong. */
   [0.8, () => spawnSkull(6)],                  // a small skull flood
   [1.0, fxAlebrije],                           // twice: it is the best one
 ];
@@ -9950,7 +9981,21 @@ const DEMO_KEEP = new Set([
 
 /* A couple of dials can take the picture to nearly black, which on a wall
    reads as "it broke" rather than "it changed". Keep them watchable. */
-const DEMO_CLAMP = { bgBright: [0.7, 2], vignette: [0, 0.9], skullSize: [0.6, 1.5] };
+/* Bounds the dice applies ON TOP of the schema's own, for dials whose extremes
+   are legitimate as a deliberate choice but wrong as a random roll on a wall
+   display nobody is standing at.
+
+   eventMinGap/eventMaxGap were the omission that made the mean face feel
+   constant (2026-08-28). The schema allows 1-30s and 2-60s, so demoRandomize
+   could roll a 1-2 SECOND event gap and then fire the whole effect catalogue
+   at ~40 events a minute. Even after the stare left the random table that is
+   not "lively", it is a strobe, and it was multiplying the frequency of every
+   other effect too. 6-14s and 15-40s keeps the board changing without the
+   engine ever becoming the subject. */
+const DEMO_CLAMP = {
+  bgBright: [0.7, 2], vignette: [0, 0.9], skullSize: [0.6, 1.5],
+  eventMinGap: [6, 14], eventMaxGap: [15, 40],
+};
 
 function demoRandomize() {
   const wear = Math.random();                     // one draw: none / crown / hat
