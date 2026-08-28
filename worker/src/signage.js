@@ -17,10 +17,30 @@
  */
 const ORIGIN = 'https://hermanosamini.com';
 
-/* Injected into <head>, so it runs before the page's own <script> in <body>.
-   demoPath() reads it. A global rather than a query string because the browser
-   never sees the URL we fetched, only the one in its address bar. */
-const FLAG = '<script>window.SKLZ_DEMO_HOST=1;</script>';
+/* Injected into <head>, so it lands before the page's own <script> in <body>.
+   demoPath() reads the global.
+
+   THE <style> IS THE HALF THAT MATTERS, and it is CSS rather than JS on
+   purpose. `#gate` is markup: it paints the instant the parser reaches it,
+   which on this page is 266 KB of script BEFORE `demoPath()` can run and clear
+   it, and `enterGate()` then only adds `.gone`, which carries an
+   `opacity 1.8s` transition. So a display showed the framed "enter the other
+   side" blurb for the whole script-parse plus a near-two-second fade, every
+   single boot. Measured 2026-08-28; Pedram: "it still shows the framed art
+   piece, I don't want that, drop straight into demo."
+
+   A rule in <head> cannot lose that race, because there is no race: the gate
+   is never laid out at all. `display:none` rather than `.gone`'s opacity fade
+   for the same reason, and it matches how kiosk mode has always done it
+   (`body.kiosk #gate { display: none !important }`).
+
+   The class goes on <html>, not <body>: <body> does not exist yet at the
+   moment this <style> is parsed, and a rule keyed to a class the Worker also
+   writes here is self-contained. index.html carries the matching selector so
+   the behaviour is visible to anyone reading the page on its own. */
+const FLAG =
+  '<script>window.SKLZ_DEMO_HOST=1;document.documentElement.className+=" demohost";</script>' +
+  '<style>html.demohost #gate{display:none!important}</style>';
 
 export async function serveSignage(request, url) {
   /* The Worker's own API lives on this hostname too (the page posts to

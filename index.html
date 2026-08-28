@@ -414,6 +414,15 @@
      refused, and a screensaver has no one to click it. CSS wins over any class
      any code path adds or removes later. */
   body.kiosk #gate { display: none !important; }
+  /* THE SIGNAGE HOST NEVER PAINTS THE GATE. demo.hermanosamini.com is served
+     through the Worker, which injects `html.demohost` plus a copy of this rule
+     into <head> (worker/src/signage.js). Both exist: the injected one is what
+     actually wins the race, because <head> is parsed before #gate's markup;
+     this one is here so the behaviour is visible to anyone reading index.html
+     on its own, and so a local `?demo=1` test can set the class by hand.
+     display, not opacity: `.gone` fades over 1.8s and a display should not
+     show the blurb for two seconds on every boot. */
+  html.demohost #gate { display: none !important; }
   /* Zen by removal, not by fade. The .notext rule animates opacity over 600ms,
      which on a screensaver means the wordmark and credits visibly fade away
      every time it starts. Take them out of the layout so they never appear. */
@@ -10158,7 +10167,14 @@ function toggleDemo() { setDemo(!demoTimer); }
      capability triggers could both be correct and still never fire.
      Checked BEFORE the identity triggers because it is certain and they are
      guesses. No history.replaceState here: the URL is already right. */
-  if (window.SKLZ_DEMO_HOST) { goDemo(''); return; }
+  if (window.SKLZ_DEMO_HOST) {
+    /* Belt and braces with the Worker's injected <style>. If a fork serves
+       this page with the flag but no CSS, the class still lands here, one
+       statement before goDemo, so the gate is hidden rather than faded. */
+    document.documentElement.classList.add('demohost');
+    goDemo('');
+    return;
+  }
 
   if (!q.has('demo') && !/\/demo$/i.test(path)) {
     let anc = '';
