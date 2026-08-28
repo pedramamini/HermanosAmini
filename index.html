@@ -534,6 +534,43 @@
      keeps the wrapper out of the way here: label/control/value still land in
      the 3-column grid above. */
   #cfgSliders .dial { display: contents; }
+  /* ── an enumerated dial's dropdown ──
+     `min-width: 0` is LOAD-BEARING and this project has already paid for it
+     once: a <select> refuses to shrink below its longest option label, so
+     without this the widest choice ("from the palette", "salt and pepper")
+     pushes the value column off the right edge of the panel. Same family as
+     the <input> whose intrinsic width is its `size` attribute. `width: 100%`
+     makes it fill the middle grid column exactly like the slider it replaced,
+     so the three columns stay aligned down the whole list.
+
+     `appearance: none` plus a drawn chevron, because the native control paints
+     a light-mode widget that is the one bright rectangle on a dark panel. */
+  #cfgPanel .dial > select {
+    width: 100%; min-width: 0; max-width: 100%;
+    appearance: none; -webkit-appearance: none;
+    font: inherit; font-size: 12px; color: var(--bone, #f5eadf);
+    background: linear-gradient(180deg, rgba(60,48,86,.92), rgba(40,32,60,.92));
+    border: 1px solid rgba(245,234,223,.22); border-radius: 7px;
+    padding: 4px 22px 4px 8px; cursor: pointer; line-height: 1.3;
+    background-image:
+      linear-gradient(45deg, transparent 50%, rgba(245,234,223,.75) 50%),
+      linear-gradient(135deg, rgba(245,234,223,.75) 50%, transparent 50%),
+      linear-gradient(180deg, rgba(60,48,86,.92), rgba(40,32,60,.92));
+    background-position: right 9px center, right 4px center, 0 0;
+    background-size: 5px 5px, 5px 5px, 100% 100%;
+    background-repeat: no-repeat;
+  }
+  #cfgPanel .dial > select:hover { border-color: rgba(255,179,71,.7); }
+  #cfgPanel .dial > select:focus { outline: none; border-color: #ffb347; }
+  /* The POPUP list is drawn by the OS and inherits none of the above, so the
+     options need their own colours or they render as dark-on-dark. */
+  #cfgPanel .dial > select option { background: #241d33; color: #f5eadf; }
+  /* Present for the grid and for syncSliders, invisible to the reader: the
+     dropdown already says "crosshair", so a "8" beside it is the same fact
+     twice. Visibility, not display:none, so the column keeps its width and
+     the three columns stay aligned with the slider rows above and below. */
+  #cfgPanel .dial > .val.enumval { visibility: hidden; }
+
   /* the dials are the biggest block in the panel; keep them folded away so
      load / save / reset stay visible without scrolling */
   #cfgSliders.collapsed { display: none; }
@@ -1061,9 +1098,12 @@
     }
     #cfgSliders .dial > .val { grid-column: 2; grid-row: 1; font-size: 13px; }
     #cfgSliders .dial > span:not(.val) { display: none; }   /* grid spacer */
-    #cfgPanel .dial > input[type=range] {
+    #cfgPanel .dial > input[type=range],
+    #cfgPanel .dial > select {
       grid-column: 1 / -1; grid-row: 2; height: 5px;
     }
+    /* a select needs real height and padding back: the 5px above is a track */
+    #cfgPanel .dial > select { height: auto; padding: 9px 26px 9px 10px; font-size: 14px; }
     #cfgPanel .dial > input[type=range]::-webkit-slider-thumb {
       width: 28px; height: 28px;
     }
@@ -2182,7 +2222,7 @@ const CFG_SCHEMA = {
   wanderPace:     [1.0,   0.3,   3,    0.1,   'eye wander pace'],
   tempoRef:       [96,    60,    140,  1,     'tempo ref BPM'],
   dayCycleMin:    [10,    2,     30,   1,     'day/night cycle (min)'],
-  perfMode:       [0,     0,     2,    1,     'perf: 0 auto 1 full 2 lite'],
+  perfMode:       [0,     0,     2,    1,     'performance', 'enum', ['auto', 'full', 'lite']],
   tempoMax:       [1.8,   1,     3,    0.02,  'tempo speed cap'],
   eventMinGap:    [7,     1,     30,   1,     'event gap min (s)'],
   eventMaxGap:    [20,    2,     60,   1,     'event gap max (s)'],
@@ -2196,8 +2236,10 @@ const CFG_SCHEMA = {
   voiceVolume:    [1.0,   0,     1,    0.05,  'his voice volume'],
   sfxVolume:      [0.55,  0,     1,    0.05,  'gesture sfx volume'],
   /* ── color ── */
-  palette:        [0,     0,     7,    1,     'palette (0-7)'],
-  bgMode:         [0,     0,     4,    1,     'background (0 smoke 1 galaxy 2 aurora 3 candle 4 void)'],
+  palette:        [0,     0,     7,    1,     'palette', 'enum',
+    ['muertos', 'ember', 'ice', 'acid', 'noir', 'candy', 'jade', 'blood']],
+  bgMode:         [0,     0,     4,    1,     'background', 'enum',
+    ['smoke', 'galaxy', 'aurora', 'candlelight', 'the void']],
   hueShift:       [0,   -180,  180,    5,     'ornament hue shift'],
   satMul:         [1.0,   0,     2,    0.05,  'ornament saturation'],
   boneHue:        [0,   -180,  180,    5,     'bone hue'],
@@ -2212,9 +2254,11 @@ const CFG_SCHEMA = {
   auraSize:       [1.0,   0,     2.5,  0.1,   'skull aura'],
   petalCount:     [12,    4,     20,   1,     'eye petals'],
   crownBlooms:    [5,     3,     12,   1,     'crown flowers'],
-  crownMetal:     [0,     0,     5,    1,     'crown metal: gold..palette'],
-  bigoteStyle:    [0,     0,     2,    1,     'mustache: 0 charro 1 handlebar 2 herradura'],
-  bigoteColor:    [0,     0,     5,    1,     'mustache colour: black..palette'],
+  crownMetal:     [0,     0,     5,    1,     'crown metal', 'enum',
+    ['gold', 'silver', 'copper', 'rose gold', 'obsidian', 'from the palette']],
+  bigoteStyle:    [0,     0,     2,    1,     'mustache', 'enum', ['charro', 'handlebar', 'herradura']],
+  bigoteColor:    [0,     0,     5,    1,     'mustache colour', 'enum',
+    ['black', 'dark brown', 'chestnut', 'salt and pepper', 'silver', 'from the palette']],
   crownPeaks:     [4,     3,     7,    1,     'crown points'],
   /* ── the pointer ──
      Nine cursors, indexed like every other named dial here (see bigoteStyle).
@@ -2226,7 +2270,8 @@ const CFG_SCHEMA = {
      string carries only non-default values. Checked before flipping: of the
      stored shorts, only one pinned cursorStyle and it pinned 4 explicitly, so
      it is unaffected; no gallery preset pins it. */
-  cursorStyle:    [8,     0,     8,    1,     'cursor: 0 candle 1 system 2 big 3 skull 4 knife 5 sword 6 marigold 7 bone 8 crosshair'],
+  cursorStyle:    [8,     0,     8,    1,     'cursor', 'enum',
+    ['candle', 'system', 'big arrow', 'skull', 'knife', 'sword', 'marigold', 'bone', 'crosshair']],
 };
 /* ── categories ──
    Every dial belongs to exactly one, for the filter dropdown. Kept as a
@@ -2298,6 +2343,17 @@ const CFG_TOGGLES = {
 Object.assign(CFG_SCHEMA, CFG_TOGGLES);
 const CFG = {};
 for (const k in CFG_SCHEMA) CFG[k] = CFG_SCHEMA[k][0];
+
+/* The name of an enumerated dial's CURRENT value: choiceName('bgMode') ->
+   'aurora'. ONE reader, because the alternative is what was here before: the
+   background names were hard-coded in demoTick AND in fxRestyle AND implied by
+   the dial's own label, three copies to keep in lockstep. Same drift class as
+   CFG_SCHEMA/LIMITS, just cheaper to notice. */
+function choiceName(k, v) {
+  const c = CFG_SCHEMA[k] && CFG_SCHEMA[k][6];
+  const i = Math.round(v === undefined ? CFG[k] : v);
+  return (c && c[i]) || String(i);
+}
 
 /* ── persistence: settings survive a refresh ──
    Saved values are validated against the schema (right key, finite number,
@@ -7904,8 +7960,13 @@ function drawDust(dt) {
    Hotspots are per shape: a pointer points with its tip, a crosshair with its
    centre. Getting that wrong is invisible in a screenshot and infuriating in
    use, which is why each entry states it rather than assuming 0,0. */
-const CURSOR_NAMES = ['candle', 'system', 'big arrow', 'skull', 'knife',
-                      'sword', 'marigold', 'bone', 'crosshair'];
+/* DERIVED from the schema, never a second list. This used to be its own array
+   and the two drifted the moment cursorStyle got a `choices` list: index 2 was
+   "big arrow" here and "big" there, so the shift-Y status line and the gear
+   panel disagreed about the same cursor. The schema is the source of truth for
+   every tunable (invariant 1) and that has to include its value NAMES.
+   `.length` is still read by the shift-Y cycle, so this must stay an array. */
+const CURSOR_NAMES = CFG_SCHEMA.cursorStyle[6];
 /* One SVG per style, as a factory taking the two ink colours so a future
    palette-aware cursor is a one-line change. Sized 40x40 (48 for the big
    arrow): browsers refuse cursor images past 128px and quietly fall back to
@@ -9928,8 +9989,7 @@ function demoTick() {
   demoRandomize();
   CFG.textOn = 0;                             // demo is always zen: no words
   applyToggles({ skipVoice: true });
-  const BG = ['smoke', 'galaxy', 'aurora', 'candlelight', 'the void'];
-  cfgStatusSay(`demo: palette ${CFG.palette}, ${BG[CFG.bgMode] || 'smoke'} background`);
+  cfgStatusSay(`demo: ${choiceName('palette')} palette, ${choiceName('bgMode')} background`);
 }
 function setDemo(on) {
   clearInterval(demoTimer);
@@ -10143,11 +10203,10 @@ document.getElementById('cfgRestyle').addEventListener('click', () => {
   fxRestyle();
   /* name what it landed on, so rolling again toward a look you like is a
      choice rather than a blind pull */
-  const BG = ['smoke', 'galaxy', 'aurora', 'candlelight', 'the void'];
   /* the cursor is named too: it is the one rolled dial that changes something
      you are holding, so a silent swap reads as a glitch rather than a roll */
-  cfgStatusSay(`new look: palette ${CFG.palette}, ${BG[CFG.bgMode] || 'smoke'} background, ` +
-               `${CURSOR_NAMES[Math.round(CFG.cursorStyle)]} cursor`);
+  cfgStatusSay(`new look: ${choiceName('palette')} palette, ${choiceName('bgMode')} background, ` +
+               `${choiceName('cursorStyle')} cursor`);
 });
 
 /* ── dial filter ──
@@ -10245,7 +10304,7 @@ let syncSliders = () => {};   // real one is assigned inside buildCfg below
 (function buildCfg() {
   const holder = document.getElementById('cfgSliders');
   for (const k in CFG_SCHEMA) {
-    const [def, min, max, step, label, kind] = CFG_SCHEMA[k];
+    const [def, min, max, step, label, kind, choices] = CFG_SCHEMA[k];
     const lab = document.createElement('label');
     lab.textContent = label;
     /* Each dial is wrapped in a .dial row. On desktop that wrapper is
@@ -10274,6 +10333,48 @@ let syncSliders = () => {};   // real one is assigned inside buildCfg below
       row.appendChild(lab); row.appendChild(sw); row.appendChild(spacer);
       continue;
     }
+    /* ── an enumerated dial is a DROPDOWN, not a slider ──
+       Seven dials here are a list of named things, not a magnitude: cursor,
+       palette, background, crown metal, mustache style and colour, perf mode.
+       A slider is the wrong instrument for all of them. It implies the values
+       are ordered and interpolable (they are not: "knife" is not between
+       "skull" and "sword"), it makes picking one a game of pixel-hunting, and
+       the option names had to be crammed into the LABEL, which is what broke:
+       "cursor: 0 candle 1 system 2 big 3 skull..." ran past the panel edge and
+       struck through the slider beside it.
+
+       The names now live in CFG_SCHEMA as `choices`, which keeps them in the
+       one place that is already the source of truth for every tunable, so the
+       cmd-K palette and any future surface read the same list. The VALUE space
+       is unchanged (still the integer index 0..max), so LIMITS, share links,
+       the dice and the chat all keep working untouched. */
+    if (kind === 'enum' && choices) {
+      const sel = document.createElement('select');
+      sel.dataset.key = k;
+      choices.forEach((name, i) => {
+        const o = document.createElement('option');
+        o.value = i; o.textContent = name;
+        sel.appendChild(o);
+      });
+      sel.value = def;
+      /* The value cell stays in the DOM: it holds the grid's third column and
+         syncSliders writes through `nextElementSibling`. But it renders EMPTY,
+         because "crosshair    8" prints the same fact twice and the number is
+         the half nobody reads. The index is still the stored value and still
+         what a share link carries; it is just not a caption. */
+      const sv = document.createElement('span'); sv.className = 'val enumval'; sv.textContent = def;
+      sel.addEventListener('change', () => {
+        CFG[k] = parseFloat(sel.value);
+        sv.textContent = sel.value;
+        SIG.evThrottled('cfg', k, sel.value);
+        if (k === 'perfMode') resize();
+        if (PALETTE_KEYS.includes(k)) schedulePaletteRebuild();
+        applyToggles();          // cursorStyle and friends take effect here
+      });
+      row.appendChild(lab); row.appendChild(sel); row.appendChild(sv);
+      continue;
+    }
+
     const r = document.createElement('input');
     r.type = 'range'; r.min = min; r.max = max; r.step = step; r.value = def;
     r.dataset.key = k;
@@ -10291,7 +10392,11 @@ let syncSliders = () => {};   // real one is assigned inside buildCfg below
   }
   /* push CFG values back into the sliders after a load/reset */
   syncSliders = function () {
-    holder.querySelectorAll('input[type=range]').forEach(r => {
+    /* Both control types, or a restore/share/dice silently leaves the
+       dropdowns showing the previous board while CFG holds the new one. The
+       selector is `[data-key]` on purpose rather than two queries: every
+       future control kind is covered the day it is added. */
+    holder.querySelectorAll('input[type=range], select[data-key]').forEach(r => {
       r.value = CFG[r.dataset.key];
       if (r.nextElementSibling) r.nextElementSibling.textContent = r.value;
     });
