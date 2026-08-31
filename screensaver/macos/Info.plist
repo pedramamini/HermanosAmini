@@ -1,12 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- THE NAME macOS SHOWS IS THE BUNDLE FILENAME, and CFBundleName/DisplayName
+     are the belt and braces. All three say HermanosAmini.com as of 2026-08-28.
+
+     Deliberately UNCHANGED, and none of them are the label:
+       CFBundleIdentifier   changing it re-registers the saver as a different
+                            product and invalidates the notarization ticket.
+       NSPrincipalClass     the ObjC class name in SKLZView.m.
+       CFBundleExecutable   the binary inside; renaming it buys nothing and
+                            has to stay in lockstep with build.sh's -o path.
+     The ScreenSaverDefaults module (com.hermanosamini.SKLZ, in SKLZView.m) is
+     also untouched ON PURPOSE: it keys the saved mode/board, so renaming it
+     would silently orphan every existing install's settings. -->
 <plist version="1.0">
 <dict>
   <key>CFBundleDevelopmentRegion</key><string>en</string>
   <key>CFBundleExecutable</key><string>SKLZ</string>
   <key>CFBundleIdentifier</key><string>com.hermanosamini.sklz.saver</string>
   <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
-  <key>CFBundleName</key><string>SKLZ</string>
+  <key>CFBundleName</key><string>HermanosAmini.com</string>
+  <key>CFBundleDisplayName</key><string>HermanosAmini.com</string>
   <key>CFBundlePackageType</key><string>BNDL</string>
   <key>CFBundleShortVersionString</key><string>1.0</string>
   <key>CFBundleVersion</key><string>1</string>

@@ -26,7 +26,7 @@
 # existed. It was that they were doing work.
 set -euo pipefail
 cd "$(dirname "$0")"
-SAVER="${SAVER:-build/SKLZ.saver}"
+SAVER="${SAVER:-build/HermanosAmini.com.saver}"
 case "$SAVER" in /*) ;; *) SAVER="$PWD/$SAVER" ;; esac
 [ -d "$SAVER" ] || { echo "no bundle at $SAVER (run ./build.sh first)"; exit 1; }
 
@@ -106,7 +106,7 @@ print("after init:           \(atInit.count) new WebKit process(es)")
 if !atInit.isEmpty { fail("initWithFrame: spawned WebKit before startAnimation was ever called") }
 
 let win = NSWindow(contentRect: rect, styleMask: [.titled], backing: .buffered, defer: false)
-win.title = "SKLZ lifecycle test"
+win.title = "hermanosamini.com lifecycle test"
 win.contentView = v
 win.setFrameOrigin(NSPoint(x: 40, y: 40))
 win.orderFrontRegardless()

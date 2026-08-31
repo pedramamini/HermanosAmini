@@ -17,6 +17,10 @@
 #import <ScreenSaver/ScreenSaver.h>
 #import <WebKit/WebKit.h>
 
+/* NOT renamed with the product (2026-08-28). This keys ScreenSaverDefaults,
+   where the saver's mode and board live, so changing the string would orphan
+   every existing install's settings silently: the sheet would come up blank
+   and the display would revert to `live`. An internal key is not a label. */
 static NSString *const kModule = @"com.hermanosamini.SKLZ";
 static const NSTimeInterval kRetry = 30.0;
 
@@ -69,6 +73,12 @@ static NSURL *saverURL(void) {
 #define SKLZ_BUILD "dev"
 #endif
 
+/* What a human sees: the status line, and the preview window's title. The
+   bundle filename and CFBundleName in Info.plist carry the same string; the
+   identifiers around them (kModule, CFBundleIdentifier, NSPrincipalClass,
+   the SKLZ_* page globals) are deliberately NOT renamed. */
+#define NAME_ON_SCREEN "hermanosamini.com"
+
 @interface SKLZView : ScreenSaverView <WKNavigationDelegate>
 @property (nonatomic, strong) WKWebView *web;
 @property (nonatomic, strong) NSTextField *statusLabel;   // ABOVE the web view
@@ -105,7 +115,10 @@ static NSURL *saverURL(void) {
   _statusLabel.drawsBackground = NO;
   _statusLabel.font = [NSFont monospacedSystemFontOfSize:13 weight:NSFontWeightRegular];
   _statusLabel.textColor = [NSColor colorWithCalibratedRed:1 green:0.70 blue:0.28 alpha:0.9];
-  _statusLabel.stringValue = @"SKLZ " @SKLZ_BUILD @"  ·  starting";
+  /* NAME_ON_SCREEN, not "SKLZ": this label is visible on a display and in
+     Preview, so it says what the thing is called. The build stamp stays: it is
+     the only way to spot the resident-host trap install.sh exists to defeat. */
+  _statusLabel.stringValue = @NAME_ON_SCREEN @" " @SKLZ_BUILD @"  ·  starting";
   [self addSubview:_statusLabel];
 
   /* NOTHING is loaded here. See startAnimation. */
@@ -179,7 +192,7 @@ static NSURL *saverURL(void) {
   self.painted = NO;
   self.loadError = nil;
   self.statusLabel.hidden = NO;
-  self.statusLabel.stringValue = @"SKLZ " @SKLZ_BUILD @"  ·  stopped";
+  self.statusLabel.stringValue = @NAME_ON_SCREEN @" " @SKLZ_BUILD @"  ·  stopped";
 }
 
 - (void)startAnimation {
@@ -199,7 +212,7 @@ static NSURL *saverURL(void) {
      it, but the timer path is safer explicit than implicit. */
   dispatch_async(dispatch_get_main_queue(), ^{
     self.statusLabel.stringValue =
-        [@"SKLZ " @SKLZ_BUILD @"  ·  " stringByAppendingString:msg];
+        [@NAME_ON_SCREEN @" " @SKLZ_BUILD @"  ·  " stringByAppendingString:msg];
   });
 }
 
@@ -333,7 +346,7 @@ static NSURL *saverURL(void) {
                 styleMask:NSWindowStyleMaskTitled
                   backing:NSBackingStoreBuffered
                     defer:YES];
-  w.title = @"SKLZ";
+  w.title = @NAME_ON_SCREEN;
   NSView *v = w.contentView;
 
   NSTextField *label = [NSTextField labelWithString:@"What should the screensaver show?"];

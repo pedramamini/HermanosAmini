@@ -67,21 +67,21 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR cmd, int) {
   if (mode == 'p') return 0;
   if (mode == 'c') {
     MessageBoxA(nullptr,
-                "SKLZ - Ritmos de los Muertos\n"
+                "hermanosamini.com - Ritmos de los Muertos\n"
                 "Una obra viva de los Hermanos Amini.\n\n"
                 "No settings here: the art is at https://hermanosamini.com\n"
                 "(the screensaver runs the same living page, silently).",
-                "SKLZ", MB_OK | MB_ICONINFORMATION);
+                "hermanosamini.com", MB_OK | MB_ICONINFORMATION);
     return 0;
   }
 
   g_w = webview_create(0, nullptr);
   if (!g_w) {
     MessageBoxA(nullptr,
-                "SKLZ needs the Microsoft WebView2 runtime\n"
+                "This screensaver needs the Microsoft WebView2 runtime\n"
                 "(preinstalled on Windows 11 and updated Windows 10).\n\n"
                 "Get it: https://developer.microsoft.com/microsoft-edge/webview2/",
-                "SKLZ", MB_OK | MB_ICONERROR);
+                "hermanosamini.com", MB_OK | MB_ICONERROR);
     return 1;
   }
 

@@ -1,7 +1,11 @@
 #!/bin/bash
-# Cross-compile SKLZ.scr from macOS/Linux with mingw-w64.
+# Cross-compile the Windows screensaver from macOS/Linux with mingw-w64.
 #   brew install mingw-w64        (macOS)
-# Output: build/SKLZ.scr and build/SKLZ-Windows.scr.zip
+# Output: build/HermanosAmini.com.scr and build/HermanosAmini.com-Windows.scr.zip
+#
+# THE .scr FILENAME IS THE NAME Windows shows in the Screen Saver dropdown, so
+# it is the product name. The zip keeps the literal token "Windows" because
+# index.html's saver modal finds the release asset with /windows/i && /\.zip$/i.
 #
 # Vendor headers are fetched pinned, not committed:
 #   webview 0.12.0 (MIT)  +  Microsoft WebView2 SDK 1.0.2210.55 (headers only;
@@ -25,13 +29,17 @@ if [ ! -f vendor/WebView2.h ]; then
     -d vendor
 fi
 
+NAME="HermanosAmini.com"                   # the label a human reads
+SCR="build/$NAME.scr"
+ZIP="$NAME-Windows.scr.zip"                # keep the Windows token, see header
+
 x86_64-w64-mingw32-g++ -std=c++17 -O2 -static -mwindows -Wall \
   -Ivendor sklz.cc \
   -lole32 -lshlwapi -lversion -ladvapi32 -lshell32 -luser32 -lgdi32 \
-  -o build/SKLZ.scr
+  -o "$SCR"
 
-x86_64-w64-mingw32-strip build/SKLZ.scr
-rm -f build/SKLZ-Windows.scr.zip
-(cd build && zip -q SKLZ-Windows.scr.zip SKLZ.scr)
+x86_64-w64-mingw32-strip "$SCR"
+rm -f "build/$ZIP"
+(cd build && zip -q "$ZIP" "$NAME.scr")
 ls -la build/
 echo "unsigned: Windows will show SmartScreen on first run (More info > Run anyway)."

@@ -1,6 +1,12 @@
 #!/bin/bash
-# Build, sign, and (credentials permitting) notarize SKLZ.saver.
-# Output: build/SKLZ.saver and build/SKLZ-macOS.saver.zip
+# Build, sign, and (credentials permitting) notarize the screensaver.
+# Output: build/HermanosAmini.com.saver and build/HermanosAmini.com-macOS.saver.zip
+#
+# THE BUNDLE FILENAME IS THE NAME macOS SHOWS in System Settings > Screen Saver,
+# so it is the product name and not an internal one. The zip keeps the literal
+# token "macOS" because index.html's saver modal finds the release asset with
+# /macos/i && /\.zip$/i; drop that token and the download button silently falls
+# back to the releases page.
 #
 # Notarization takes credentials one of two ways, checked in this order:
 #
@@ -24,8 +30,10 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 IDENTITY="Developer ID Application: Pedram Amini (4N4DQ24LED)"
-PROFILE="sklz-notary"
-OUT=build/SKLZ.saver
+PROFILE="sklz-notary"                      # keychain profile name, internal
+NAME="HermanosAmini.com"                   # the label a human reads
+OUT="build/$NAME.saver"
+ZIP="build/$NAME-macOS.saver.zip"          # keep the macOS token, see header
 
 rm -rf build
 mkdir -p "$OUT/Contents/MacOS" "$OUT/Contents/Resources"
@@ -35,13 +43,13 @@ clang -arch arm64 -arch x86_64 -mmacosx-version-min=11.0 -fobjc-arc -Wall \
   -DSKLZ_BUILD="\"$BUILD_STAMP\"" \
   -bundle SKLZView.m \
   -framework ScreenSaver -framework WebKit -framework AppKit -framework Foundation \
-  -o "$OUT/Contents/MacOS/SKLZ"
+  -o "$OUT/Contents/MacOS/SKLZ"   # CFBundleExecutable, internal: leave it
 cp Info.plist "$OUT/Contents/Info.plist"
 
 codesign --force --options runtime --timestamp --sign "$IDENTITY" "$OUT"
 codesign --verify --strict --verbose=2 "$OUT"
 
-ditto -c -k --keepParent "$OUT" build/SKLZ-macOS.saver.zip
+ditto -c -k --keepParent "$OUT" "$ZIP"
 
 # Resolve credentials: env vars first (nothing stored), keychain profile second.
 NOTARY_ARGS=()
@@ -55,12 +63,12 @@ fi
 
 if [[ ${#NOTARY_ARGS[@]} -gt 0 ]]; then
   echo "submitting (waits for Apple)..."
-  xcrun notarytool submit build/SKLZ-macOS.saver.zip "${NOTARY_ARGS[@]}" --wait
+  xcrun notarytool submit "$ZIP" "${NOTARY_ARGS[@]}" --wait
   xcrun stapler staple "$OUT"
   # re-zip so the distributed archive carries the stapled ticket
-  rm build/SKLZ-macOS.saver.zip
-  ditto -c -k --keepParent "$OUT" build/SKLZ-macOS.saver.zip
-  echo "signed + notarized + stapled: build/SKLZ-macOS.saver.zip"
+  rm "$ZIP"
+  ditto -c -k --keepParent "$OUT" "$ZIP"
+  echo "signed + notarized + stapled: $ZIP"
 else
   echo "SIGNED BUT NOT NOTARIZED: no APPLE_ID/APPLE_APP_SPECIFIC_PASSWORD/APPLE_TEAM_ID"
   echo "in the environment and no '$PROFILE' keychain profile."

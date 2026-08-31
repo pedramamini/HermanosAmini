@@ -341,7 +341,7 @@ art keeps evolving because a screensaver runs the live site, not a copy.
 > `screensaver/macos/install.sh` copies the bundle and kills those hosts. The
 > saver prints its build stamp on screen, so a stale one is visible at a glance.
 
-**macOS** (`SKLZ.saver`, signed and notarized): download from the
+**macOS** (`HermanosAmini.com.saver`, signed and notarized): download from the
 [latest release](https://github.com/pedramamini/HermanosAmini/releases/latest), unzip,
 double-click, and System Settings offers to install it. No Gatekeeper warning:
 it carries a stapled Apple notarization ticket. Or build it yourself:
@@ -362,7 +362,7 @@ CPU actually goes away. It asserts on a work RATE rather than a process count,
 because WebKit's GPU and Networking services are per-process-pool singletons
 that outlive the web view on purpose.
 
-**Windows** (`SKLZ.scr`): download from the
+**Windows** (`HermanosAmini.com.scr`): download from the
 [latest release](https://github.com/pedramamini/HermanosAmini/releases/latest), right-click the `.scr`,
 choose **Install**. Needs the WebView2 runtime, which Windows 11 and updated
 Windows 10 already have. Unsigned, so SmartScreen will ask once. Or
