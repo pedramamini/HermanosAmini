@@ -4897,7 +4897,8 @@ const skullPos = new Array(N_SKULLS);
    catches the drift instead, at the one moment both values exist. */
 const WAKE_N = 10;
 const wake = Array.from({ length: WAKE_N },
-  () => ({ id: -1, x: 0, y: 0, nx: 0, ny: 0, push: 0, r: 0, str: 0, tgt: 0 }));
+  () => ({ id: -1, x: 0, y: 0, nx: 0, ny: 0, push: 0, r: 0, str: 0, tgt: 0,
+           dis: 0, rb: 0.07 }));
 /* ── THE FOG IS A LAYER AT A DEPTH ──
    Pedram, 2026-09-01: "imagine there's a fog machine, and someone is walking
    through it. they interact with the fog only when they move through the
@@ -4936,7 +4937,17 @@ const wake = Array.from({ length: WAKE_N },
    the angle was already spread. R over the band is 124..295px, which clears
    the silhouette. Deterministic, so a slot keeps its depth across frames and
    reloads; a random draw would make a skull's crossing jump on every wrap. */
-const FOG_D0 = 0.40, FOG_D1 = 0.52;   // where each slot crosses, inside the slab
+/* THE SHEET IS AT ONE DEPTH (v1.98.0). Spreading crossings over 0.40-0.52
+   was my fix for "one emergence point", and it carried a side effect Pedram
+   caught on sight: sprite size is (0.05 + d^3*2.3)*246, so a skull crossing at
+   0.40 came through at 49px and one at 0.52 at 83px. A real sheet hangs at one
+   distance, so everything coming through it is the SAME size and the SAME
+   distance from centre; what varies is the ANGLE, which the golden spacing
+   already spreads. Slots cross one at a time (~0.6s apart at default speed)
+   because their d values are evenly staggered. d=0.48: ring R=174px, sprite
+   75px, inner edge 137px against the hero's 123px half-width. */
+const FOG_SHEET_D = 0.48;
+const FOG_D0 = FOG_SHEET_D, FOG_D1 = FOG_SHEET_D;   // one depth: it is a sheet
 /* THE SHEET IS THIN, and thickness is measured in SECONDS, not just d.
    d advances at CFG.tunnelSpeed per second (default 0.030), so FOG_FADE 0.15
    meant a skull took 5s to materialise and disturbed the fog for 7.3s: a slab.
@@ -4978,13 +4989,13 @@ function fogK(d, i) {
   if (u <= -0.35 || u >= 1.1) return 0;
   const sm = x => x * x * (3 - 2 * x);
   /* Rises just BEFORE the skull clarifies (something parts the fog ahead of
-     becoming visible), holds through the crossing, then releases. */
-  let k = 1;
-  if (u < 0.15)      k = sm((u + 0.35) / 0.5);
-  else if (u > 0.55) k = sm(1 - (u - 0.55) / 0.55);
-  /* The slab's own back edge, independent of which slot this is. */
-  if (d > FOG_BACK0) k *= sm(1 - (d - FOG_BACK0) / (FOG_BACK1 - FOG_BACK0));
-  return k;
+     becoming visible) and holds while the body is in the sheet. There is NO
+     out-ramp here any more: a driven ramp-down runs the same displacement
+     backwards, which is the "smoke collapsing back" Pedram saw. When the
+     skull leaves the sheet this drops to 0, the slot loses its driver, and
+     stepWake's dissipation takes over: the swirl spreads and dies where it
+     is, it never rewinds. */
+  return u < 0.15 ? sm((u + 0.35) / 0.5) : 1;
 }
 /* Flat uniform buffer, allocated once. Rebuilding a 24-float array every frame
    would hand the GC 3,600 arrays a minute for no reason. */
@@ -6817,18 +6828,24 @@ function stepWake(dt) {
   const want = new Map();
   for (const c of cand.slice(0, budget)) want.set(c.i, c);
 
-  /* Keep a slot on its skull if that skull is still wanted; otherwise aim its
-     strength at zero and free it only once it has actually faded out. */
+  /* Keep a slot on its skull while that skull is in the sheet. When it
+     leaves, the slot flips to DISSIPATE: think of a hand through fog-machine
+     smoke. The swirl the hand made does not shrink back to where the smoke
+     was; it stops being driven, spreads, drifts a little the way it was
+     pushed, and dies out where it is. A driven ramp-down runs the same
+     displacement in reverse, and that rewind is exactly what read as "the
+     smoke is collapsing back". */
   for (const w of wake) {
     const c = want.get(w.id);
     if (c) {
       w.x = c.ux; w.y = c.uy; w.nx = c.nx; w.ny = c.ny;
       w.push = c.push; w.r = c.r;
-      w.tgt = 1;
+      w.tgt = 1; w.dis = 0;
       want.delete(w.id);
+    } else if (w.id !== -1 && w.str > 0.03) {
+      w.tgt = 0; w.dis = 1;
     } else {
-      w.tgt = 0;
-      if (w.str < 0.01) { w.id = -1; w.str = 0; }
+      w.id = -1; w.str = 0; w.dis = 0;
     }
   }
   /* Newly promoted skulls take any slot that has finished fading. */
@@ -6847,24 +6864,37 @@ function stepWake(dt) {
      its target without bound, so a wake would grow instead of fading. The page
      has two external frame drivers (SKLZ_TICK and the screensaver host), and a
      clamp is cheaper than trusting every future one to be monotonic. */
-  const k = Math.max(0, Math.min(1, dt * 3.4));
+  const kIn  = Math.max(0, Math.min(1, dt * 3.4));
+  /* Dissipation is slower than the drive-up on purpose: the punch-through is
+     quick, the smoke settling is not. tau ~0.77s, gone by ~2.7s. Tighter than
+     the first cut (tau 1s, freed at 2%), which held slots so long that
+     demand pegged all 10 (measured median 10/10) and newly crossing skulls
+     got no wake at all: a silent cap no-op on the one effect this feature IS. */
+  const kOut = Math.max(0, Math.min(1, dt * 1.3));
+  const dtc  = Math.max(0, Math.min(0.1, dt));
   for (let n = 0; n < WAKE_N; n++) {
     const w = wake[n];
-    w.str += (w.tgt - w.str) * k;
+    w.str += (w.tgt - w.str) * (w.tgt ? kIn : kOut);
+    if (w.dis) {
+      /* the swirl keeps a little of the momentum it was given, and spreads */
+      w.x += w.nx * 0.05 * w.str * dtc;
+      w.y += w.ny * 0.05 * w.str * dtc;
+      w.rb = Math.min(0.30, w.rb + dtc * 0.055);
+    } else {
+      /* Driven size: the HOLE IN THE FOG, not the sprite. A skull in the sheet
+         is ~26px wide, so scaling straight off `r` collapses to a few pixels
+         and reads as nothing; a body pushing through fog disturbs more than
+         its own silhouette. The 0.18 cap is the lesson from the first pass
+         (r*2.4 uncapped smeared half the screen). Dissipation above may grow
+         PAST this cap, deliberately: spreading thin is how the swirl dies. */
+      w.rb = Math.min(0.18, Math.max(0.07, w.r * 4 + 0.05));
+    }
     const s = w.str * force * w.push;
     wakeBuf[n * 4]     = w.x;
     wakeBuf[n * 4 + 1] = w.y;
     wakeBuf[n * 4 + 2] = w.nx * s;
     wakeBuf[n * 4 + 3] = w.ny * s;
-    /* Sized to the HOLE IN THE FOG, not to the sprite. A skull mid-crossing is
-       11-48px wide, so scaling straight off `r` collapses to a few pixels and
-       reads as nothing, while a body pushing through fog disturbs a good deal
-       more than its own silhouette. The ceiling is the lesson from the first
-       pass, which used r*2.4 with no useful cap: on a rim skull that is half
-       the screen height, and the amplified difference image showed it as a
-       soft screen-wide smear reading as "different smoke" rather than
-       "something went through it". */
-    wakeRBuf[n] = Math.min(0.18, Math.max(0.07, w.r * 4 + 0.05));
+    wakeRBuf[n] = w.rb;
   }
 }
 
