@@ -46,6 +46,7 @@ const LIMITS = {
   dustCount: [0.2, 2, 'dust particles'], gazeRange: [0.3, 2, 'pupil travel range'], wanderPace: [0.3, 3, 'eye wander pace'],
   tempoRef: [60, 140, 'tempo ref BPM'], dayCycleMin: [2, 30, 'day/night cycle minutes'], perfMode: [0, 2, 'perf mode'], tempoMax: [1, 3, 'tempo speed cap'],
   eventMinGap: [1, 30, 'event gap min seconds'], eventMaxGap: [2, 60, 'event gap max seconds'],
+  stareGap: [0, 90, 'minutes between mean mugs, 0 = never'],
   liquidFill: [2, 30, 'logo travel time'], liquidRest: [0, 20, 'logo dwell'],
   musicVolume: [0, 1, 'music volume'], musicSeek: [0, 100, 'start at (% of track)'], gritoVolume: [0, 1, 'grito volume'], sfxVolume: [0, 1, 'gesture sfx volume'], voiceVolume: [0, 1, 'her voice volume'],
   /* color + feel. These shipped in the page well after this list was written,
