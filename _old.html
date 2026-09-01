@@ -4917,40 +4917,19 @@ const wake = Array.from({ length: WAKE_N },
    to the fade-in alone would pile ten overlapping wakes into one blob in the
    middle of the screen. By d=0.45 they are ~154px out and ~48px wide: spread
    enough to read as individuals. */
-/* ── EVERY SLOT CROSSES AT ITS OWN DEPTH ──
-   The first cut put the fog at ONE depth for the whole tunnel, and the depth
-   it picked was the one the alpha ramp already used. That is the centre of the
-   frame, and the centre of the frame is where the hero's silhouette is.
-
-   MEASURED on a 1400x900 frame: the hero's opaque bbox is x 576..822 y 260..576
-   (123px half-width), a slot rides `R = 60 + d*d*d*maxR`, and the old fade-in
-   `min(1, d*7)` finished at d=0.143 where R is 61px. So a skull did not merely
-   TEND to appear behind the main skull, it was structurally incapable of
-   appearing anywhere else: 76% of the band's skulls sat on hero pixels, and the
-   rest were within 207px of centre. One emergence point, permanently occluded.
-
-   Now `fogAt(i)` hands each slot its own crossing depth on a golden-ratio
-   low-discrepancy sequence. Adjacent slots already sit at adjacent GOLDEN
-   angles, so giving them very different depths is what turns one emergence
-   point into a scattered field: different depth means different radius, and
-   the angle was already spread. R over the band is 124..295px, which clears
-   the silhouette. Deterministic, so a slot keeps its depth across frames and
-   reloads; a random draw would make a skull's crossing jump on every wrap. */
-const FOG_D0 = 0.40, FOG_D1 = 0.62;   // where the layer sits, per slot
-const FOG_FADE = 0.15;                // how long a skull takes to materialise
-const FOG_MURK = 0.34;                // how much of a skull reads through the layer
-const fogAt = i => FOG_D0 + ((i * 0.61803398874989) % 1) * (FOG_D1 - FOG_D0);
-
-/* Disturbance in slot-relative units: `u` is 0 as the skull starts to appear
-   and 1 when it is fully there. It begins slightly BEFORE (something parts the
-   fog just ahead of becoming visible) and trails off well after, which is the
-   layer falling behind. Never a hard edge at either end. */
-function fogK(d, i) {
-  const u = (d - fogAt(i)) / FOG_FADE;
-  if (u <= -0.35 || u >= 2.4) return 0;
-  const sm = x => x * x * (3 - 2 * x);
-  if (u < 0.15) return sm((u + 0.35) / 0.5);
-  if (u > 1.2) return sm(1 - (u - 1.2) / 1.2);
+/* MEASURED, at tunnelCount 56 on a 1400x900 frame. Band 0.03-0.46 holds 24
+   skulls spanning 0.13-0.37 of half-height; 0.03-0.55 holds 29 spanning
+   0.13-0.48; 0.03-0.65 holds 35 and reaches 0.81, which is the rim. The last
+   one breaks the whole idea: if a skull is still disturbing fog at the frame
+   edge then the layer is never behind it. 0.55 keeps the outer half of the
+   frame clean, which is what makes the crossing read as a crossing. */
+const FOG_IN0 = 0.03, FOG_IN1 = 0.11;    // entering the layer
+const FOG_OUT0 = 0.24, FOG_OUT1 = 0.55;  // leaving it behind
+function fogK(d) {
+  if (d <= FOG_IN0 || d >= FOG_OUT1) return 0;
+  const sm = u => u * u * (3 - 2 * u);                 // smoothstep, no hard edges
+  if (d < FOG_IN1) return sm((d - FOG_IN0) / (FOG_IN1 - FOG_IN0));
+  if (d > FOG_OUT0) return sm(1 - (d - FOG_OUT0) / (FOG_OUT1 - FOG_OUT0));
   return 1;
 }
 /* Flat uniform buffer, allocated once. Rebuilding a 24-float array every frame
@@ -5474,18 +5453,7 @@ function drawTunnel(dt) {
     let x = Math.cos(ang) * R;
     let y = Math.sin(ang) * R * 0.85;
     const s = (0.05 + ease * 2.3) * TUN_SCALE;
-    /* Fog DIMS what is behind it; it does not delete it. Deleting was the
-       first cut and it cost the tunnel its depth: a slot invisible until its
-       own crossing spends half its cycle drawing nothing, which emptied the
-       far field where the small skulls live, and compensating with twice the
-       slots only doubled the NEAR ones. Measured: 55 drawn before, 27 after
-       deleting, and 41 near-only after doubling, which read as a crowd with no
-       distance in it. Behind the layer a skull is present but murky; crossing
-       it is what brings it to full ink, and that happens at THIS slot's own
-       depth rather than at one shared with all 56. */
-    const clear = Math.min(1, Math.max(0, (d - fogAt(i)) / FOG_FADE));
-    const murk = Math.min(1, d * 7) * FOG_MURK;
-    const alpha = (murk + (1 - murk) * clear) * Math.min(1, (1 - d) * 3.4) * 0.85;
+    const alpha = Math.min(1, d * 7) * Math.min(1, (1 - d) * 3.4) * 0.85;
     if (alpha <= 0.01) continue;
 
     /* flick displacement: damped velocity + tumble */
@@ -6757,7 +6725,7 @@ function stepWake(dt) {
   for (let i = 0; i < N_SKULLS; i++) {
     const p = skullPos[i];
     if (!p) continue;
-    const k = fogK(p.d, i);
+    const k = fogK(p.d);
     if (k < 0.05) continue;                      // outside the layer: no interaction
 
     /* Cheap insurance. At these depths a skull is near the middle anyway, but
