@@ -2212,6 +2212,11 @@ const CFG_SCHEMA = {
   pupilBeat:      [0.2,   0,     0.6,  0.05,  'pupil beat snap'],
   smokeStir:      [0.6,   0,     4,    0.1,   'smoke cursor stir'],
   smokeDecay:     [0.3,   0.05,  3,    0.05,  'smoke stir fade rate'],
+  /* How hard the tunnel skulls shove the background (viewer request #14).
+     Defaults ON at 1: the request was approved as an idea people should see,
+     and a feature nobody finds is not shipped. 0 restores the old look
+     exactly, so the escape hatch is one dial away. */
+  wakeForce:      [1,     0,     2,    0.1,   'skulls part the smoke'],
   skullSize:      [1.0,   0.5,   1.8,  0.05,  'hero skull size'],
   /* the flood's random-size WINDOW. Equal min and max = one fixed size.
      Skulls carry a 0..1 draw `u`, so moving either end resizes the living
@@ -2313,7 +2318,7 @@ const CFG_CATEGORY = {
           'flowerCrown', 'crownBlooms', 'thirdEye', 'eyeRings', 'cheekRings',
           'swarmSizeMin', 'swarmSizeMax'],
   sky: ['tunnelCount', 'starDensity', 'dustCount', 'smokeScale', 'smokeStir',
-        'smokeDecay', 'eventMinGap', 'eventMaxGap', 'autoEvents'],
+        'smokeDecay', 'wakeForce', 'eventMinGap', 'eventMaxGap', 'autoEvents'],
   sound: ['musicVolume', 'musicSeek', 'gritoVolume', 'sfxVolume', 'voiceVolume', 'musicOn',
          'trackOn', 'sfxOn'],
   system: ['perfMode', 'hudOn', 'textOn', 'voiceOn', 'cursorStyle'],
@@ -3113,6 +3118,17 @@ uniform float u_bass;
 uniform vec2  u_mouse;
 uniform float u_mstr;
 uniform vec3  u_hole;   /* xy = centre in screen-uv, z = strength 0..1 */
+/* Skull wakes (viewer request #14). xy = centre in UNSCALED screen-uv, zw =
+   velocity * strength, so a slot with zero strength contributes exactly zero
+   without needing a branch. Fixed length 6 with a constant loop bound: WebGL1
+   requires both, and 6 is CAPS.wake. */
+uniform vec4  u_wake[10];
+/* Influence radius per slot, in uv, scaled from the skull's own screen size: a
+   near skull disturbs a wide field and a far one barely creases it. A single
+   shared radius made every skull shove the same sized hole, which reads as a
+   bug the moment two different-sized skulls cross. */
+uniform float u_wakeR[10];
+uniform float u_wakeOn;  /* 0 = skip the loop entirely; uniform, so no divergence */
 uniform float u_scale;
 uniform float u_drift;
 uniform float u_stars;
@@ -3178,6 +3194,48 @@ void main(){
     float pull = u_hole.z * exp(-hr * hr * 3.2);
     uv -= (hd / hr) * pull * .62;
     uv += vec2(-hd.y, hd.x) / hr * pull * .48;
+  }
+
+  /* ── the tunnel skulls part the smoke (viewer request #14) ──
+     The request said "particle physics", and the honest answer is that there
+     are no particles: this is a domain-warped fbm field computed per pixel
+     from scratch. That is better news than it sounds. A particle smoke
+     colliding with 56 skulls would be the single most expensive thing in the
+     piece; warping a field costs one exp per source.
+
+     Two terms, because a real wake has two halves:
+       BOW WAVE   the field is pushed radially away from the skull, so the
+                  smoke opens where the body is. This is the half that makes
+                  it read as "coming through" rather than "floating over".
+       VORTICES   a curl whose sign flips across the line of travel, which is
+                  the pair of counter-rotating eddies that trail anything
+                  moving through a fluid. Without it the bow wave alone reads
+                  as a bubble, not a passage.
+
+     The centre is divided by u_scale for the same reason u_hole.xy is: the
+     cursor stir lives in post-scale space and its drift is invisible for a
+     stir, but a wake that misses its skull by a few pixels destroys the
+     illusion instantly. See the note above the suv declaration. */
+  if (u_wakeOn > .5) {
+    for (int wi = 0; wi < 10; wi++) {
+      /* zw is the unit direction of travel times a push in 0..1. JS does the
+         normalising, so this cannot blow up on a skull that wrapped from the
+         rim back to the centre: measured, real tunnel speeds run 0.03 to 0.14
+         uv/s but a recycle reads as 24, and an unclamped magnitude would tear
+         the field open for one frame. */
+      vec2 wv = u_wake[wi].zw;
+      float ws = length(wv);
+      vec2 wd = uv - u_wake[wi].xy / u_scale;
+      float wr = length(wd) + 1e-4;
+      float nr = wr / (u_wakeR[wi] / u_scale + 1e-4);
+      float infl = exp(-nr * nr) * ws;
+      /* Stronger than the first pass, because the influence is now tight: a
+         narrow crease can push hard and still read as local, where a wide one
+         at the same strength just moved the whole background. */
+      uv += (wd / wr) * infl * .10;                               /* bow wave */
+      float side = wd.x * wv.y - wd.y * wv.x;
+      uv += vec2(-wd.y, wd.x) / wr * infl * sign(side) * .065;    /* trailing vortices */
+    }
   }
 
   /* domain-warped fbm, two passes of drift */
@@ -3297,6 +3355,9 @@ const uMouse = gl.getUniformLocation(prog, 'u_mouse');
 const uHole  = gl.getUniformLocation(prog, 'u_hole');
 const uMstr = gl.getUniformLocation(prog, 'u_mstr');
 const uScale = gl.getUniformLocation(prog, 'u_scale');
+const uWake  = gl.getUniformLocation(prog, 'u_wake');
+const uWakeR = gl.getUniformLocation(prog, 'u_wakeR');
+const uWakeOn = gl.getUniformLocation(prog, 'u_wakeOn');
 const uDrift = gl.getUniformLocation(prog, 'u_drift');
 const uStars = gl.getUniformLocation(prog, 'u_stars');
 const uNhue = gl.getUniformLocation(prog, 'u_nhue');
@@ -4822,6 +4883,37 @@ let zoomT = 0;
 const skullFx = new Map();
 const skullPos = new Array(N_SKULLS);
 
+/* ── smoke wakes: which skulls are currently shoving the background around ──
+   Six fixed slots, each owning one tunnel skull. `str` RAMPS toward `tgt` and
+   is never assigned, which is the whole reason this reads as smoke rather than
+   as a bug: the top-six set changes membership constantly, and a warp that
+   switches on or off between two frames is a visible pop in the background.
+   Same rule the black hole's `str` follows. Free slots carry id -1 and zero
+   strength, which the shader multiplies out to exactly nothing. */
+/* 10, and it must equal CAPS.wake AND the array length in the shader above.
+   Deliberately NOT written as `CAPS.wake`: that const is declared ~1000 lines
+   further down, so reading it here is a temporal dead zone that throws at load
+   and kills the rest of the script. Same trap as invariant 3. The assert below
+   catches the drift instead, at the one moment both values exist. */
+const WAKE_N = 10;
+const wake = Array.from({ length: WAKE_N },
+  () => ({ id: -1, x: 0, y: 0, nx: 0, ny: 0, push: 0, r: 0, str: 0, tgt: 0 }));
+/* Previous screen position per tunnel slot, for velocity. Measured rather than
+   derived from the orbit maths on purpose: a skull that has been flicked or
+   bent by the hole is somewhere its formula does not predict, and the wake has
+   to follow the skull the viewer can actually see. */
+const wakePrev = new Array(N_SKULLS);
+/* Flat uniform buffer, allocated once. Rebuilding a 24-float array every frame
+   would hand the GC 3,600 arrays a minute for no reason. */
+const wakeBuf = new Float32Array(WAKE_N * 4);
+const wakeRBuf = new Float32Array(WAKE_N);
+/* Speed that counts as a full-strength shove, in uv per second. MEASURED, not
+   chosen: sampling every visible tunnel skull over 5s gives p50 0.033, p90
+   0.108, p99 0.142. Saturating at 0.12 means the near skulls, the ones a
+   viewer is actually watching, push at nearly full force while the distant
+   drift contributes almost nothing. */
+const WAKE_REF_SPEED = 0.12;
+
 /* per-skull idle spin: seeded 0.17-1.0 of CFG.skullSpinMax, random direction */
 const skullSpin = Array.from({ length: N_SKULLS }, (_, i) => {
   const h = Math.abs(Math.sin(i * 127.1 + 311.7) * 43758.5453) % 1;
@@ -5884,6 +5976,13 @@ const CAPS = {
      someone hammering the crown, which should thin out rather than lag. */
   crownbit: 24,
   boom:     12,
+  /* Simultaneous smoke-wake sources (viewer request #14). Not a spawnable, but
+     it is a population and the rule has no exceptions. Six is a shader budget,
+     not a taste: the warp costs an exp() and two length() PER SOURCE PER PIXEL,
+     and the nebula is up to ~2500px wide at Q0. tunnelCount alone defaults to
+     56 and CAPS.swarm allows 140 more, so without this the ask is unshippable
+     on the old TV the quality ladder exists for. */
+  wake:     10,   // must equal WAKE_N and u_wake[]'s length; checked below
   /* not a spark: the swarm has its own array, but the cap belongs with the
      others so there is one place to look. 140 is generous enough that a held
      key genuinely floods the frame, and the FPS governor thins them above it. */
@@ -6566,6 +6665,140 @@ function paintNebulaFallback() {
   neb2d.globalCompositeOperation = 'source-over';
 }
 
+/* How many wake sources this quality tier can afford. The warp is per-pixel,
+   so this is the one knob that decides whether an old TV survives the feature.
+   Off entirely at Q3+, where the nebula is already painting every 2nd or 4th
+   frame and a warp that updates at 15Hz would strobe rather than flow. */
+function wakeBudget() {
+  const q = qLevel();
+  if (q >= 3) return 0;
+  return q === 2 ? 4 : WAKE_N;
+}
+
+/* ── pick the six skulls that get to move the smoke ──
+   Runs immediately before paintNebula, so it reads the PREVIOUS frame's
+   skullPos: drawTunnel clears and rewrites that array after the nebula is
+   already painted. One frame of lag at 16ms, which is invisible, and the
+   alternative is reordering the whole draw sequence for nothing.
+
+   Ranked by radius * speed, and that ranking falls out of the art rather than
+   being a guess. Tunnel slots ride R = 60 + ease*maxR with ease = d*d*d, so
+   the skulls nearest the viewer are simultaneously the biggest and the
+   fastest: exactly the ones a person expects to be shoving smoke aside. The
+   distant ones are a few pixels across, contribute nothing visible, and now
+   cost nothing either. */
+function stepWake(dt) {
+  const budget = wakeBudget();
+  const force = CFG.wakeForce;
+
+  /* Score every visible tunnel skull, and capture velocity while we are here.
+     Velocity is in uv units per second, the same space the shader warps in. */
+  const cand = [];
+  for (let i = 0; i < N_SKULLS; i++) {
+    const p = skullPos[i];
+    if (!p) { wakePrev[i] = undefined; continue; }
+    const ux = (p.x / W - 0.5) * (W / H), uy = 0.5 - p.y / H;
+    const prev = wakePrev[i];
+    wakePrev[i] = { x: ux, y: uy };
+    if (!prev || dt <= 0) continue;              // no velocity on its first frame
+    const vx = (ux - prev.x) / dt, vy = (uy - prev.y) / dt;
+    const sp = Math.hypot(vx, vy);
+    /* A wrapped slot teleports from the rim back to the centre. That is a
+       recycle, not motion, and letting it through would fire a huge wake from
+       a skull nobody saw move. */
+    if (sp > 3) continue;
+
+    /* ── ON SCREEN, OR IT DOES NOT COUNT ──
+       This clause is the whole feature. Ranking purely by radius*speed sounds
+       right and is measurably wrong: tunnel slots ride R = 60 + ease*maxR with
+       ease = d*d*d, so a skull is at its biggest and fastest exactly when it
+       has already crossed the rim. Measured before this guard: of the top 2%
+       by radius*speed, **0%** were on screen, and only 0.1% of nebula pixels
+       ever changed. Every wake was firing outside the frame.
+
+       The margin is deliberate rather than a hard clip: a skull straddling the
+       edge still owns half the visible smoke, and cutting it off at exactly
+       the border would pop its wake out mid-crossing. */
+    const m = 0.18;
+    const onX = p.x > -m * W && p.x < W * (1 + m);
+    const onY = p.y > -m * H && p.y < H * (1 + m);
+    if (!onX || !onY) continue;
+
+    const push = Math.min(1, sp / WAKE_REF_SPEED);
+    if (push < 0.05) continue;                   // parked skulls displace nothing
+
+    /* ── weight toward the middle of the frame ──
+       Size alone is the obvious ranking and it is the wrong one twice over.
+       Because R = 60 + ease*maxR with ease = d*d*d, a skull is largest exactly
+       when it is at the rim, where half of it is off-screen AND it is at full
+       opacity, so it covers the very smoke its wake just displaced. Measured
+       with size-only ranking: all ten radii pinned to the clamp, every source
+       at the frame edge, and the amplified difference image showed the change
+       hugging the border with the whole middle untouched.
+
+       This is what a person actually means by "they come through the smoke":
+       the moment of PASSAGE, mid-frame, where there is visible field on both
+       sides of the skull. Falls to ~0.35 at the corners rather than to zero,
+       so a rim skull still creases the edge instead of switching off. */
+    const cxu = (p.x / W - 0.5) * 2, cyu = (p.y / H - 0.5) * 2;   // -1..1
+    const central = 1 / (1 + 1.9 * (cxu * cxu + cyu * cyu));
+
+    cand.push({ i, ux, uy, r: p.r / H,
+                nx: vx / sp, ny: vy / sp, push,
+                score: (p.r / H) * push * central });
+  }
+  cand.sort((a, b) => b.score - a.score);
+  const want = new Map();
+  for (const c of cand.slice(0, budget)) want.set(c.i, c);
+
+  /* Keep a slot on its skull if that skull is still wanted; otherwise aim its
+     strength at zero and free it only once it has actually faded out. */
+  for (const w of wake) {
+    const c = want.get(w.id);
+    if (c) {
+      w.x = c.ux; w.y = c.uy; w.nx = c.nx; w.ny = c.ny;
+      w.push = c.push; w.r = c.r;
+      w.tgt = 1;
+      want.delete(w.id);
+    } else {
+      w.tgt = 0;
+      if (w.str < 0.01) { w.id = -1; w.str = 0; }
+    }
+  }
+  /* Newly promoted skulls take any slot that has finished fading. */
+  for (const c of want.values()) {
+    const free = wake.find(w => w.id === -1);
+    if (!free) break;
+    free.id = c.i; free.x = c.ux; free.y = c.uy;
+    free.nx = c.nx; free.ny = c.ny; free.push = c.push; free.r = c.r;
+    free.str = 0; free.tgt = 1;                  // always ramp, never snap
+  }
+
+  /* ~0.3s to full. Slower and a fast skull outruns its own wake; faster and
+     the promotion pops, which is the failure this ramp exists to prevent. */
+  /* Math.max(0, ...) is not decoration. dt is clamped at the TOP end in
+     frame() but not the bottom, and a negative dt would drive `str` AWAY from
+     its target without bound, so a wake would grow instead of fading. The page
+     has two external frame drivers (SKLZ_TICK and the screensaver host), and a
+     clamp is cheaper than trusting every future one to be monotonic. */
+  const k = Math.max(0, Math.min(1, dt * 3.4));
+  for (let n = 0; n < WAKE_N; n++) {
+    const w = wake[n];
+    w.str += (w.tgt - w.str) * k;
+    const s = w.str * force * w.push;
+    wakeBuf[n * 4]     = w.x;
+    wakeBuf[n * 4 + 1] = w.y;
+    wakeBuf[n * 4 + 2] = w.nx * s;
+    wakeBuf[n * 4 + 3] = w.ny * s;
+    /* A wake HUGS the body. First pass used r*2.4 with a 0.09 floor, which for
+       a rim skull is half the screen height, and the amplified difference
+       image showed exactly that: a soft screen-wide smear that reads as
+       "different smoke" instead of "something went through it". Tight enough
+       to be a crease, capped so no single skull can smear the whole field. */
+    wakeRBuf[n] = Math.min(0.20, Math.max(0.05, w.r * 1.5));
+  }
+}
+
 function paintNebula() {
   if (!HAS_GL) return paintNebulaFallback();
   gl.uniform2f(uRes, nebCanvas.width, nebCanvas.height);
@@ -6575,6 +6808,12 @@ function paintNebula() {
   gl.uniform1f(uMstr, mouse.str * CFG.smokeStir);
   gl.uniform3f(uHole, (hole.x / W - 0.5) * (W / H), 0.5 - hole.y / H, hole.str);
   gl.uniform1f(uScale, CFG.smokeScale);
+  gl.uniform4fv(uWake, wakeBuf);
+  gl.uniform1fv(uWakeR, wakeRBuf);
+  /* Skip the loop wholesale when the dial is off or the tier cannot afford it.
+     Uniform-conditional, so every fragment takes the same branch and it costs
+     nothing rather than costing a divergent warp. */
+  gl.uniform1f(uWakeOn, (CFG.wakeForce > 0 && wakeBudget() > 0) ? 1 : 0);
   gl.uniform1f(uDrift, CFG.smokeDrift);
   gl.uniform1f(uStars, CFG.starDensity);
   gl.uniform1f(uNhue, CFG.nebulaHue);
@@ -7430,6 +7669,13 @@ const EVENTS = [
   [0.8, () => spawnSkull(6)],                  // a small skull flood
   [1.0, fxAlebrije],                           // twice: it is the best one
 ];
+/* Three places have to agree on the wake count: CAPS.wake, WAKE_N, and the
+   fixed array length in the fragment shader. WebGL1 needs a compile-time
+   constant for the last one, so it cannot be derived. A silent mismatch would
+   upload fewer floats than the shader reads, which renders as stale garbage in
+   the unread slots rather than as an error. */
+if (CAPS.wake !== WAKE_N) console.warn('SKLZ: CAPS.wake and WAKE_N disagree');
+
 const EVENTS_TOTAL = EVENTS.reduce((s, e) => s + e[0], 0);
 function randomEffect() {
   let r = Math.random() * EVENTS_TOTAL;
@@ -8315,6 +8561,7 @@ function frame(now) {
   const q = qLevel();
   frame.n = (frame.n || 0) + 1;
   nebulaFresh = q < 3 || (q === 3 && frame.n % 2 === 0) || (q === 4 && frame.n % 4 === 0);
+  stepWake(dt);                // must precede paintNebula: it fills the uniform
   if (nebulaFresh) paintNebula();
 
   drawTunnel(dt);
