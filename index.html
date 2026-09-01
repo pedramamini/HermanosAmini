@@ -4937,7 +4937,15 @@ const wake = Array.from({ length: WAKE_N },
    the silhouette. Deterministic, so a slot keeps its depth across frames and
    reloads; a random draw would make a skull's crossing jump on every wrap. */
 const FOG_D0 = 0.40, FOG_D1 = 0.52;   // where each slot crosses, inside the slab
-const FOG_FADE = 0.15;                // how long a skull takes to materialise
+/* THE SHEET IS THIN, and thickness is measured in SECONDS, not just d.
+   d advances at CFG.tunnelSpeed per second (default 0.030), so FOG_FADE 0.15
+   meant a skull took 5s to materialise and disturbed the fog for 7.3s: a slab.
+   Pedram: "The smoke should be a thin layer, almost like a piece of paper.
+   It's just poof, it's coming through." 0.03 is ~1s of materialise and ~1.5s
+   of total disturbance at default speed. A fixed d-width is the right model:
+   slow the tunnel down and the crossing takes proportionally longer, which is
+   what drifting slowly through a real fog sheet does. */
+const FOG_FADE = 0.03;                // sheet thickness: ~1s at default speed
 const FOG_MURK = 0.34;                // how much of a skull reads through the layer
 const fogAt = i => FOG_D0 + ((i * 0.61803398874989) % 1) * (FOG_D1 - FOG_D0);
 
@@ -4953,7 +4961,8 @@ const fogAt = i => FOG_D0 + ((i * 0.61803398874989) % 1) * (FOG_D1 - FOG_D0);
    entire way in. Two independent causes, so two fixes:
 
      1. The per-slot tail was three times longer than the rise. Now out by
-        u=1.1, so a slot's own window is `fogAt + 0.165` at the widest.
+        u=1.1 of FOG_FADE (0.03 as of v1.97.0: a slot's whole window is
+        `fogAt + 0.033`, ~1.5 seconds at default tunnelSpeed).
      2. Nothing was bounded in ABSOLUTE depth, only relative to each slot's
         crossing, so a late-crossing slot inherited a late tail. FOG_BACK0/1 is
         a global fade that ends every wake by d=0.58 (R=258px, 0.57 of
@@ -5590,8 +5599,14 @@ function drawTunnel(dt) {
     skullPos[i] = { x: W / 2 + x, y: H / 2 + y, r: px * 0.34, d };   // after the pull, so clicks land
     tctx.translate(x, y);
     if (L) holeLensApply(tctx, L);
-    /* lite: fixed seeded tilt, no continuous spin */
-    tctx.rotate((lite ? skullSpin[i] * 0.5 : tempoT * skullSpin[i] * CFG.skullSpinMax + Math.sin(t * 0.4 + i * 1.7) * 0.06) + fxRot);
+    /* ONE rotation formula for lite and full. They used to differ (fixed
+       seeded tilt vs continuous spin), and the LOD swap at px0=110 lands at
+       d=0.557, inside the fog crossing: the skull's angle JUMPED from the
+       tilt to wherever the live spin happened to be, at the exact moment the
+       viewer's eye is on it. Pedram: "the skulls randomly flip at some point.
+       They're not smoothly rotating." The rotate call costs the same either
+       way; lite mode's savings were always the live FACE, not the spin. */
+    tctx.rotate(tempoT * skullSpin[i] * CFG.skullSpinMax + Math.sin(t * 0.4 + i * 1.7) * 0.06 + fxRot);
     tctx.globalAlpha = alpha * (L ? L.alpha : 1);
     tctx.drawImage(spr, -px / 2, -px / 2, px, px);
     if (lite) { tctx.restore(); continue; }            // static face, done
