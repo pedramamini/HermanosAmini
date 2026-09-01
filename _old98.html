@@ -3216,7 +3216,6 @@ void main(){
      cursor stir lives in post-scale space and its drift is invisible for a
      stir, but a wake that misses its skull by a few pixels destroys the
      illusion instantly. See the note above the suv declaration. */
-  float wthin = 0.;
   if (u_wakeOn > .5) {
     for (int wi = 0; wi < 10; wi++) {
       /* zw is the unit direction of travel times a push in 0..1. JS does the
@@ -3230,25 +3229,13 @@ void main(){
       float wr = length(wd) + 1e-4;
       float nr = wr / (u_wakeR[wi] / u_scale + 1e-4);
       float infl = exp(-nr * nr) * ws;
-      /* A HAND, NOT A HOLE (v1.99.0). At .10 the bow wave moved the field up
-         to 10% of frame height, a quarter of the black hole's full-strength
-         .62: same visual family, and Pedram read it exactly that way ("almost
-         replicating the black hole effect"). A hand through fog-machine smoke
-         barely MOVES the smoke; mostly it THINS it where the body passed.
-         So the displacement is now a whisper (~2% bow, ~1% curl: a ripple)
-         and the visible signature moved to wthin, a local density loss fed
-         into each mode's fog term below. Dissipation is the effect, not the
-         leftover. */
-      uv += (wd / wr) * infl * .022;                              /* bow ripple */
+      /* Stronger than the first pass, because the influence is now tight: a
+         narrow crease can push hard and still read as local, where a wide one
+         at the same strength just moved the whole background. */
+      uv += (wd / wr) * infl * .10;                               /* bow wave */
       float side = wd.x * wv.y - wd.y * wv.x;
-      uv += vec2(-wd.y, wd.x) / wr * infl * sign(side) * .014;    /* soft curl */
-      /* Thinning hugs the BODY, not the ripple: exp(-3nr^2) halves the reach
-         of the displacement gaussian. First cut reused infl and 7 overlapping
-         tails dimmed 32% of the frame at once, which out-shouted the ripple
-         it was meant to replace. */
-      wthin += exp(-nr * nr * 3.) * ws;
+      uv += vec2(-wd.y, wd.x) / wr * infl * sign(side) * .065;    /* trailing vortices */
     }
-    wthin = min(wthin, 1.);
   }
 
   /* domain-warped fbm, two passes of drift */
@@ -3313,11 +3300,6 @@ void main(){
     col += violet * f * f * .22;                  /* the faintest breath of dust */
     starGain = 2.3;
   }
-
-  /* the wake's real signature: the fog THINS where a body passed through it.
-     Applied to the lit colour, not the stars: less smoke means less lit smoke,
-     and the starfield behind it is untouched, which is what thinner fog does. */
-  col = mix(col, deep * .55, wthin * .20);
 
   col *= 1. + u_bass * .4;                        /* breathe with the low end */
   col += stars(uv + vec2(0., t * .15), u_time) * starGain * (1. - smoothstep(.3, .75, f));
