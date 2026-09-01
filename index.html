@@ -4936,22 +4936,46 @@ const wake = Array.from({ length: WAKE_N },
    the angle was already spread. R over the band is 124..295px, which clears
    the silhouette. Deterministic, so a slot keeps its depth across frames and
    reloads; a random draw would make a skull's crossing jump on every wrap. */
-const FOG_D0 = 0.40, FOG_D1 = 0.62;   // where the layer sits, per slot
+const FOG_D0 = 0.40, FOG_D1 = 0.52;   // where each slot crosses, inside the slab
 const FOG_FADE = 0.15;                // how long a skull takes to materialise
 const FOG_MURK = 0.34;                // how much of a skull reads through the layer
 const fogAt = i => FOG_D0 + ((i * 0.61803398874989) % 1) * (FOG_D1 - FOG_D0);
 
-/* Disturbance in slot-relative units: `u` is 0 as the skull starts to appear
-   and 1 when it is fully there. It begins slightly BEFORE (something parts the
-   fog just ahead of becoming visible) and trails off well after, which is the
-   layer falling behind. Never a hard edge at either end. */
+/* THE SLAB HAS A BACK EDGE, and it is the half of the metaphor v1.96.0 lost.
+   Fog occupies a region of space. Cross it and it is behind you: a skull on
+   its way to the viewer must stop disturbing the medium, or it is not a
+   crossing, it is a permanent attachment.
+
+   MEASURED on the deployed v1.96.0 build: the per-slot tail ran to
+   `fogAt(i) + 2.4*FOG_FADE`, i.e. d 0.76 to 0.98, which is the rim. 77% of all
+   disturbance happened past v1.95.0's d=0.55 cap and 80% of it in the OUTER
+   HALF of the frame, out to 2.2 half-heights. Every skull stirred the smoke the
+   entire way in. Two independent causes, so two fixes:
+
+     1. The per-slot tail was three times longer than the rise. Now out by
+        u=1.1, so a slot's own window is `fogAt + 0.165` at the widest.
+     2. Nothing was bounded in ABSOLUTE depth, only relative to each slot's
+        crossing, so a late-crossing slot inherited a late tail. FOG_BACK0/1 is
+        a global fade that ends every wake by d=0.58 (R=258px, 0.57 of
+        half-height) whatever slot it belongs to.
+
+   Depth-to-radius on a 1400x900 frame, which is what makes these numbers
+   choosable rather than taste: d 0.37 -> R 112px, 0.45 -> 154px, 0.52 -> 205px,
+   0.58 -> 258px, 0.70 -> 414px, 0.85 -> 694px. */
+const FOG_BACK0 = 0.50, FOG_BACK1 = 0.58;   // past here, the layer is behind you
 function fogK(d, i) {
+  if (d >= FOG_BACK1) return 0;
   const u = (d - fogAt(i)) / FOG_FADE;
-  if (u <= -0.35 || u >= 2.4) return 0;
+  if (u <= -0.35 || u >= 1.1) return 0;
   const sm = x => x * x * (3 - 2 * x);
-  if (u < 0.15) return sm((u + 0.35) / 0.5);
-  if (u > 1.2) return sm(1 - (u - 1.2) / 1.2);
-  return 1;
+  /* Rises just BEFORE the skull clarifies (something parts the fog ahead of
+     becoming visible), holds through the crossing, then releases. */
+  let k = 1;
+  if (u < 0.15)      k = sm((u + 0.35) / 0.5);
+  else if (u > 0.55) k = sm(1 - (u - 0.55) / 0.55);
+  /* The slab's own back edge, independent of which slot this is. */
+  if (d > FOG_BACK0) k *= sm(1 - (d - FOG_BACK0) / (FOG_BACK1 - FOG_BACK0));
+  return k;
 }
 /* Flat uniform buffer, allocated once. Rebuilding a 24-float array every frame
    would hand the GC 3,600 arrays a minute for no reason. */
