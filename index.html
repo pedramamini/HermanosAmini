@@ -4898,21 +4898,44 @@ const skullPos = new Array(N_SKULLS);
 const WAKE_N = 10;
 const wake = Array.from({ length: WAKE_N },
   () => ({ id: -1, x: 0, y: 0, nx: 0, ny: 0, push: 0, r: 0, str: 0, tgt: 0 }));
-/* Previous screen position per tunnel slot, for velocity. Measured rather than
-   derived from the orbit maths on purpose: a skull that has been flicked or
-   bent by the hole is somewhere its formula does not predict, and the wake has
-   to follow the skull the viewer can actually see. */
-const wakePrev = new Array(N_SKULLS);
+/* ── THE FOG IS A LAYER AT A DEPTH ──
+   Pedram, 2026-09-01: "imagine there's a fog machine, and someone is walking
+   through it. they interact with the fog only when they move through the
+   layer. then the layer is behind them."
+
+   That is a depth window, not a screen-position heuristic, and it replaces the
+   centrality weighting the first pass used. A tunnel slot rides `d` from 0 at
+   the far plane to 1 as it passes the viewer, so the fog is simply a band of
+   `d`. Inside it a skull disturbs the medium; past it the fog is behind it and
+   it just floats toward you, untouched and untouching.
+
+   The band deliberately STARTS inside the alpha fade-in (which runs d 0 to
+   0.143, `min(1, d*7)`), so a skull is still materialising as it parts the
+   fog: that is the "we want to see the skulls fade in and move the background
+   medium" half of the ask. It then extends past the fade-in, because at d<0.15
+   every skull sits within 63px of centre and is 11px wide, so a band confined
+   to the fade-in alone would pile ten overlapping wakes into one blob in the
+   middle of the screen. By d=0.45 they are ~154px out and ~48px wide: spread
+   enough to read as individuals. */
+/* MEASURED, at tunnelCount 56 on a 1400x900 frame. Band 0.03-0.46 holds 24
+   skulls spanning 0.13-0.37 of half-height; 0.03-0.55 holds 29 spanning
+   0.13-0.48; 0.03-0.65 holds 35 and reaches 0.81, which is the rim. The last
+   one breaks the whole idea: if a skull is still disturbing fog at the frame
+   edge then the layer is never behind it. 0.55 keeps the outer half of the
+   frame clean, which is what makes the crossing read as a crossing. */
+const FOG_IN0 = 0.03, FOG_IN1 = 0.11;    // entering the layer
+const FOG_OUT0 = 0.24, FOG_OUT1 = 0.55;  // leaving it behind
+function fogK(d) {
+  if (d <= FOG_IN0 || d >= FOG_OUT1) return 0;
+  const sm = u => u * u * (3 - 2 * u);                 // smoothstep, no hard edges
+  if (d < FOG_IN1) return sm((d - FOG_IN0) / (FOG_IN1 - FOG_IN0));
+  if (d > FOG_OUT0) return sm(1 - (d - FOG_OUT0) / (FOG_OUT1 - FOG_OUT0));
+  return 1;
+}
 /* Flat uniform buffer, allocated once. Rebuilding a 24-float array every frame
    would hand the GC 3,600 arrays a minute for no reason. */
 const wakeBuf = new Float32Array(WAKE_N * 4);
 const wakeRBuf = new Float32Array(WAKE_N);
-/* Speed that counts as a full-strength shove, in uv per second. MEASURED, not
-   chosen: sampling every visible tunnel skull over 5s gives p50 0.033, p90
-   0.108, p99 0.142. Saturating at 0.12 means the near skulls, the ones a
-   viewer is actually watching, push at nearly full force while the distant
-   drift contributes almost nothing. */
-const WAKE_REF_SPEED = 0.12;
 
 /* per-skull idle spin: seeded 0.17-1.0 of CFG.skullSpinMax, random direction */
 const skullSpin = Array.from({ length: N_SKULLS }, (_, i) => {
@@ -6681,71 +6704,43 @@ function wakeBudget() {
    already painted. One frame of lag at 16ms, which is invisible, and the
    alternative is reordering the whole draw sequence for nothing.
 
-   Ranked by radius * speed, and that ranking falls out of the art rather than
-   being a guess. Tunnel slots ride R = 60 + ease*maxR with ease = d*d*d, so
-   the skulls nearest the viewer are simultaneously the biggest and the
-   fastest: exactly the ones a person expects to be shoving smoke aside. The
-   distant ones are a few pixels across, contribute nothing visible, and now
-   cost nothing either. */
+   Ranked by how deep in the fog layer each skull is, so the set is the ones
+   mid-crossing. An earlier pass ranked by radius * speed, which sounds right
+   and measured wrong: `ease = d*d*d` makes a skull biggest and fastest exactly
+   at the rim, where it is half off-frame and opaque enough to cover the smoke
+   it just displaced. 0% of the top-ranked skulls were on screen. */
 function stepWake(dt) {
   const budget = wakeBudget();
   const force = CFG.wakeForce;
 
-  /* Score every visible tunnel skull, and capture velocity while we are here.
-     Velocity is in uv units per second, the same space the shader warps in. */
+  /* Score every tunnel skull that is currently INSIDE the fog layer.
+
+     Direction is radial from screen centre, which is the analytic truth for a
+     tunnel slot: they ride outward on `R = 60 + ease*maxR`. The first pass
+     measured screen velocity instead, which cost a per-slot position cache and
+     needed a guard against wrap teleports (a slot recycling from rim to centre
+     reads as 24 uv/s against a real p99 of 0.14). Deriving the direction
+     removes the cache, the guard, and the failure mode together. */
   const cand = [];
   for (let i = 0; i < N_SKULLS; i++) {
     const p = skullPos[i];
-    if (!p) { wakePrev[i] = undefined; continue; }
-    const ux = (p.x / W - 0.5) * (W / H), uy = 0.5 - p.y / H;
-    const prev = wakePrev[i];
-    wakePrev[i] = { x: ux, y: uy };
-    if (!prev || dt <= 0) continue;              // no velocity on its first frame
-    const vx = (ux - prev.x) / dt, vy = (uy - prev.y) / dt;
-    const sp = Math.hypot(vx, vy);
-    /* A wrapped slot teleports from the rim back to the centre. That is a
-       recycle, not motion, and letting it through would fire a huge wake from
-       a skull nobody saw move. */
-    if (sp > 3) continue;
+    if (!p) continue;
+    const k = fogK(p.d);
+    if (k < 0.05) continue;                      // outside the layer: no interaction
 
-    /* ── ON SCREEN, OR IT DOES NOT COUNT ──
-       This clause is the whole feature. Ranking purely by radius*speed sounds
-       right and is measurably wrong: tunnel slots ride R = 60 + ease*maxR with
-       ease = d*d*d, so a skull is at its biggest and fastest exactly when it
-       has already crossed the rim. Measured before this guard: of the top 2%
-       by radius*speed, **0%** were on screen, and only 0.1% of nebula pixels
-       ever changed. Every wake was firing outside the frame.
-
-       The margin is deliberate rather than a hard clip: a skull straddling the
-       edge still owns half the visible smoke, and cutting it off at exactly
-       the border would pop its wake out mid-crossing. */
+    /* Cheap insurance. At these depths a skull is near the middle anyway, but
+       a flicked one can be thrown anywhere and a wake off-frame is wasted. */
     const m = 0.18;
-    const onX = p.x > -m * W && p.x < W * (1 + m);
-    const onY = p.y > -m * H && p.y < H * (1 + m);
-    if (!onX || !onY) continue;
+    if (p.x < -m * W || p.x > W * (1 + m)) continue;
+    if (p.y < -m * H || p.y > H * (1 + m)) continue;
 
-    const push = Math.min(1, sp / WAKE_REF_SPEED);
-    if (push < 0.05) continue;                   // parked skulls displace nothing
-
-    /* ── weight toward the middle of the frame ──
-       Size alone is the obvious ranking and it is the wrong one twice over.
-       Because R = 60 + ease*maxR with ease = d*d*d, a skull is largest exactly
-       when it is at the rim, where half of it is off-screen AND it is at full
-       opacity, so it covers the very smoke its wake just displaced. Measured
-       with size-only ranking: all ten radii pinned to the clamp, every source
-       at the frame edge, and the amplified difference image showed the change
-       hugging the border with the whole middle untouched.
-
-       This is what a person actually means by "they come through the smoke":
-       the moment of PASSAGE, mid-frame, where there is visible field on both
-       sides of the skull. Falls to ~0.35 at the corners rather than to zero,
-       so a rim skull still creases the edge instead of switching off. */
-    const cxu = (p.x / W - 0.5) * 2, cyu = (p.y / H - 0.5) * 2;   // -1..1
-    const central = 1 / (1 + 1.9 * (cxu * cxu + cyu * cyu));
-
-    cand.push({ i, ux, uy, r: p.r / H,
-                nx: vx / sp, ny: vy / sp, push,
-                score: (p.r / H) * push * central });
+    const ux = (p.x / W - 0.5) * (W / H), uy = 0.5 - p.y / H;
+    const dl = Math.hypot(ux, uy) || 1e-4;       // outward from centre
+    /* fogK is FLAT at 1 across the plateau, so without a tie-break the ten
+       chosen out of ~29 candidates would be arbitrary. Size decides: a bigger
+       skull mid-crossing is the one a viewer is actually watching. */
+    const r = p.r / H;
+    cand.push({ i, ux, uy, r, nx: ux / dl, ny: uy / dl, push: k, score: k * (1 + r * 3) });
   }
   cand.sort((a, b) => b.score - a.score);
   const want = new Map();
@@ -6790,12 +6785,15 @@ function stepWake(dt) {
     wakeBuf[n * 4 + 1] = w.y;
     wakeBuf[n * 4 + 2] = w.nx * s;
     wakeBuf[n * 4 + 3] = w.ny * s;
-    /* A wake HUGS the body. First pass used r*2.4 with a 0.09 floor, which for
-       a rim skull is half the screen height, and the amplified difference
-       image showed exactly that: a soft screen-wide smear that reads as
-       "different smoke" instead of "something went through it". Tight enough
-       to be a crease, capped so no single skull can smear the whole field. */
-    wakeRBuf[n] = Math.min(0.20, Math.max(0.05, w.r * 1.5));
+    /* Sized to the HOLE IN THE FOG, not to the sprite. A skull mid-crossing is
+       11-48px wide, so scaling straight off `r` collapses to a few pixels and
+       reads as nothing, while a body pushing through fog disturbs a good deal
+       more than its own silhouette. The ceiling is the lesson from the first
+       pass, which used r*2.4 with no useful cap: on a rim skull that is half
+       the screen height, and the amplified difference image showed it as a
+       soft screen-wide smear reading as "different smoke" rather than
+       "something went through it". */
+    wakeRBuf[n] = Math.min(0.18, Math.max(0.07, w.r * 4 + 0.05));
   }
 }
 

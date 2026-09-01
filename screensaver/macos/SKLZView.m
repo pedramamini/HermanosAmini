@@ -78,10 +78,15 @@ static NSURL *saverURL(void) {
    identifiers around them (kModule, CFBundleIdentifier, NSPrincipalClass,
    the SKLZ_* page globals) are deliberately NOT renamed. */
 #define NAME_ON_SCREEN "hermanosamini.com"
+/* Seconds of not-painting before the status line is allowed on screen. Long
+   enough that a slow first load never flashes it, short enough that a real
+   black screen explains itself while somebody is still standing there. */
+#define STATUS_GRACE 8.0
 
 @interface SKLZView : ScreenSaverView <WKNavigationDelegate>
 @property (nonatomic, strong) WKWebView *web;
 @property (nonatomic, strong) NSTextField *statusLabel;   // ABOVE the web view
+@property (nonatomic, strong) NSDate *shownAt;            // when this run started
 @property (nonatomic, strong) NSTimer *retryTimer;
 @property (nonatomic, copy)   NSString *loadError;        // survives the paint poll
 @property (nonatomic, assign) BOOL painted;
@@ -119,6 +124,28 @@ static NSURL *saverURL(void) {
      Preview, so it says what the thing is called. The build stamp stays: it is
      the only way to spot the resident-host trap install.sh exists to defeat. */
   _statusLabel.stringValue = @NAME_ON_SCREEN @" " @SKLZ_BUILD @"  ·  starting";
+  /* ── THE STATUS LINE IS NOT FURNITURE (2026-09-01) ──
+     Pedram: "drop the text we write on the bottom left." It used to show
+     during startup and again on stop, which is every normal run, and a
+     screensaver should be the art and nothing else.
+
+     The NSTextField STAYS, hidden, and that is deliberate three times over:
+       - `lifecycle-test.sh` walks the view tree for it and FAILS the run if it
+         cannot read "painting". Deleting the object breaks the test that
+         proves the saver stops doing work when it leaves the screen.
+       - `preview.sh` mirrors it into the terminal.
+       - It is the only thing that tells SCRIPT DEAD from a stalled clock from
+         NO-WEBGL. "The canvas is black" is equally true of all three, and
+         telling them apart once cost a full day.
+     `hidden` does not touch `stringValue`, so both tools keep working.
+
+     It comes back ON SCREEN only if the art has failed to paint for
+     STATUS_GRACE seconds, which is not a normal run by definition. A
+     screensaver that goes black with no explanation is the exact failure this
+     label was added for; silence there would trade a real diagnostic for
+     nothing, since nobody is looking at a working saver's corner anyway. */
+  _statusLabel.hidden = YES;
+  _shownAt = [NSDate date];
   [self addSubview:_statusLabel];
 
   /* NOTHING is loaded here. See startAnimation. */
@@ -191,12 +218,15 @@ static NSURL *saverURL(void) {
 
   self.painted = NO;
   self.loadError = nil;
-  self.statusLabel.hidden = NO;
+  /* stringValue only: the tests read it, and the screensaver has already left
+     the screen so there is nobody to show it to. */
+  self.statusLabel.hidden = YES;
   self.statusLabel.stringValue = @NAME_ON_SCREEN @" " @SKLZ_BUILD @"  ·  stopped";
 }
 
 - (void)startAnimation {
   [super startAnimation];        // this is what flips isAnimating to YES
+  self.shownAt = [NSDate date];  // the grace clock runs from each start
   [self buildWeb];
   [self load];
 }
@@ -261,11 +291,14 @@ static NSURL *saverURL(void) {
     /* A recorded load failure is the more useful message: without this, the
        poll's generic "no canvas" would bury the reason the page never came. */
     [self say:(!nowPainting && self.loadError) ? self.loadError : s];
-    if (nowPainting != self.painted) {
-      self.painted = nowPainting;
-      /* Only hide the status once the art is genuinely on screen. */
-      self.statusLabel.hidden = nowPainting;
-    }
+    self.painted = nowPainting;
+    /* Hidden while painting, and hidden while NOT painting until the grace
+       period is up. Evaluated every poll rather than only on transition: the
+       stuck case never transitions, which is precisely the case that needs to
+       speak up. */
+    BOOL stuck = !nowPainting &&
+        (-[self.shownAt timeIntervalSinceNow] > STATUS_GRACE);
+    self.statusLabel.hidden = !stuck;
   }];
 }
 
@@ -299,7 +332,11 @@ static NSURL *saverURL(void) {
    sandboxed host. Say so rather than silently reloading forever. */
 - (void)webViewWebContentProcessDidTerminate:(WKWebView *)w {
   self.painted = NO;
-  self.statusLabel.hidden = NO;
+  /* A crash-and-reload usually recovers inside a second. Restart the grace
+     clock rather than flashing text for a blip; if the reload does not take,
+     the poll above surfaces it after STATUS_GRACE. */
+  self.shownAt = [NSDate date];
+  self.statusLabel.hidden = YES;
   if (!self.isAnimating) return;         // it died because we killed it
   [self say:@"web process died, reloading"];
   [self load];
