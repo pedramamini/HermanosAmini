@@ -8964,7 +8964,17 @@ window.SKLZ = {
        m['__proto__'] is truthy-but-not-callable, which would throw */
     if (Object.prototype.hasOwnProperty.call(m, name)) m[name]();
   },
-  stare(on) { stare.until = on ? t + 3600 : t; },
+  /* A 3.2-SECOND GRANT, exactly what every other stare source gets. This was
+     `t + 3600`: one message = one HOUR of glare. A live presence bridge
+     re-sends z every frame while someone is actually close, so a short grant
+     continuously extended IS "stare while they lean in, release 3.2s after
+     they back off" -- and a stuck, crashed, or test-mode bridge can strand at
+     most 3.2s of anger instead of an hour. Found 2026-09-03: webcam_bridge.py
+     --fake (a scripted ghost that leans in every 8 seconds) had been running
+     on Pedram's Mac for 18 days, mean-mugging him on an 8s loop through this
+     one line while three rounds of scheduler fixes did nothing, because this
+     path bypasses the scheduler, the stareGap dial, and the EVENTS table. */
+  stare(on) { stare.until = on ? t + 3.2 : t; },
   config(obj) { return obj ? cfgAdopt(obj) : { ...CFG }; },   // read or patch
   saveConfig() { return cfgSave(); },
   state() { return { bpm, beatPulse, tempoMul, gritoIdx, ufos: ufos.length, lite: isLite(), t }; }
