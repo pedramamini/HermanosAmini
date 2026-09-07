@@ -16,6 +16,7 @@
 
 #import <ScreenSaver/ScreenSaver.h>
 #import <WebKit/WebKit.h>
+#import <objc/message.h>
 
 /* NOT renamed with the product (2026-08-28). This keys ScreenSaverDefaults,
    where the saver's mode and board live, so changing the string would orphan
@@ -90,6 +91,8 @@ static NSURL *saverURL(void) {
 @property (nonatomic, strong) NSTimer *retryTimer;
 @property (nonatomic, copy)   NSString *loadError;        // survives the paint poll
 @property (nonatomic, assign) BOOL painted;
+@property (nonatomic, assign) NSInteger evalsInFlight;    // backpressure, see animateOneFrame
+@property (nonatomic, assign) NSInteger tickCount;        // per-view, NOT a file static
 @property (nonatomic, strong) NSWindow *sheet;
 @property (nonatomic, strong) NSPopUpButton *modePop;
 @property (nonatomic, strong) NSTextField *boardField;
@@ -199,6 +202,10 @@ static NSURL *saverURL(void) {
      diagnostics still composite on top of the art. */
   [self addSubview:w positioned:NSWindowBelow relativeTo:self.statusLabel];
   self.web = w;
+  /* A fresh web view owes us nothing: any evaluation outstanding against the
+     old one will never call back, and its unpaid count would otherwise sit in
+     the budget forever and throttle the new one to a standstill. */
+  self.evalsInFlight = 0;
 }
 
 /* Tear the web view all the way down rather than merely hiding or pausing it.
@@ -215,9 +222,19 @@ static NSURL *saverURL(void) {
   [w stopLoading];
   [w loadHTMLString:@"" baseURL:nil];    // drop the page and its GL contexts
   [w removeFromSuperview];
+  /* Releasing the web view is NOT what ends its web content process: measured,
+     the trio outlived every reference we hold by more than a minute. `_close`
+     is the one call that tears the process down at a known moment. It is SPI,
+     so it is guarded rather than assumed: if a future WebKit drops it the
+     saver keeps working and the shared pool above still caps the damage. */
+  SEL closeSel = NSSelectorFromString(@"_close");
+  if ([w respondsToSelector:closeSel]) {
+    ((void (*)(id, SEL))objc_msgSend)(w, closeSel);
+  }
 
   self.painted = NO;
   self.loadError = nil;
+  self.evalsInFlight = 0;      // nothing outstanding can call back now
   /* stringValue only: the tests read it, and the screensaver has already left
      the screen so there is nobody to show it to. */
   self.statusLabel.hidden = YES;
@@ -231,10 +248,48 @@ static NSURL *saverURL(void) {
   [self load];
 }
 
+/* ── NEVER DEPEND ON stopAnimation ALONE ──
+   teardownWeb had exactly one caller, stopAnimation, so the entire cleanup
+   path rested on the host politely announcing the end. A view that is simply
+   DISCARDED (display reconfigured, host recycling its view, a preview torn
+   down, the wallpaper/screensaver plumbing swapping instances) never gets that
+   call, and on macOS Tahoe the screensaver is hosted by
+   legacyScreenSaver (Wallpaper), which is resident: whatever it fails to
+   release stays released-never.
+
+   Leaving a window is the one event that always fires when a view stops being
+   on screen, whoever discarded it and however impolitely. It is idempotent
+   (teardownWeb returns immediately with no web view) and startAnimation
+   rebuilds unconditionally, so a view that comes back gets a fresh page. */
+- (void)viewDidMoveToWindow {
+  [super viewDidMoveToWindow];
+  if (self.window) return;               // added or moved: nothing to clean up
+  /* The FULL shutdown, not just teardownWeb. Measured 2026-09-07: tearing the
+     web view down here while leaving isAnimating YES still leaked all three
+     WebKit processes, because ScreenSaverView's own animation machinery keeps
+     running against a view it believes is live. Routing through stopAnimation
+     is what makes a discarded view indistinguishable from a stopped one, which
+     is the entire point. Guarded because stopAnimation on a view that never
+     started is not a no-op worth risking. */
+  if (self.isAnimating) { [self stopAnimation]; return; }
+  [self.retryTimer invalidate];
+  self.retryTimer = nil;
+  [self teardownWeb];
+}
+
 - (void)dealloc {
   [_retryTimer invalidate];
+  _retryTimer = nil;
+  /* Last ditch, and deliberately the full teardown rather than the partial one
+     this used to do. Releasing the view does release the web view eventually,
+     but only once WebKit's own internal references clear; dropping the page
+     here ends the WebGL context, the audio graph and the connection to
+     hermanosamini.com at a known moment instead of an unknown one. */
   _web.navigationDelegate = nil;
   [_web stopLoading];
+  [_web loadHTMLString:@"" baseURL:nil];
+  [_web removeFromSuperview];
+  _web = nil;
 }
 
 - (void)say:(NSString *)msg {
@@ -279,12 +334,40 @@ static NSURL *saverURL(void) {
        "var c=document.getElementById('hero');"
        "if(!c) return 'no canvas yet';"
        "var gl2=(typeof HAS_GL!=='undefined')?(HAS_GL?'':' NO-WEBGL'):'';"
-       "var d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;"
-       "var n=0,l=0;for(var i=3;i<d.length;i+=1600){n++;if(d[i]>20)l++;}"
+       /* Downscale, THEN read back. The old probe called getImageData over the
+          WHOLE hero canvas to sample every 400th pixel: at DPR 2 on a 5K panel
+          that copies ~59 MB from the GPU every two seconds, per view, to look
+          at ~9,000 of them. That readback is synchronous inside the web
+          content process, so it stalls the very process the next 60 SKLZ_TICK
+          evaluations are queued against. blitting to 48x48 first answers the
+          same question ("is anything lit") from a 9 KB buffer. */
+       "var s=window.__sklzProbe||(window.__sklzProbe=document.createElement('canvas'));"
+       "s.width=48;s.height=48;"
+       "var sx=s.getContext('2d');sx.clearRect(0,0,48,48);sx.drawImage(c,0,0,48,48);"
+       "var d=sx.getImageData(0,0,48,48).data;"
+       "var n=0,l=0;for(var i=3;i<d.length;i+=4){n++;if(d[i]>20)l++;}"
        "return (l>0? 'painting ':'canvas blank ')+Math.round(l/n*100)+'% t='+"
        "tv.toFixed(1)+gl2;"
        "}catch(e){return 'js error: '+e.message}})()";
+  /* ── THE COMPLETION HANDLER MUST NOT RETAIN self ──
+     This block is owned by the WKWebView until the evaluation comes back. A
+     strong `self` here therefore closes a cycle for the whole in-flight
+     window: self -> web (strong property) -> pending block -> self. That is
+     survivable when the callback always arrives, and it is a permanent leak
+     when it does not, which is exactly what a saturated or wedged web content
+     process produces.
+
+     The consequence was measured on Pedram's machine on 2026-09-07: ~75 live
+     "legacyScreenSaver (Wallpaper) Web Content" processes, one per screensaver
+     engagement, none of them ever released. teardownWeb drops OUR reference to
+     the web view, but a pending block holding self keeps the web view alive
+     from the other side, and legacyScreenSaver.appex is resident, so nothing
+     ever collects the pile. Weak here means a dropped callback costs one
+     no-op, never a process. */
+  __weak typeof(self) weakSelf = self;
   [self.web evaluateJavaScript:js completionHandler:^(id r, NSError *e) {
+    typeof(self) self = weakSelf;
+    if (!self) return;                 // view already gone: nothing to report
     NSString *s = e ? [@"probe failed: " stringByAppendingString:e.localizedDescription]
                     : [NSString stringWithFormat:@"%@", r];
     BOOL nowPainting = [s hasPrefix:@"painting"];
@@ -332,6 +415,8 @@ static NSURL *saverURL(void) {
    sandboxed host. Say so rather than silently reloading forever. */
 - (void)webViewWebContentProcessDidTerminate:(WKWebView *)w {
   self.painted = NO;
+  /* Every evaluation queued against the dead process is unpayable. */
+  self.evalsInFlight = 0;
   /* A crash-and-reload usually recovers inside a second. Restart the grace
      clock rather than flashing text for a blip; if the reload does not take,
      the poll above surfaces it after STATUS_GRACE. */
@@ -345,12 +430,27 @@ static NSURL *saverURL(void) {
 /* The engine calls this on animationTimeInterval. The page draws itself, so
    the only job here is to keep asking whether it really is. */
 - (void)animateOneFrame {
-  static int tick = 0;
   if (!self.isAnimating || !self.web) return;
-  /* drive the page's clock every tick; ask whether it is painting every ~2s */
-  [self.web evaluateJavaScript:@"window.SKLZ_TICK && SKLZ_TICK()"
-             completionHandler:nil];
-  if ((tick++ % 60) == 0) [self pollPaint];
+  /* ── BACKPRESSURE: NEVER PILE WORK ONTO A STALLED WEB PROCESS ──
+     This fires 30 times a second and each call is a real XPC round trip into
+     the web content process. With no accounting, a process that is busy (or
+     wedged) still gets 30 more evaluations queued every second, forever, and
+     each one holds its own completion state. That is how a saver that is
+     merely slow becomes a saver that is eating the machine.
+
+     `tick` was also a FILE STATIC, so on a multi-display setup every view
+     shared one counter and the paint poll landed on whichever view happened to
+     hit the modulus. It is per-view now. */
+  if (self.evalsInFlight < 4) {
+    self.evalsInFlight++;
+    __weak typeof(self) weakSelf = self;
+    [self.web evaluateJavaScript:@"window.SKLZ_TICK && SKLZ_TICK()"
+               completionHandler:^(id r, NSError *e) {
+      typeof(self) self = weakSelf;
+      if (self && self.evalsInFlight > 0) self.evalsInFlight--;
+    }];
+  }
+  if ((self.tickCount++ % 60) == 0) [self pollPaint];
 }
 
 - (void)stopAnimation {
