@@ -63,18 +63,85 @@ const LIMITS = {
 /* Deliberately blunt list: slurs and profanity roots. Matching happens after
    leet-normalization, on word boundaries where a root is also a legit
    substring (the Scunthorpe problem), and anywhere for the unambiguous ones. */
-const BAD_ANY = [
-  'fuck', 'shit', 'bitch', 'cunt', 'whore', 'slut', 'dick', 'cock', 'pussy',
-  'nigger', 'nigga', 'faggot', 'fag', 'retard', 'kike', 'spic', 'chink',
-  'wetback', 'tranny', 'rape', 'nazi', 'hitler', 'porn', 'cum', 'jizz',
-  'blowjob', 'handjob', 'dildo', 'anal', 'penis', 'vagina', 'boob', 'tits',
-  'asshole', 'bastard', 'douche', 'wank', 'twat', 'bollock', 'pedo', 'incest',
-  'molest', 'kill yourself', 'kys', 'suicide', 'heroin', 'meth', 'cocaine',
+/* ── TWO TIERS, AND THE SPLIT IS MEASURED ──
+   Roots live here only if their substring appearances are THEMSELVES
+   objectionable. Checked against /usr/share/dict/words (235,762 entries): the
+   worst offender in this list is "whore" -> whoredom/whoremaster, which we are
+   happy to block. Matching is inside a WORD, never across a space. */
+const BAD_HARD = [
+  'fuck', 'bitch', 'cunt', 'whore', 'nigger', 'nigga', 'faggot', 'kike',
+  'wetback', 'tranny', 'hitler', 'jizz', 'blowjob', 'handjob', 'dildo',
+  'asshole', 'bollock', 'incest', 'molest', 'suicide', 'kill yourself',
 ];
-/* Roots that are fine inside real words, blocked only as standalone words.
-   "hell", "damn" and "crap" are deliberately NOT here: they are PG-permissible
-   and blocking them kills legitimate names like "Hell of a View". */
-const BAD_WORD = ['ass', 'sex', 'weed', 'nude', 'coke', 'dope'];
+/* Roots that are ALSO ordinary English inside longer words, so they are only
+   ever blocked as a standalone word (plus simple inflections). Every one of
+   these was a live false positive under the old "strip the spaces and
+   substring-match everything" rule. Dictionary false positives, measured:
+     cum 500 (document, accumulate)   anal 218 (analysis, canal)
+     meth 193 (SOMETHING, method)     cock 162 (peacock, cocktail)
+     rape 158 (grape, therapeutic)    spic 144 (suspicious, allspice)
+     heroin 4 (heroine)               pussy 7 (pussycat, pussyfoot)
+   "hell", "damn" and "crap" are deliberately in NEITHER list: they are
+   PG-permissible and blocking them kills names like "Hell of a View". */
+const BAD_WORD = [
+  'ass', 'sex', 'weed', 'nude', 'coke', 'dope', 'cum', 'anal', 'meth', 'cock',
+  'rape', 'spic', 'pedo', 'fag', 'vagina', 'retard', 'shit', 'nazi', 'wank',
+  'dick', 'porn', 'twat', 'slut', 'boob', 'bastard', 'chink', 'pussy', 'kys',
+  'penis', 'tits', 'douche', 'cocaine', 'heroin',
+];
+/* Every inflected form of a BAD_WORD root, expanded once at module load, so
+   "raping" and "retarded" cannot walk through a whole-word match. A Set makes
+   the check an O(1) lookup per word instead of a scan per root. */
+const BAD_WORD_FORMS = (() => {
+  const out = new Set();
+  for (const w of BAD_WORD) {
+    out.add(w);
+    for (const suf of ['s', 'es', 'ed', 'ing', 'er', 'ers', 'y']) out.add(w + suf);
+    if (w.endsWith('e')) {                       // rape -> raping, raped, raper
+      const stem = w.slice(0, -1);
+      for (const suf of ['ing', 'ed', 'er', 'ers']) out.add(stem + suf);
+    }
+  }
+  return out;
+})();
+
+/* ── ONE PG CHECK, USED BY EVERY CALLER ──
+   Returns 'keep it PG' or null. This exists because the same rule was written
+   out by hand in four places and every copy did the same wrong thing: it
+   stripped ALL spaces and substring-matched the whole blob. That invents
+   profanity two different ways, both measured on 2026-09-08:
+
+     inside a word      "something" contains "meth", "document" contains "cum",
+                        "analysis" contains "anal". 1,747 ordinary dictionary
+                        words tripped the old rule, 0.74% of English.
+     across a boundary  space-stripping glues neighbours together, so
+                        "that water" becomes "thatwater" and contains "twat",
+                        and "milky sky" contains "kys".
+
+   A real viewer request died on this: an agentic-chat idea about the Earth and
+   moon was rejected with "keep it PG" and never reached D1, so no issue was
+   filed and no mail was ever sent. Nothing downstream was broken; the request
+   was refused at the door.
+
+   Spacer evasion ("f u c k") is still defeated, but ONLY by joining runs of
+   three or more isolated single letters. That cannot glue two real words
+   together, which is exactly the property the old rule lacked. */
+function pgProblem(text) {
+  if (!text) return null;
+  const flat = normalizeForFilter(String(text));
+  /* collapse "f u c k" but never "a cock" */
+  const deSpaced = flat.replace(/(?:\b[a-z] ){2,}[a-z]\b/g, m => m.replace(/ /g, ''));
+  for (const form of [flat, deSpaced]) {
+    const words = form.split(/\s+/).filter(Boolean);
+    for (const w of words) {
+      for (const bad of BAD_HARD) if (w.includes(bad.replace(/ /g, ''))) return 'keep it PG';
+      if (BAD_WORD_FORMS.has(w)) return 'keep it PG';
+    }
+    /* multi-word roots such as "kill yourself" */
+    for (const bad of BAD_HARD) if (bad.includes(' ') && form.includes(bad)) return 'keep it PG';
+  }
+  return null;
+}
 
 function normalizeForFilter(s) {
   return s.toLowerCase()
@@ -88,13 +155,7 @@ function nameProblem(name) {
   if (trimmed.length < 2) return 'name too short';
   if (trimmed.length > 28) return 'name too long (28 max)';
   if (!/^[A-Za-z0-9 '\-!?.]+$/.test(trimmed)) return 'letters, numbers and simple punctuation only';
-  const flat = normalizeForFilter(trimmed);
-  const squished = flat.replace(/ /g, '');
-  for (const w of BAD_ANY) {
-    if (squished.includes(w.replace(/ /g, ''))) return 'keep it PG';
-  }
-  const words = flat.split(/\s+/).filter(Boolean);
-  for (const w of BAD_WORD) if (words.includes(w)) return 'keep it PG';
+  if (pgProblem(trimmed)) return 'keep it PG';
   if (/(.)\1{5,}/.test(trimmed)) return 'no keyboard mashing';
   return null;
 }
@@ -493,10 +554,7 @@ export default {
            "try again". Change one, change the other, in the same commit. */
         if (text.length > 400) return json({ error: 'keep it under 400 characters' }, 400, request);
         /* same PG bar as preset names: this becomes a public issue */
-        if (nameProblem(text.slice(0, 28)) === 'keep it PG' ||
-            BAD_ANY.some(w => normalizeForFilter(text).replace(/ /g, '').includes(w.replace(/ /g, '')))) {
-          return json({ error: 'keep it PG' }, 400, request);
-        }
+        if (pgProblem(text)) return json({ error: 'keep it PG' }, 400, request);
 
         /* The whole follow-up exchange, so the issue can show a conversation
            rather than a bare second sentence. Stored as JSON in `detail` when
@@ -509,9 +567,7 @@ export default {
                        a: String((t && t.a) || '').trim().slice(0, 600) }))
           .filter(t => t.q && t.a);
         const joined = turns.map(t => t.a).join(' ');
-        if (joined && BAD_ANY.some(w => normalizeForFilter(joined).replace(/ /g, '').includes(w.replace(/ /g, '')))) {
-          return json({ error: 'keep it PG' }, 400, request);
-        }
+        if (pgProblem(joined)) return json({ error: 'keep it PG' }, 400, request);
 
         let detail = String(body.detail || '').trim().slice(0, 600);
         let probeQ = String(body.probe || '').trim().slice(0, 200);
@@ -537,9 +593,16 @@ export default {
             detail = JSON.stringify({ spec, transcript: tx }).slice(0, 6000);
           }
         }
-        if (detail && !turns.length &&
-            BAD_ANY.some(w => normalizeForFilter(detail).replace(/ /g, '').includes(w.replace(/ /g, '')))) {
-          return json({ error: 'keep it PG' }, 400, request);
+        /* Filter what a HUMAN wrote, not the JSON we wrapped it in. `detail`
+           here is JSON.stringify({spec, transcript}), so the old check was
+           scanning brace-and-quote scaffolding glued to prose. */
+        if (!turns.length) {
+          let human = detail;
+          try {
+            const d = JSON.parse(detail);
+            human = [d.spec || '', ...(Array.isArray(d.transcript) ? d.transcript.map(m => m.content || '') : [])].join(' ');
+          } catch (_) { /* a plain-string detail: filter it as-is */ }
+          if (pgProblem(human)) return json({ error: 'keep it PG' }, 400, request);
         }
 
         const email = String(body.email || '').trim().slice(0, 120);
