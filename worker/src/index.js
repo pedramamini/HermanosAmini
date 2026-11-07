@@ -684,7 +684,8 @@ export default {
          POST /api/tts { text, voice } -> audio/mpeg, or 204 when the kill switch is off
 
          THE KILL SWITCH IS A WRANGLER VAR, NOT A CLIENT SETTING. `TTS_SOURCE` in
-         wrangler.toml is one of "browser" | "melotts" | "aura" | "aura2es". The client asks
+         wrangler.toml is one of "browser" | "aura" | "aura2es" ("melotts" went with
+         Cloudflare retiring MeloTTS on 2026-11-20). The client asks
          /api/tts/config on load and obeys; it cannot choose an engine, only
          tune whatever is enabled. Flipping to "browser" costs zero neurons and
          needs nothing but a redeploy, which is the whole point: if Aura turns
@@ -704,19 +705,19 @@ export default {
          hash for a day, so the tuning modal's "say it again" and repeated
          canned lines ("sent to the artists") cost nothing after the first. */
       if (request.method === 'GET' && path === '/api/tts/config') {
-        const source = ['melotts', 'aura', 'aura2es'].includes(env.TTS_SOURCE) ? env.TTS_SOURCE : 'browser';
+        const source = ['aura', 'aura2es'].includes(env.TTS_SOURCE) ? env.TTS_SOURCE : 'browser';
         return json({
           source,
           /* what the client may tune for THIS source. Browser voices are
              enumerated client-side, so only the server engines list here. */
           voices: source === 'aura2es' ? AURA2ES_MEN : source === 'aura'
             ? ['angus', 'asteria', 'arcas', 'orion', 'orpheus', 'athena', 'luna', 'zeus', 'perseus', 'helios', 'hera', 'stella']
-            : source === 'melotts' ? ['en', 'es', 'fr', 'zh', 'jp', 'kr'] : [],
+            : [],
           cache: 86400,
         }, 200, request);
       }
       if (request.method === 'POST' && path === '/api/tts') {
-        const source = ['melotts', 'aura', 'aura2es'].includes(env.TTS_SOURCE) ? env.TTS_SOURCE : 'browser';
+        const source = ['aura', 'aura2es'].includes(env.TTS_SOURCE) ? env.TTS_SOURCE : 'browser';
         if (source === 'browser') return new Response(null, { status: 204, headers: cors(request) });
         const body = await request.json().catch(() => null);
         const text = String((body && body.text) || '').trim().slice(0, 400);
@@ -758,22 +759,12 @@ export default {
               { text, speaker: AURA2ES_MEN.includes(voice) ? voice : 'sirio', encoding: 'mp3' },
               { returnRawResponse: true });
             audio = await resp.arrayBuffer();
-          } else if (source === 'aura') {
+          } else {
             const AURA = ['angus', 'asteria', 'arcas', 'orion', 'orpheus', 'athena', 'luna', 'zeus', 'perseus', 'helios', 'hera', 'stella'];
             const resp = await env.AI.run('@cf/deepgram/aura-1',
               { text, speaker: AURA.includes(voice) ? voice : 'angus', encoding: 'mp3' },
               { returnRawResponse: true });
             audio = await resp.arrayBuffer();
-          } else {
-            const MELO = ['en', 'es', 'fr', 'zh', 'jp', 'kr'];
-            const out = await env.AI.run('@cf/myshell-ai/melotts',
-              { prompt: text, lang: MELO.includes(voice) ? voice : 'en' });
-            /* MeloTTS returns either raw mpeg bytes or {audio: base64} depending
-               on the binding version; accept both rather than guess */
-            if (out instanceof ArrayBuffer) audio = out;
-            else if (out && out.audio) audio = Uint8Array.from(atob(out.audio), c => c.charCodeAt(0)).buffer;
-            else if (out && typeof out.arrayBuffer === 'function') audio = await out.arrayBuffer();
-            else throw new Error('unexpected melotts shape');
           }
         } catch (e) {
           return json({ error: 'tts failed', detail: String(e).slice(0, 120) }, 502, request);
